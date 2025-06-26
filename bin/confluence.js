@@ -4,6 +4,7 @@ const { program } = require('commander');
 const chalk = require('chalk');
 const ConfluenceClient = require('../lib/confluence-client');
 const { getConfig, initConfig } = require('../lib/config');
+const Analytics = require('../lib/analytics');
 
 program
   .name('confluence')
@@ -24,12 +25,15 @@ program
   .description('Read a Confluence page by ID or URL')
   .option('-f, --format <format>', 'Output format (html, text)', 'text')
   .action(async (pageId, options) => {
+    const analytics = new Analytics();
     try {
       const config = getConfig();
       const client = new ConfluenceClient(config);
       const content = await client.readPage(pageId, options.format);
       console.log(content);
+      analytics.track('read', true);
     } catch (error) {
+      analytics.track('read', false);
       console.error(chalk.red('Error:'), error.message);
       process.exit(1);
     }
@@ -40,6 +44,7 @@ program
   .command('info <pageId>')
   .description('Get information about a Confluence page')
   .action(async (pageId) => {
+    const analytics = new Analytics();
     try {
       const config = getConfig();
       const client = new ConfluenceClient(config);
@@ -52,7 +57,9 @@ program
       if (info.space) {
         console.log(`Space: ${chalk.green(info.space.name)} (${info.space.key})`);
       }
+      analytics.track('info', true);
     } catch (error) {
+      analytics.track('info', false);
       console.error(chalk.red('Error:'), error.message);
       process.exit(1);
     }
@@ -64,6 +71,7 @@ program
   .description('Search for Confluence pages')
   .option('-l, --limit <limit>', 'Limit number of results', '10')
   .action(async (query, options) => {
+    const analytics = new Analytics();
     try {
       const config = getConfig();
       const client = new ConfluenceClient(config);
@@ -71,6 +79,7 @@ program
       
       if (results.length === 0) {
         console.log(chalk.yellow('No results found.'));
+        analytics.track('search', true);
         return;
       }
 
@@ -81,7 +90,9 @@ program
           console.log(`   ${chalk.gray(result.excerpt)}`);
         }
       });
+      analytics.track('search', true);
     } catch (error) {
+      analytics.track('search', false);
       console.error(chalk.red('Error:'), error.message);
       process.exit(1);
     }
@@ -92,6 +103,7 @@ program
   .command('spaces')
   .description('List all Confluence spaces')
   .action(async () => {
+    const analytics = new Analytics();
     try {
       const config = getConfig();
       const client = new ConfluenceClient(config);
@@ -101,6 +113,22 @@ program
       spaces.forEach(space => {
         console.log(`${chalk.green(space.key)} - ${space.name}`);
       });
+      analytics.track('spaces', true);
+    } catch (error) {
+      analytics.track('spaces', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Stats command
+program
+  .command('stats')
+  .description('Show usage statistics')
+  .action(async () => {
+    try {
+      const analytics = new Analytics();
+      analytics.showStats();
     } catch (error) {
       console.error(chalk.red('Error:'), error.message);
       process.exit(1);
