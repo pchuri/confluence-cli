@@ -1,3 +1,11 @@
+# [1.1.0](https://github.com/pchuri/confluence-cli/compare/v1.0.0...v1.1.0) (2025-06-26)
+
+
+### Features
+
+* add analytics tracking to spaces command ([265e8f4](https://github.com/pchuri/confluence-cli/commit/265e8f42b5ba86fb50398e8b1fcfd1d85fcc54d9))
+* add community feedback and analytics infrastructure ([a7ff6e8](https://github.com/pchuri/confluence-cli/commit/a7ff6e87cdc92d98f3d927ee98fac9e33aedbaae))
+
 # 1.0.0 (2025-06-26)
 
 
