@@ -91,6 +91,11 @@ confluence search "search term" --limit 5
 confluence spaces
 ```
 
+### View Usage Statistics
+```bash
+confluence stats
+```
+
 ## Commands
 
 | Command | Description | Options |
@@ -100,6 +105,7 @@ confluence spaces
 | `info <pageId>` | Get page information | - |
 | `search <query>` | Search for pages | `--limit <number>` |
 | `spaces` | List all spaces | - |
+| `stats` | View your usage statistics | - |
 
 ## Examples
 
@@ -121,6 +127,9 @@ confluence search "API documentation" --limit 3
 
 # List all spaces
 confluence spaces
+
+# View usage statistics
+confluence stats
 ```
 
 ## Development
@@ -165,13 +174,36 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Page attachments management
 - [ ] Comments and reviews
 
-## Support
+## Support & Feedback
 
-If you encounter any issues or have questions:
+### 💬 We'd love to hear from you!
 
+Your feedback helps make confluence-cli better for everyone. Here's how you can share your thoughts:
+
+#### 🐛 Found a bug?
 1. Check the [Issues](https://github.com/pchuri/confluence-cli/issues) page
-2. Create a new issue if your problem isn't already reported
-3. Provide detailed information about your environment and the issue
+2. Create a new [bug report](https://github.com/pchuri/confluence-cli/issues/new?template=bug_report.md)
+
+#### 💡 Have a feature idea?
+1. Create a [feature request](https://github.com/pchuri/confluence-cli/issues/new?template=feature_request.md)
+2. Join our [Discussions](https://github.com/pchuri/confluence-cli/discussions) to chat with the community
+
+#### 📝 General feedback?
+- Share your experience with a [feedback issue](https://github.com/pchuri/confluence-cli/issues/new?template=feedback.md)
+- Rate us on [NPM](https://www.npmjs.com/package/confluence-cli)
+- Star the repo if you find it useful! ⭐
+
+#### 🤝 Want to contribute?
+Check out our [Contributing Guide](CONTRIBUTING.md) - all contributions are welcome!
+
+### 📈 Usage Analytics
+
+To help us understand how confluence-cli is being used and improve it, we collect anonymous usage statistics. This includes:
+- Command usage frequency (no personal data)
+- Error patterns (to fix bugs faster)
+- Feature adoption metrics
+
+You can opt-out anytime by setting: `export CONFLUENCE_CLI_ANALYTICS=false`
 
 ---
 
