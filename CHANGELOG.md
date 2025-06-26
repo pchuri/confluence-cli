@@ -1,3 +1,17 @@
+# 1.0.0 (2025-06-26)
+
+
+### Bug Fixes
+
+* add explicit permissions for GitHub Actions ([fa36b29](https://github.com/pchuri/confluence-cli/commit/fa36b2974b1261c144a415ced324383b35a938fb))
+* add NODE_AUTH_TOKEN for npm authentication ([2031314](https://github.com/pchuri/confluence-cli/commit/2031314ad01fc1d9b4f9557a3d1321a046cad8f3))
+* resolve eslint errors and npm publish warnings ([b93285e](https://github.com/pchuri/confluence-cli/commit/b93285ee098d96c8b750dbf2be5a93f28f44706c))
+
+
+### Features
+
+* initial release of confluence-cli ([ec04e06](https://github.com/pchuri/confluence-cli/commit/ec04e06bb0c785dcff84dabcafeeb60bf9e1658f))
+
 # Confluence CLI Changelog
 
 All notable changes to this project will be documented in this file.
