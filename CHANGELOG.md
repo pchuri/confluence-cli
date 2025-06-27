@@ -1,10 +1,9 @@
-# [1.3.1](https://github.com/pchuri/confluence-cli/compare/v1.3.0...v1.3.1) (2025-06-27)
+## [1.3.1](https://github.com/pchuri/confluence-cli/compare/v1.3.0...v1.3.1) (2025-06-27)
 
 
 ### Bug Fixes
 
-* **CHANGELOG**: clean up duplicate entries from merge conflicts
-* **merge conflicts**: resolve duplicate changelog entries after hotfix merge
+* clean up duplicate CHANGELOG entries ([0163deb](https://github.com/pchuri/confluence-cli/commit/0163deb7f007e1d64ce4693eb8e86280d27eb6cc))
 
 # [1.3.0](https://github.com/pchuri/confluence-cli/compare/v1.2.0...v1.3.0) (2025-06-27)
 
