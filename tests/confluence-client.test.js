@@ -32,9 +32,9 @@ describe('ConfluenceClient', () => {
       const markdown = '# Hello World\n\nThis is a **test** page.';
       const result = client.markdownToStorage(markdown);
       
-      expect(result).toContain('<ac:structured-macro ac:name="html">');
-      expect(result).toContain('<h1>Hello World</h1>');
-      expect(result).toContain('<strong>test</strong>');
+      expect(result).toContain('<ac:structured-macro ac:name="markdown">');
+      expect(result).toContain('Hello World');
+      expect(result).toContain('**test**');
     });
   });
 

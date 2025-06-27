@@ -1,3 +1,14 @@
+# [1.2.1](https://github.com/pchuri/confluence-cli/compare/v1.2.0...v1.2.1) (2025-06-27)
+
+
+### Bug Fixes
+
+* **format handling**: improve compatibility across Confluence instances
+  - Switch from 'html' macro to 'markdown' macro for better compatibility
+  - Change HTML processing to direct Storage format (no macro wrapper)
+  - Add markdownToNativeStorage method for alternative conversion
+  - Fix issues discovered during production testing in real Confluence environments
+
 # [1.2.0](https://github.com/pchuri/confluence-cli/compare/v1.1.0...v1.2.0) (2025-06-27)
 
 
@@ -17,8 +28,13 @@
   - Support for reading content from files or inline
   - Markdown to Confluence Storage format conversion
 * **content formats**: support multiple input formats
+<<<<<<< HEAD
+  - Markdown format with automatic conversion using `markdown` macro
+  - HTML format with direct Storage format integration
+=======
   - Markdown format with automatic conversion
   - HTML format with Storage format wrapping
+>>>>>>> origin/main
   - Native Confluence Storage format
 * **examples**: add sample files and demo scripts for new features
 
