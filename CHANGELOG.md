@@ -10,8 +10,8 @@
   - Support for reading content from files or inline
   - Markdown to Confluence Storage format conversion
 * **content formats**: support multiple input formats
-  - Markdown format with automatic conversion
-  - HTML format with Storage format wrapping
+  - Markdown format with automatic conversion using `markdown` macro
+  - HTML format with direct Storage format integration
   - Native Confluence Storage format
 * **examples**: add sample files and demo scripts for new features
 
