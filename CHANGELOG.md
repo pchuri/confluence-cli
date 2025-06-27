@@ -1,3 +1,15 @@
+# [1.3.0](https://github.com/pchuri/confluence-cli/compare/v1.2.0...v1.3.0) (2025-06-27)
+
+
+### Bug Fixes
+
+* improve format handling based on production testing ([820f9cd](https://github.com/pchuri/confluence-cli/commit/820f9cdc7e59b6aa4b676eda6cff7e22865ec8fb))
+
+
+### Features
+
+* implement page creation and update capabilities ([3c43b19](https://github.com/pchuri/confluence-cli/commit/3c43b19765f94318d01fea3a22b324ada00a77d1))
+
 # [1.2.1](https://github.com/pchuri/confluence-cli/compare/v1.2.0...v1.2.1) (2025-06-27)
 
 
