@@ -8,6 +8,9 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - 🔍 **Search** - Find pages using Confluence's powerful search
 - ℹ️ **Page info** - Get detailed information about pages
 - 🏠 **List spaces** - View all available Confluence spaces
+- ✏️ **Create pages** - Create new pages with support for Markdown, HTML, or Storage format
+- 📝 **Update pages** - Update existing page content and titles
+- 🛠️ **Edit workflow** - Export page content for editing and re-import
 - 🔧 **Easy setup** - Simple configuration with environment variables or interactive setup
 
 ## Installation
@@ -38,6 +41,16 @@ npx confluence-cli
    confluence search "my search term"
    ```
 
+4. **Create a new page:**
+   ```bash
+   confluence create "My New Page" SPACEKEY --content "Hello World!"
+   ```
+
+5. **Update a page:**
+   ```bash
+   confluence update 123456789 --content "Updated content"
+   ```
+
 ## Configuration
 
 ### Option 1: Interactive Setup
@@ -64,6 +77,79 @@ export CONFLUENCE_API_TOKEN="your-api-token"
 ```bash
 # Read by page ID
 confluence read 123456789
+
+# Read in HTML format
+confluence read 123456789 --format html
+
+# Read by URL
+confluence read "https://your-domain.atlassian.net/wiki/spaces/SPACE/pages/123456789/Page+Title"
+```
+
+### Create a New Page
+```bash
+# Create with inline content
+confluence create "My New Page" SPACEKEY --content "This is my page content"
+
+# Create from a file
+confluence create "Documentation" SPACEKEY --file ./content.md --format markdown
+
+# Create with HTML content
+confluence create "Rich Content" SPACEKEY --file ./content.html --format html
+
+# Create with Storage format (Confluence native)
+confluence create "Advanced Page" SPACEKEY --file ./content.xml --format storage
+```
+
+### Create a Child Page
+```bash
+# Find parent page first
+confluence find "Project Documentation" --space MYTEAM
+
+# Create child page with inline content
+confluence create-child "Meeting Notes" 123456789 --content "This is a child page"
+
+# Create child page from file
+confluence create-child "Technical Specifications" 123456789 --file ./content.md --format markdown
+
+# Create child page with HTML content
+confluence create-child "Report Summary" 123456789 --file ./content.html --format html
+```
+
+### Find Pages
+```bash
+# Find page by title
+confluence find "Project Documentation"
+
+# Find page by title in specific space
+confluence find "Project Documentation" --space MYTEAM
+```
+
+### Update an Existing Page
+```bash
+# Update content only
+confluence update 123456789 --content "Updated content"
+
+# Update content from file
+confluence update 123456789 --file ./updated-content.md --format markdown
+
+# Update both title and content
+confluence update 123456789 --title "New Title" --content "New content"
+
+# Update from HTML file
+confluence update 123456789 --file ./content.html --format html
+```
+
+### Edit Workflow
+```bash
+# Export page content for editing
+confluence edit 123456789 --output ./page-content.xml
+
+# Edit the file with your preferred editor
+vim ./page-content.xml
+
+# Update the page with your changes
+confluence update 123456789 --file ./page-content.xml --format storage
+```
 
 # Read with HTML format
 confluence read 123456789 --format html
@@ -166,7 +252,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## Roadmap
 
-- [ ] Create and update pages
+- [x] **Create and update pages** ✅
 - [ ] Page templates
 - [ ] Bulk operations
 - [ ] Export pages to different formats

@@ -1,3 +1,24 @@
+# [1.2.0](https://github.com/pchuri/confluence-cli/compare/v1.1.0...v1.2.0) (2025-06-27)
+
+
+### Features
+
+* **page management**: add page creation and update capabilities ([NEW])
+  - `confluence create` - Create new pages with support for Markdown, HTML, and Storage formats
+  - `confluence update` - Update existing page content and titles
+  - `confluence edit` - Export page content for editing workflow
+  - Support for reading content from files or inline
+  - Markdown to Confluence Storage format conversion
+* **content formats**: support multiple input formats
+  - Markdown format with automatic conversion
+  - HTML format with Storage format wrapping
+  - Native Confluence Storage format
+* **examples**: add sample files and demo scripts for new features
+
+### Breaking Changes
+
+* None - all new features are additive
+
 # [1.1.0](https://github.com/pchuri/confluence-cli/compare/v1.0.0...v1.1.0) (2025-06-26)
 
 

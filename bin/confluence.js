@@ -135,4 +135,202 @@ program
     }
   });
 
+// Create command
+program
+  .command('create <title> <spaceKey>')
+  .description('Create a new Confluence page')
+  .option('-f, --file <file>', 'Read content from file')
+  .option('-c, --content <content>', 'Page content as string')
+  .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
+  .action(async (title, spaceKey, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+      
+      let content = '';
+      
+      if (options.file) {
+        const fs = require('fs');
+        if (!fs.existsSync(options.file)) {
+          throw new Error(`File not found: ${options.file}`);
+        }
+        content = fs.readFileSync(options.file, 'utf8');
+      } else if (options.content) {
+        content = options.content;
+      } else {
+        throw new Error('Either --file or --content option is required');
+      }
+      
+      const result = await client.createPage(title, spaceKey, content, options.format);
+      
+      console.log(chalk.green('✅ Page created successfully!'));
+      console.log(`Title: ${chalk.blue(result.title)}`);
+      console.log(`ID: ${chalk.blue(result.id)}`);
+      console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
+      console.log(`URL: ${chalk.gray(`https://${config.domain}/wiki${result._links.webui}`)}`);
+      
+      analytics.track('create', true);
+    } catch (error) {
+      analytics.track('create', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Create child page command
+program
+  .command('create-child <title> <parentId>')
+  .description('Create a new Confluence page as a child of another page')
+  .option('-f, --file <file>', 'Read content from file')
+  .option('-c, --content <content>', 'Page content as string')
+  .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
+  .action(async (title, parentId, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+      
+      // Get parent page info to get space key
+      const parentInfo = await client.getPageInfo(parentId);
+      const spaceKey = parentInfo.space.key;
+      
+      let content = '';
+      
+      if (options.file) {
+        const fs = require('fs');
+        if (!fs.existsSync(options.file)) {
+          throw new Error(`File not found: ${options.file}`);
+        }
+        content = fs.readFileSync(options.file, 'utf8');
+      } else if (options.content) {
+        content = options.content;
+      } else {
+        throw new Error('Either --file or --content option is required');
+      }
+      
+      const result = await client.createChildPage(title, spaceKey, parentId, content, options.format);
+      
+      console.log(chalk.green('✅ Child page created successfully!'));
+      console.log(`Title: ${chalk.blue(result.title)}`);
+      console.log(`ID: ${chalk.blue(result.id)}`);
+      console.log(`Parent: ${chalk.blue(parentInfo.title)} (${parentId})`);
+      console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
+      console.log(`URL: ${chalk.gray(`https://${config.domain}/wiki${result._links.webui}`)}`);
+      
+      analytics.track('create_child', true);
+    } catch (error) {
+      analytics.track('create_child', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Update command
+program
+  .command('update <pageId>')
+  .description('Update an existing Confluence page')
+  .option('-t, --title <title>', 'New page title (optional)')
+  .option('-f, --file <file>', 'Read content from file')
+  .option('-c, --content <content>', 'Page content as string')
+  .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
+  .action(async (pageId, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+      
+      let content = '';
+      
+      if (options.file) {
+        const fs = require('fs');
+        if (!fs.existsSync(options.file)) {
+          throw new Error(`File not found: ${options.file}`);
+        }
+        content = fs.readFileSync(options.file, 'utf8');
+      } else if (options.content) {
+        content = options.content;
+      } else {
+        throw new Error('Either --file or --content option is required');
+      }
+      
+      const result = await client.updatePage(pageId, options.title, content, options.format);
+      
+      console.log(chalk.green('✅ Page updated successfully!'));
+      console.log(`Title: ${chalk.blue(result.title)}`);
+      console.log(`ID: ${chalk.blue(result.id)}`);
+      console.log(`Version: ${chalk.blue(result.version.number)}`);
+      console.log(`URL: ${chalk.gray(`https://${config.domain}/wiki${result._links.webui}`)}`);
+      
+      analytics.track('update', true);
+    } catch (error) {
+      analytics.track('update', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Edit command - opens page content for editing
+program
+  .command('edit <pageId>')
+  .description('Get page content for editing')
+  .option('-o, --output <file>', 'Save content to file')
+  .action(async (pageId, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+      const pageData = await client.getPageForEdit(pageId);
+      
+      console.log(chalk.blue('Page Information:'));
+      console.log(`Title: ${chalk.green(pageData.title)}`);
+      console.log(`ID: ${chalk.green(pageData.id)}`);
+      console.log(`Version: ${chalk.green(pageData.version)}`);
+      console.log(`Space: ${chalk.green(pageData.space.name)} (${pageData.space.key})`);
+      console.log('');
+      
+      if (options.output) {
+        const fs = require('fs');
+        fs.writeFileSync(options.output, pageData.content);
+        console.log(chalk.green(`✅ Content saved to: ${options.output}`));
+        console.log(chalk.yellow('💡 Edit the file and use "confluence update" to save changes'));
+      } else {
+        console.log(chalk.blue('Page Content:'));
+        console.log(pageData.content);
+      }
+      
+      analytics.track('edit', true);
+    } catch (error) {
+      analytics.track('edit', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Find page by title command
+program
+  .command('find <title>')
+  .description('Find a page by title')
+  .option('-s, --space <spaceKey>', 'Limit search to specific space')
+  .action(async (title, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+      const pageInfo = await client.findPageByTitle(title, options.space);
+      
+      console.log(chalk.blue('Page found:'));
+      console.log(`Title: ${chalk.green(pageInfo.title)}`);
+      console.log(`ID: ${chalk.green(pageInfo.id)}`);
+      console.log(`Space: ${chalk.green(pageInfo.space.name)} (${pageInfo.space.key})`);
+      console.log(`URL: ${chalk.gray(`https://${config.domain}/wiki${pageInfo.url}`)}`);
+      
+      analytics.track('find', true);
+    } catch (error) {
+      analytics.track('find', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
 program.parse();
