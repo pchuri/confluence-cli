@@ -3,6 +3,13 @@
 
 ### Features
 
+* implement page creation and update capabilities ([#2](https://github.com/pchuri/confluence-cli/issues/2)) ([b814ddf](https://github.com/pchuri/confluence-cli/commit/b814ddfd056aeac83cc7eb5d8d6db47ba9c70cdf))
+
+# [1.2.0](https://github.com/pchuri/confluence-cli/compare/v1.1.0...v1.2.0) (2025-06-27)
+
+
+### Features
+
 * **page management**: add page creation and update capabilities ([NEW])
   - `confluence create` - Create new pages with support for Markdown, HTML, and Storage formats
   - `confluence update` - Update existing page content and titles
