@@ -19,7 +19,7 @@
     "wiki",
     "documentation"
   ],
-  "author": "Your Name",
+  "author": "pchuri",
   "license": "MIT",
   "dependencies": {
     "axios": "^1.6.2",
