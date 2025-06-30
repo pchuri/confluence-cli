@@ -5,11 +5,12 @@ const chalk = require('chalk');
 const ConfluenceClient = require('../lib/confluence-client');
 const { getConfig, initConfig } = require('../lib/config');
 const Analytics = require('../lib/analytics');
+const pkg = require('../package.json');
 
 program
   .name('confluence')
   .description('CLI tool for Atlassian Confluence')
-  .version('1.0.0');
+  .version(pkg.version);
 
 // Init command
 program
