@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/pchuri/confluence-cli/compare/v1.3.2...v1.4.0) (2025-06-30)
+
+
+### Features
+
+* Enhanced Markdown Support with Bidirectional Conversion ([#5](https://github.com/pchuri/confluence-cli/issues/5)) ([d17771b](https://github.com/pchuri/confluence-cli/commit/d17771b40d8d60ed68c0ac0a3594fed6b9a4e771))
+
 ## [1.3.2](https://github.com/pchuri/confluence-cli/compare/v1.3.1...v1.3.2) (2025-06-27)
 
 
