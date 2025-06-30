@@ -1,3 +1,10 @@
+## [1.4.1](https://github.com/pchuri/confluence-cli/compare/v1.4.0...v1.4.1) (2025-06-30)
+
+
+### Bug Fixes
+
+* correct version display in CLI ([#6](https://github.com/pchuri/confluence-cli/issues/6)) ([36f8419](https://github.com/pchuri/confluence-cli/commit/36f8419b309ae1ff99fa94c12ace9a527ee3f162))
+
 # [1.4.0](https://github.com/pchuri/confluence-cli/compare/v1.3.2...v1.4.0) (2025-06-30)
 
 
