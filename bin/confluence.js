@@ -23,7 +23,7 @@ program
 program
   .command('read <pageId>')
   .description('Read a Confluence page by ID or URL')
-  .option('-f, --format <format>', 'Output format (html, text)', 'text')
+  .option('-f, --format <format>', 'Output format (html, text, markdown)', 'text')
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {

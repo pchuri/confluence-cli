@@ -126,6 +126,32 @@ node bin/confluence.js read 123456789
 - Add comments for complex logic
 - Keep functions small and focused
 
+### Markdown Support
+
+The CLI includes enhanced markdown support with:
+
+- **Native Confluence Storage Format**: Converts markdown to native Confluence elements instead of HTML macros
+- **Confluence Extensions**: Support for admonitions (`[!info]`, `[!warning]`, `[!note]`)
+- **Bidirectional Conversion**: Convert from markdown to storage format and back
+- **Rich Elements**: Tables, code blocks, lists, links, and formatting
+
+Example markdown with Confluence extensions:
+```markdown
+# My Page
+
+[!info]
+This is an info admonition that will render as a Confluence info macro.
+
+```javascript
+console.log("Code blocks preserve syntax highlighting");
+```
+
+| Feature | Status |
+|---------|--------|
+| Tables  | ✅     |
+| Lists   | ✅     |
+```
+
 ### File Structure
 
 ```
