@@ -78,84 +78,11 @@ export CONFLUENCE_API_TOKEN="your-api-token"
 # Read by page ID
 confluence read 123456789
 
-# Read in HTML format
-confluence read 123456789 --format html
+# Read in markdown format
+confluence read 123456789 --format markdown
 
-# Read by URL
-confluence read "https://your-domain.atlassian.net/wiki/spaces/SPACE/pages/123456789/Page+Title"
-```
-
-### Create a New Page
-```bash
-# Create with inline content
-confluence create "My New Page" SPACEKEY --content "This is my page content"
-
-# Create from a file
-confluence create "Documentation" SPACEKEY --file ./content.md --format markdown
-
-# Create with HTML content
-confluence create "Rich Content" SPACEKEY --file ./content.html --format html
-
-# Create with Storage format (Confluence native)
-confluence create "Advanced Page" SPACEKEY --file ./content.xml --format storage
-```
-
-### Create a Child Page
-```bash
-# Find parent page first
-confluence find "Project Documentation" --space MYTEAM
-
-# Create child page with inline content
-confluence create-child "Meeting Notes" 123456789 --content "This is a child page"
-
-# Create child page from file
-confluence create-child "Technical Specifications" 123456789 --file ./content.md --format markdown
-
-# Create child page with HTML content
-confluence create-child "Report Summary" 123456789 --file ./content.html --format html
-```
-
-### Find Pages
-```bash
-# Find page by title
-confluence find "Project Documentation"
-
-# Find page by title in specific space
-confluence find "Project Documentation" --space MYTEAM
-```
-
-### Update an Existing Page
-```bash
-# Update content only
-confluence update 123456789 --content "Updated content"
-
-# Update content from file
-confluence update 123456789 --file ./updated-content.md --format markdown
-
-# Update both title and content
-confluence update 123456789 --title "New Title" --content "New content"
-
-# Update from HTML file
-confluence update 123456789 --file ./content.html --format html
-```
-
-### Edit Workflow
-```bash
-# Export page content for editing
-confluence edit 123456789 --output ./page-content.xml
-
-# Edit the file with your preferred editor
-vim ./page-content.xml
-
-# Update the page with your changes
-confluence update 123456789 --file ./page-content.xml --format storage
-```
-
-# Read with HTML format
-confluence read 123456789 --format html
-
-# Read by URL (with pageId parameter)
-confluence read "https://yourcompany.atlassian.net/wiki/spaces/SPACE/pages/123456789/Page+Title"
+# Read by URL (must contain pageId parameter)
+confluence read "https://your-domain.atlassian.net/wiki/viewpage.action?pageId=123456789"
 ```
 
 ### Get Page Information
@@ -177,6 +104,61 @@ confluence search "search term" --limit 5
 confluence spaces
 ```
 
+### Find a Page by Title
+```bash
+# Find page by title
+confluence find "Project Documentation"
+
+# Find page by title in a specific space
+confluence find "Project Documentation" --space MYTEAM
+```
+
+### Create a New Page
+```bash
+# Create with inline content and markdown format
+confluence create "My New Page" SPACEKEY --content "**Hello** World!" --format markdown
+
+# Create from a file
+confluence create "Documentation" SPACEKEY --file ./content.md --format markdown
+```
+
+### Create a Child Page
+```bash
+# Create child page with inline content
+confluence create-child "Meeting Notes" 123456789 --content "This is a child page"
+
+# Create child page from a file
+confluence create-child "Tech Specs" 123456789 --file ./specs.md --format markdown
+```
+
+### Update an Existing Page
+```bash
+# Update title only
+confluence update 123456789 --title "A Newer Title for the Page"
+
+# Update content only from a string
+confluence update 123456789 --content "Updated page content."
+
+# Update content from a file
+confluence update 123456789 --file ./updated-content.md --format markdown
+
+# Update both title and content
+confluence update 123456789 --title "New Title" --content "And new content"
+```
+
+### Edit Workflow
+The `edit` and `update` commands work together to create a seamless editing workflow.
+```bash
+# 1. Export page content to a file (in Confluence storage format)
+confluence edit 123456789 --output ./page-to-edit.xml
+
+# 2. Edit the file with your preferred editor
+vim ./page-to-edit.xml
+
+# 3. Update the page with your changes
+confluence update 123456789 --file ./page-to-edit.xml --format storage
+```
+
 ### View Usage Statistics
 ```bash
 confluence stats
@@ -185,13 +167,18 @@ confluence stats
 ## Commands
 
 | Command | Description | Options |
-|---------|-------------|---------|
-| `init` | Initialize CLI configuration | - |
-| `read <pageId>` | Read page content | `--format <html\|text>` |
-| `info <pageId>` | Get page information | - |
+|---|---|---|
+| `init` | Initialize CLI configuration | |
+| `read <pageId_or_url>` | Read page content | `--format <html\|text\|markdown>` |
+| `info <pageId_or_url>` | Get page information | |
 | `search <query>` | Search for pages | `--limit <number>` |
-| `spaces` | List all spaces | - |
-| `stats` | View your usage statistics | - |
+| `spaces` | List all available spaces | |
+| `find <title>` | Find a page by its title | `--space <spaceKey>` |
+| `create <title> <spaceKey>` | Create a new page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`|
+| `create-child <title> <parentId>` | Create a child page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
+| `update <pageId>` | Update a page's title or content | `--title <string>`, `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
+| `edit <pageId>` | Export page content for editing | `--output <file>` |
+| `stats` | View your usage statistics | |
 
 ## Examples
 
