@@ -238,10 +238,15 @@ program
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
+      // Check if at least one option is provided
+      if (!options.title && !options.file && !options.content) {
+        throw new Error('At least one of --title, --file, or --content must be provided.');
+      }
+
       const config = getConfig();
       const client = new ConfluenceClient(config);
       
-      let content = '';
+      let content = null; // Use null to indicate no content change
       
       if (options.file) {
         const fs = require('fs');
@@ -251,8 +256,6 @@ program
         content = fs.readFileSync(options.file, 'utf8');
       } else if (options.content) {
         content = options.content;
-      } else {
-        throw new Error('Either --file or --content option is required');
       }
       
       const result = await client.updatePage(pageId, options.title, content, options.format);
