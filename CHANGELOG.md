@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/pchuri/confluence-cli/compare/v1.4.1...v1.5.0) (2025-08-13)
+
+
+### Features
+
+* Align README with implementation and fix update command ([#7](https://github.com/pchuri/confluence-cli/issues/7)) ([87f48e0](https://github.com/pchuri/confluence-cli/commit/87f48e03c6310bb9bfc7fda2930247c0d61414ec))
+
 ## [1.4.1](https://github.com/pchuri/confluence-cli/compare/v1.4.0...v1.4.1) (2025-06-30)
 
 
