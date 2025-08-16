@@ -1,0 +1,46 @@
+# Confluence CLI
+
+> A powerful command-line interface for Atlassian Confluence that allows you to read, search, and manage your Confluence content from the terminal.
+
+This CLI tool provides a comprehensive set of commands for interacting with Confluence. Key features include creating, reading, updating, and searching for pages. It supports various content formats like markdown and HTML.
+
+To get started, install the tool via npm and initialize the configuration:
+```sh
+npm install -g confluence-cli
+confluence init
+```
+
+## Documentation
+
+- [README.md](./README.md): Main documentation with installation, usage, and command reference.
+
+## Core Source Code
+
+- [bin/confluence.js](./bin/confluence.js): The main entry point for the CLI, defines commands and argument parsing.
+- [lib/confluence-client.js](./lib/confluence-client.js): The client library for interacting with the Confluence REST API.
+- [package.json](./package.json): Project metadata, dependencies, and scripts.
+
+## Recent Changes & Fixes
+
+This section summarizes recent improvements to align the codebase with its documentation and fix bugs.
+
+### `update` Command Logic and Documentation:
+- **Inconsistency:** The `README.md` suggested that updating a page's title without changing its content was possible. However, the implementation in `bin/confluence.js` incorrectly threw an error if the `--content` or `--file` flags were not provided, making title-only updates impossible.
+- **Fix:**
+    - Modified `updatePage` in `lib/confluence-client.js` to fetch and re-use existing page content if no new content is provided.
+    - Adjusted validation in `bin/confluence.js` for the `update` command to only require one of `--title`, `--content`, or `--file`.
+    - Updated `README.md` with an example of a title-only update.
+
+### Incomplete `README.md` Command Reference:
+- **Inconsistency:** The main command table in `README.md` was missing several commands (`create`, `create-child`, `update`, `edit`, `find`).
+- **Fix:** Expanded the command table in `README.md` to include all available commands.
+
+### Misleading `read` Command URL Examples:
+- **Inconsistency:** The documentation for the `read` command used "display" or "pretty" URLs, which are not supported by the `extractPageId` function.
+- **Fix:** Removed incorrect URL examples and clarified that only URLs with a `pageId` query parameter are supported.
+
+## Next Steps
+
+- Refer to [README.md](./README.md) for detailed usage instructions and advanced configuration.
+- For troubleshooting or to contribute, visit the project's GitHub repository at https://github.com/pchuri/confluence-cli.
+- If you encounter issues, open an issue or check the FAQ section in the documentation.
