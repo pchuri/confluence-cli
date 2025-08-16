@@ -38,3 +38,9 @@ This section summarizes recent improvements to align the codebase with its docum
 ### Misleading `read` Command URL Examples:
 - **Inconsistency:** The documentation for the `read` command used "display" or "pretty" URLs, which are not supported by the `extractPageId` function.
 - **Fix:** Removed incorrect URL examples and clarified that only URLs with a `pageId` query parameter are supported.
+
+## Next Steps
+
+- Refer to [README.md](./README.md) for detailed usage instructions and advanced configuration.
+- For troubleshooting or to contribute, visit the project's GitHub repository at https://github.com/pchuri/confluence-cli.
+- If you encounter issues, open an issue or check the FAQ section in the documentation.
