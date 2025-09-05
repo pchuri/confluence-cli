@@ -345,6 +345,7 @@ program
   .option('--exclude <patterns>', 'Comma-separated patterns to exclude (supports wildcards)')
   .option('--delay-ms <ms>', 'Delay between sibling creations in ms (default: 100)', '100')
   .option('--copy-suffix <suffix>', 'Suffix for new root title (default: " (Copy)")', ' (Copy)')
+  .option('-n, --dry-run', 'Preview operations without creating pages')
   .option('--fail-on-error', 'Exit with non-zero code if any page fails')
   .option('-q, --quiet', 'Suppress progress output')
   .action(async (sourcePageId, targetParentId, newTitle, options) => {
@@ -353,13 +354,20 @@ program
       const config = getConfig();
       const client = new ConfluenceClient(config);
       
+      // Parse numeric flags with safe fallbacks
+      const parsedDepth = parseInt(options.maxDepth, 10);
+      const maxDepth = Number.isNaN(parsedDepth) ? 10 : parsedDepth;
+      const parsedDelay = parseInt(options.delayMs, 10);
+      const delayMs = Number.isNaN(parsedDelay) ? 100 : parsedDelay;
+      const copySuffix = options.copySuffix ?? ' (Copy)';
+
       console.log(chalk.blue('🚀 Starting page tree copy...'));
       console.log(`Source: ${sourcePageId}`);
       console.log(`Target parent: ${targetParentId}`);
       if (newTitle) console.log(`New root title: ${newTitle}`);
-      console.log(`Max depth: ${options.maxDepth}`);
-      console.log(`Delay: ${options.delayMs} ms`);
-      if (options.copySuffix) console.log(`Root suffix: ${options.copySuffix}`);
+      console.log(`Max depth: ${maxDepth}`);
+      console.log(`Delay: ${delayMs} ms`);
+      if (copySuffix) console.log(`Root suffix: ${copySuffix}`);
       console.log('');
 
       // Parse exclude patterns
@@ -376,18 +384,49 @@ program
         console.log(message);
       };
 
+      // Dry-run: compute plan without creating anything
+      if (options.dryRun) {
+        const info = await client.getPageInfo(sourcePageId);
+        const rootTitle = newTitle || `${info.title}${copySuffix}`;
+        const descendants = await client.getAllDescendantPages(sourcePageId, maxDepth);
+        const filtered = descendants.filter(p => !client.shouldExcludePage(p.title, excludePatterns));
+        console.log(chalk.yellow('Dry run: no changes will be made.'));
+        console.log(`Would create root: ${chalk.blue(rootTitle)} (under parent ${targetParentId})`);
+        console.log(`Would create ${filtered.length} child page(s)`);
+        // Show a preview list (first 50)
+        const tree = client.buildPageTree(filtered, sourcePageId);
+        const lines = [];
+        const walk = (nodes, depth = 0) => {
+          for (const n of nodes) {
+            if (lines.length >= 50) return; // limit output
+            lines.push(`${'  '.repeat(depth)}- ${n.title}`);
+            if (n.children && n.children.length) walk(n.children, depth + 1);
+          }
+        };
+        walk(tree);
+        if (lines.length) {
+          console.log('Planned children:');
+          lines.forEach(l => console.log(l));
+          if (filtered.length > lines.length) {
+            console.log(`...and ${filtered.length - lines.length} more`);
+          }
+        }
+        analytics.track('copy_tree_dry_run', true);
+        return;
+      }
+
       // Copy the page tree
       const result = await client.copyPageTree(
         sourcePageId,
         targetParentId,
         newTitle,
         {
-          maxDepth: parseInt(options.maxDepth),
+          maxDepth,
           excludePatterns,
           onProgress: options.quiet ? null : onProgress,
           quiet: options.quiet,
-          delayMs: parseInt(options.delayMs),
-          copySuffix: options.copySuffix
+          delayMs,
+          copySuffix
         }
       );
 

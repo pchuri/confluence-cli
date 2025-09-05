@@ -145,6 +145,9 @@ confluence copy-tree 123456789 987654321 --exclude "temp*,test*,*draft*"
 # Control pacing and naming
 confluence copy-tree 123456789 987654321 --delay-ms 150 --copy-suffix " (Backup)"
 
+# Dry run (preview only)
+confluence copy-tree 123456789 987654321 --dry-run
+
 # Quiet mode (suppress progress output)
 confluence copy-tree 123456789 987654321 --quiet
 ```
@@ -202,7 +205,7 @@ confluence stats
 | `find <title>` | Find a page by its title | `--space <spaceKey>` |
 | `create <title> <spaceKey>` | Create a new page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`|
 | `create-child <title> <parentId>` | Create a child page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
-| `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--copy-suffix <text>`, `--fail-on-error`, `--quiet` |
+| `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--copy-suffix <text>`, `--dry-run`, `--fail-on-error`, `--quiet` |
 | `update <pageId>` | Update a page's title or content | `--title <string>`, `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
 | `edit <pageId>` | Export page content for editing | `--output <file>` |
 | `stats` | View your usage statistics | |

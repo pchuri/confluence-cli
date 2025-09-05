@@ -211,5 +211,15 @@ describe('ConfluenceClient', () => {
       const a = tree.find(n => n.title === 'A');
       expect(a.children.map(n => n.title)).toEqual(['B']);
     });
+
+    test('exclude parser should tolerate spaces and empty items', () => {
+      const raw = ' temp* , , *draft* ,,test? ';
+      const patterns = raw.split(',').map(p => p.trim()).filter(Boolean);
+      expect(patterns).toEqual(['temp*', '*draft*', 'test?']);
+      expect(client.shouldExcludePage('temp file', patterns)).toBe(true);
+      expect(client.shouldExcludePage('my draft page', patterns)).toBe(true);
+      expect(client.shouldExcludePage('test1', patterns)).toBe(true);
+      expect(client.shouldExcludePage('production', patterns)).toBe(false);
+    });
   });
 });
