@@ -337,4 +337,126 @@ program
     }
   });
 
+// Copy page tree command
+program
+  .command('copy-tree <sourcePageId> <targetParentId> [newTitle]')
+  .description('Copy a page and all its children to a new location')
+  .option('--max-depth <depth>', 'Maximum depth to copy (default: 10)', '10')
+  .option('--exclude <patterns>', 'Comma-separated patterns to exclude (supports wildcards)')
+  .option('--delay-ms <ms>', 'Delay between sibling creations in ms (default: 100)', '100')
+  .option('--copy-suffix <suffix>', 'Suffix for new root title (default: " (Copy)")', ' (Copy)')
+  .option('-n, --dry-run', 'Preview operations without creating pages')
+  .option('--fail-on-error', 'Exit with non-zero code if any page fails')
+  .option('-q, --quiet', 'Suppress progress output')
+  .action(async (sourcePageId, targetParentId, newTitle, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+      
+      // Parse numeric flags with safe fallbacks
+      const parsedDepth = parseInt(options.maxDepth, 10);
+      const maxDepth = Number.isNaN(parsedDepth) ? 10 : parsedDepth;
+      const parsedDelay = parseInt(options.delayMs, 10);
+      const delayMs = Number.isNaN(parsedDelay) ? 100 : parsedDelay;
+      const copySuffix = options.copySuffix ?? ' (Copy)';
+
+      console.log(chalk.blue('🚀 Starting page tree copy...'));
+      console.log(`Source: ${sourcePageId}`);
+      console.log(`Target parent: ${targetParentId}`);
+      if (newTitle) console.log(`New root title: ${newTitle}`);
+      console.log(`Max depth: ${maxDepth}`);
+      console.log(`Delay: ${delayMs} ms`);
+      if (copySuffix) console.log(`Root suffix: ${copySuffix}`);
+      console.log('');
+
+      // Parse exclude patterns
+      let excludePatterns = [];
+      if (options.exclude) {
+        excludePatterns = options.exclude.split(',').map(p => p.trim()).filter(Boolean);
+        if (excludePatterns.length > 0) {
+          console.log(chalk.yellow(`Exclude patterns: ${excludePatterns.join(', ')}`));
+        }
+      }
+
+      // Progress callback
+      const onProgress = (message) => {
+        console.log(message);
+      };
+
+      // Dry-run: compute plan without creating anything
+      if (options.dryRun) {
+        const info = await client.getPageInfo(sourcePageId);
+        const rootTitle = newTitle || `${info.title}${copySuffix}`;
+        const descendants = await client.getAllDescendantPages(sourcePageId, maxDepth);
+        const filtered = descendants.filter(p => !client.shouldExcludePage(p.title, excludePatterns));
+        console.log(chalk.yellow('Dry run: no changes will be made.'));
+        console.log(`Would create root: ${chalk.blue(rootTitle)} (under parent ${targetParentId})`);
+        console.log(`Would create ${filtered.length} child page(s)`);
+        // Show a preview list (first 50)
+        const tree = client.buildPageTree(filtered, sourcePageId);
+        const lines = [];
+        const walk = (nodes, depth = 0) => {
+          for (const n of nodes) {
+            if (lines.length >= 50) return; // limit output
+            lines.push(`${'  '.repeat(depth)}- ${n.title}`);
+            if (n.children && n.children.length) walk(n.children, depth + 1);
+          }
+        };
+        walk(tree);
+        if (lines.length) {
+          console.log('Planned children:');
+          lines.forEach(l => console.log(l));
+          if (filtered.length > lines.length) {
+            console.log(`...and ${filtered.length - lines.length} more`);
+          }
+        }
+        analytics.track('copy_tree_dry_run', true);
+        return;
+      }
+
+      // Copy the page tree
+      const result = await client.copyPageTree(
+        sourcePageId,
+        targetParentId,
+        newTitle,
+        {
+          maxDepth,
+          excludePatterns,
+          onProgress: options.quiet ? null : onProgress,
+          quiet: options.quiet,
+          delayMs,
+          copySuffix
+        }
+      );
+
+      console.log('');
+      console.log(chalk.green('✅ Page tree copy completed'));
+      console.log(`Root page: ${chalk.blue(result.rootPage.title)} (ID: ${result.rootPage.id})`);
+      console.log(`Total copied pages: ${chalk.blue(result.totalCopied)}`);
+      if (result.failures?.length) {
+        console.log(chalk.yellow(`Failures: ${result.failures.length}`));
+        result.failures.slice(0, 10).forEach(f => {
+          const reason = f.status ? `${f.status}` : '';
+          console.log(` - ${f.title} (ID: ${f.id})${reason ? `: ${reason}` : ''}`);
+        });
+        if (result.failures.length > 10) {
+          console.log(` - ...and ${result.failures.length - 10} more`);
+        }
+      }
+      console.log(`URL: ${chalk.gray(`https://${config.domain}/wiki${result.rootPage._links.webui}`)}`);
+      if (options.failOnError && result.failures?.length) {
+        analytics.track('copy_tree', false);
+        console.error(chalk.red('Completed with failures and --fail-on-error is set.'));
+        process.exit(1);
+      }
+      
+      analytics.track('copy_tree', true);
+    } catch (error) {
+      analytics.track('copy_tree', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
 program.parse();

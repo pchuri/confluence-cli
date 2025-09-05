@@ -154,4 +154,72 @@ describe('ConfluenceClient', () => {
       expect(typeof client.findPageByTitle).toBe('function');
     });
   });
+
+  describe('page tree operations', () => {
+    test('should have required methods for tree operations', () => {
+      expect(typeof client.getChildPages).toBe('function');
+      expect(typeof client.getAllDescendantPages).toBe('function');
+      expect(typeof client.copyPageTree).toBe('function');
+      expect(typeof client.buildPageTree).toBe('function');
+      expect(typeof client.shouldExcludePage).toBe('function');
+    });
+
+    test('should correctly exclude pages based on patterns', () => {
+      const patterns = ['temp*', 'test*', '*draft*'];
+
+      expect(client.shouldExcludePage('temporary document', patterns)).toBe(true);
+      expect(client.shouldExcludePage('test page', patterns)).toBe(true);
+      expect(client.shouldExcludePage('my draft page', patterns)).toBe(true);
+      expect(client.shouldExcludePage('normal document', patterns)).toBe(false);
+      expect(client.shouldExcludePage('production page', patterns)).toBe(false);
+    });
+
+    test('should handle empty exclude patterns', () => {
+      expect(client.shouldExcludePage('any page', [])).toBe(false);
+      expect(client.shouldExcludePage('any page', null)).toBe(false);
+      expect(client.shouldExcludePage('any page', undefined)).toBe(false);
+    });
+
+    test('globToRegExp should escape regex metacharacters and match case-insensitively', () => {
+      const patterns = [
+        'file.name*',   // dot should be literal
+        '[draft]?',     // brackets should be literal
+        'Plan (Q1)?',   // parentheses literal, ? wildcard
+        'DATA*SET',     // case-insensitive
+      ];
+      const rx = patterns.map(p => client.globToRegExp(p));
+      expect('file.name.v1').toMatch(rx[0]);
+      expect('filexname').not.toMatch(rx[0]);
+      expect('[draft]1').toMatch(rx[1]);
+      expect('[draft]AB').not.toMatch(rx[1]);
+      expect('Plan (Q1)A').toMatch(rx[2]);
+      expect('Plan Q1A').not.toMatch(rx[2]);
+      expect('data big set').toMatch(rx[3]);
+    });
+
+    test('buildPageTree should link children by parentId and collect orphans at root', () => {
+      const rootId = 'root';
+      const pages = [
+        { id: 'a', title: 'A', parentId: rootId },
+        { id: 'b', title: 'B', parentId: 'a' },
+        { id: 'c', title: 'C', parentId: 'missing' }, // orphan
+      ];
+      const tree = client.buildPageTree(pages, rootId);
+      // tree should contain A and C at top-level (B is child of A)
+      const topTitles = tree.map(n => n.title).sort();
+      expect(topTitles).toEqual(['A', 'C']);
+      const a = tree.find(n => n.title === 'A');
+      expect(a.children.map(n => n.title)).toEqual(['B']);
+    });
+
+    test('exclude parser should tolerate spaces and empty items', () => {
+      const raw = ' temp* , , *draft* ,,test? ';
+      const patterns = raw.split(',').map(p => p.trim()).filter(Boolean);
+      expect(patterns).toEqual(['temp*', '*draft*', 'test?']);
+      expect(client.shouldExcludePage('temp file', patterns)).toBe(true);
+      expect(client.shouldExcludePage('my draft page', patterns)).toBe(true);
+      expect(client.shouldExcludePage('test1', patterns)).toBe(true);
+      expect(client.shouldExcludePage('production', patterns)).toBe(false);
+    });
+  });
 });
