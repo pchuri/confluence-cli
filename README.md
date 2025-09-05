@@ -131,6 +131,21 @@ confluence create-child "Meeting Notes" 123456789 --content "This is a child pag
 confluence create-child "Tech Specs" 123456789 --file ./specs.md --format markdown
 ```
 
+### Copy Page Tree
+```bash
+# Copy a page and all its children to a new location
+confluence copy-tree 123456789 987654321 "프로젝트 문서 (복사본)"
+
+# Copy with maximum depth limit
+confluence copy-tree 123456789 987654321 --max-depth 3
+
+# Copy excluding certain pages (supports wildcards)
+confluence copy-tree 123456789 987654321 --exclude "임시*,테스트*,*draft*"
+
+# Quiet mode (no progress output)
+confluence copy-tree 123456789 987654321 --quiet
+```
+
 ### Update an Existing Page
 ```bash
 # Update title only
@@ -176,6 +191,7 @@ confluence stats
 | `find <title>` | Find a page by its title | `--space <spaceKey>` |
 | `create <title> <spaceKey>` | Create a new page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`|
 | `create-child <title> <parentId>` | Create a child page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
+| `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--quiet` |
 | `update <pageId>` | Update a page's title or content | `--title <string>`, `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
 | `edit <pageId>` | Export page content for editing | `--output <file>` |
 | `stats` | View your usage statistics | |

@@ -154,4 +154,30 @@ describe('ConfluenceClient', () => {
       expect(typeof client.findPageByTitle).toBe('function');
     });
   });
+
+  describe('page tree operations', () => {
+    test('should have required methods for tree operations', () => {
+      expect(typeof client.getChildPages).toBe('function');
+      expect(typeof client.getAllDescendantPages).toBe('function');
+      expect(typeof client.copyPageTree).toBe('function');
+      expect(typeof client.buildPageTree).toBe('function');
+      expect(typeof client.shouldExcludePage).toBe('function');
+    });
+
+    test('should correctly exclude pages based on patterns', () => {
+      const patterns = ['임시*', '테스트*', '*draft*'];
+      
+      expect(client.shouldExcludePage('임시 문서', patterns)).toBe(true);
+      expect(client.shouldExcludePage('테스트 페이지', patterns)).toBe(true);
+      expect(client.shouldExcludePage('my draft page', patterns)).toBe(true);
+      expect(client.shouldExcludePage('정상 문서', patterns)).toBe(false);
+      expect(client.shouldExcludePage('프로덕션 페이지', patterns)).toBe(false);
+    });
+
+    test('should handle empty exclude patterns', () => {
+      expect(client.shouldExcludePage('any page', [])).toBe(false);
+      expect(client.shouldExcludePage('any page', null)).toBe(false);
+      expect(client.shouldExcludePage('any page', undefined)).toBe(false);
+    });
+  });
 });

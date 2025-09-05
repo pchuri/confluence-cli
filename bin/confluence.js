@@ -337,4 +337,64 @@ program
     }
   });
 
+// Copy page tree command
+program
+  .command('copy-tree <sourcePageId> <targetParentId> [newTitle]')
+  .description('Copy a page and all its children to a new location')
+  .option('--max-depth <depth>', 'Maximum depth to copy (default: 10)', '10')
+  .option('--exclude <patterns>', 'Comma-separated patterns to exclude (supports wildcards)')
+  .option('-q, --quiet', 'Suppress progress output')
+  .action(async (sourcePageId, targetParentId, newTitle, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+      
+      console.log(chalk.blue('🚀 페이지 트리 복사 시작...'));
+      console.log(`원본: ${sourcePageId}`);
+      console.log(`대상 부모: ${targetParentId}`);
+      if (newTitle) {
+        console.log(`새 제목: ${newTitle}`);
+      }
+      console.log('');
+
+      // Parse exclude patterns
+      let excludePatterns = [];
+      if (options.exclude) {
+        excludePatterns = options.exclude.split(',').map(p => p.trim());
+        console.log(chalk.yellow(`제외 패턴: ${excludePatterns.join(', ')}`));
+      }
+
+      // Progress callback
+      const onProgress = (message) => {
+        console.log(message);
+      };
+
+      // Copy the page tree
+      const result = await client.copyPageTree(
+        sourcePageId,
+        targetParentId,
+        newTitle,
+        {
+          maxDepth: parseInt(options.maxDepth),
+          excludePatterns: excludePatterns,
+          onProgress: options.quiet ? null : onProgress,
+          quiet: options.quiet
+        }
+      );
+
+      console.log('');
+      console.log(chalk.green('✅ 페이지 트리 복사 완료!'));
+      console.log(`루트 페이지: ${chalk.blue(result.rootPage.title)} (ID: ${result.rootPage.id})`);
+      console.log(`총 복사된 페이지: ${chalk.blue(result.totalCopied)}개`);
+      console.log(`URL: ${chalk.gray(`https://${config.domain}/wiki${result.rootPage._links.webui}`)}`);
+      
+      analytics.track('copy_tree', true);
+    } catch (error) {
+      analytics.track('copy_tree', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
 program.parse();
