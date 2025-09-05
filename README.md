@@ -142,6 +142,9 @@ confluence copy-tree 123456789 987654321 --max-depth 3
 # Exclude pages by title (supports wildcards * and ?; case-insensitive)
 confluence copy-tree 123456789 987654321 --exclude "temp*,test*,*draft*"
 
+# Control pacing and naming
+confluence copy-tree 123456789 987654321 --delay-ms 150 --copy-suffix " (Backup)"
+
 # Quiet mode (suppress progress output)
 confluence copy-tree 123456789 987654321 --quiet
 ```
@@ -150,7 +153,9 @@ Notes:
 - Preserves the original parent-child hierarchy when copying.
 - Continues on errors: failed pages are logged and the copy proceeds.
 - Exclude patterns use simple globbing: `*` matches any sequence, `?` matches any single character, and special regex characters are treated literally.
-- Large trees may take time; the CLI applies a small delay between creations to avoid rate limits.
+- Large trees may take time; the CLI applies a small delay between sibling page creations to avoid rate limits (configurable via `--delay-ms`).
+- Root title suffix defaults to ` (Copy)`; override with `--copy-suffix`. Child pages keep their original titles.
+- Use `--fail-on-error` to exit non-zero if any page fails to copy.
 
 ### Update an Existing Page
 ```bash
@@ -197,7 +202,7 @@ confluence stats
 | `find <title>` | Find a page by its title | `--space <spaceKey>` |
 | `create <title> <spaceKey>` | Create a new page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`|
 | `create-child <title> <parentId>` | Create a child page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
-| `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--quiet` |
+| `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--copy-suffix <text>`, `--fail-on-error`, `--quiet` |
 | `update <pageId>` | Update a page's title or content | `--title <string>`, `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
 | `edit <pageId>` | Export page content for editing | `--output <file>` |
 | `stats` | View your usage statistics | |

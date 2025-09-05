@@ -343,6 +343,9 @@ program
   .description('Copy a page and all its children to a new location')
   .option('--max-depth <depth>', 'Maximum depth to copy (default: 10)', '10')
   .option('--exclude <patterns>', 'Comma-separated patterns to exclude (supports wildcards)')
+  .option('--delay-ms <ms>', 'Delay between sibling creations in ms (default: 100)', '100')
+  .option('--copy-suffix <suffix>', 'Suffix for new root title (default: " (Copy)")', ' (Copy)')
+  .option('--fail-on-error', 'Exit with non-zero code if any page fails')
   .option('-q, --quiet', 'Suppress progress output')
   .action(async (sourcePageId, targetParentId, newTitle, options) => {
     const analytics = new Analytics();
@@ -350,19 +353,22 @@ program
       const config = getConfig();
       const client = new ConfluenceClient(config);
       
-      console.log(chalk.blue('🚀 페이지 트리 복사 시작...'));
-      console.log(`원본: ${sourcePageId}`);
-      console.log(`대상 부모: ${targetParentId}`);
-      if (newTitle) {
-        console.log(`새 제목: ${newTitle}`);
-      }
+      console.log(chalk.blue('🚀 Starting page tree copy...'));
+      console.log(`Source: ${sourcePageId}`);
+      console.log(`Target parent: ${targetParentId}`);
+      if (newTitle) console.log(`New root title: ${newTitle}`);
+      console.log(`Max depth: ${options.maxDepth}`);
+      console.log(`Delay: ${options.delayMs} ms`);
+      if (options.copySuffix) console.log(`Root suffix: ${options.copySuffix}`);
       console.log('');
 
       // Parse exclude patterns
       let excludePatterns = [];
       if (options.exclude) {
-        excludePatterns = options.exclude.split(',').map(p => p.trim());
-        console.log(chalk.yellow(`제외 패턴: ${excludePatterns.join(', ')}`));
+        excludePatterns = options.exclude.split(',').map(p => p.trim()).filter(Boolean);
+        if (excludePatterns.length > 0) {
+          console.log(chalk.yellow(`Exclude patterns: ${excludePatterns.join(', ')}`));
+        }
       }
 
       // Progress callback
@@ -377,17 +383,34 @@ program
         newTitle,
         {
           maxDepth: parseInt(options.maxDepth),
-          excludePatterns: excludePatterns,
+          excludePatterns,
           onProgress: options.quiet ? null : onProgress,
-          quiet: options.quiet
+          quiet: options.quiet,
+          delayMs: parseInt(options.delayMs),
+          copySuffix: options.copySuffix
         }
       );
 
       console.log('');
-      console.log(chalk.green('✅ 페이지 트리 복사 완료!'));
-      console.log(`루트 페이지: ${chalk.blue(result.rootPage.title)} (ID: ${result.rootPage.id})`);
-      console.log(`총 복사된 페이지: ${chalk.blue(result.totalCopied)}개`);
+      console.log(chalk.green('✅ Page tree copy completed'));
+      console.log(`Root page: ${chalk.blue(result.rootPage.title)} (ID: ${result.rootPage.id})`);
+      console.log(`Total copied pages: ${chalk.blue(result.totalCopied)}`);
+      if (result.failures?.length) {
+        console.log(chalk.yellow(`Failures: ${result.failures.length}`));
+        result.failures.slice(0, 10).forEach(f => {
+          const reason = f.status ? `${f.status}` : '';
+          console.log(` - ${f.title} (ID: ${f.id})${reason ? `: ${reason}` : ''}`);
+        });
+        if (result.failures.length > 10) {
+          console.log(` - ...and ${result.failures.length - 10} more`);
+        }
+      }
       console.log(`URL: ${chalk.gray(`https://${config.domain}/wiki${result.rootPage._links.webui}`)}`);
+      if (options.failOnError && result.failures?.length) {
+        analytics.track('copy_tree', false);
+        console.error(chalk.red('Completed with failures and --fail-on-error is set.'));
+        process.exit(1);
+      }
       
       analytics.track('copy_tree', true);
     } catch (error) {
