@@ -1,12 +1,12 @@
 #!/bin/bash
 
-# Confluence CLI - 페이지 트리 복사 예제
-# 이 스크립트는 페이지와 모든 하위 페이지를 새로운 위치로 복사하는 방법을 보여줍니다.
+# Confluence CLI - Copy Page Tree Example
+# This script shows how to copy a page and all its descendants to a new location.
 
 echo "📋 Confluence CLI - Copy Page Tree Example"
 echo "=================================================="
 
-# 사전 요구사항
+# Prerequisites
 echo ""
 echo "📝 Prerequisites:"
 echo "- confluence CLI is set up (confluence init)"
@@ -14,7 +14,7 @@ echo "- You have access to source and target locations"
 echo "- You have permissions to create pages"
 echo ""
 
-# 1단계: 복사할 원본 페이지 찾기
+# Step 1: Find the source page
 echo "1️⃣ Find the source page"
 echo "=============================="
 echo ""
@@ -27,7 +27,7 @@ echo ""
 echo "📝 Note the source page ID from the output (e.g., 123456789)"
 echo ""
 
-# 2단계: 대상 부모 페이지 찾기
+# Step 2: Find the target parent page
 echo "2️⃣ Find the target parent page"
 echo "========================="
 echo ""
@@ -38,7 +38,7 @@ echo ""
 echo "📝 Note the target parent page ID (e.g., 987654321)"
 echo ""
 
-# 3단계: 페이지 트리 복사 실행
+# Step 3: Run the copy
 echo "3️⃣ Run copy"
 echo "========================"
 echo ""
@@ -63,7 +63,7 @@ echo "📄 Control pacing and naming"
 echo 'confluence copy-tree 123456789 987654321 --delay-ms 150 --copy-suffix " (Backup)"'
 echo ""
 
-# 실제 사용 예제
+# Practical example
 echo "💡 Practical example"
 echo "================="
 echo ""
@@ -77,7 +77,7 @@ echo "# 3. Run backup with date suffix"
 echo 'confluence copy-tree $SOURCE_ID $TARGET_ID "Project Docs Backup - $(date +%Y%m%d)"'
 echo ""
 
-# 고급 사용법
+# Advanced usage
 echo "🚀 Advanced"
 echo "============="
 echo ""
@@ -91,7 +91,7 @@ echo "3. Shallow copy (only direct children)"
 echo "   confluence copy-tree 123456789 987654321 --max-depth 1"
 echo ""
 
-# 주의사항 및 팁
+# Notes and tips
 echo "⚠️  Notes and tips"
 echo "=================="
 echo "- Large trees may take time to copy"
@@ -107,7 +107,7 @@ echo "================"
 echo "After completion, you can check the results:"
 echo ""
 echo "# Root page info"
-echo "confluence info [새로운페이지ID]"
+echo "confluence info [NEW_PAGE_ID]"
 echo ""
 echo "# Find copied pages"
 echo "confluence search \"Copy\" --limit 20"
