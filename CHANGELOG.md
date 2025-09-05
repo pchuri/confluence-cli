@@ -1,3 +1,10 @@
+# [1.6.0](https://github.com/pchuri/confluence-cli/compare/v1.5.0...v1.6.0) (2025-09-05)
+
+
+### Features
+
+* Add copy-tree command for recursive page copying with children ([#9](https://github.com/pchuri/confluence-cli/issues/9)) ([29efa5b](https://github.com/pchuri/confluence-cli/commit/29efa5b2f8edeee1c5072ad8d7077f38f860c2ba))
+
 # [1.5.0](https://github.com/pchuri/confluence-cli/compare/v1.4.1...v1.5.0) (2025-08-13)
 
 
