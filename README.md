@@ -134,17 +134,23 @@ confluence create-child "Tech Specs" 123456789 --file ./specs.md --format markdo
 ### Copy Page Tree
 ```bash
 # Copy a page and all its children to a new location
-confluence copy-tree 123456789 987654321 "프로젝트 문서 (복사본)"
+confluence copy-tree 123456789 987654321 "Project Docs (Copy)"
 
-# Copy with maximum depth limit
+# Copy with maximum depth limit (only 3 levels deep)
 confluence copy-tree 123456789 987654321 --max-depth 3
 
-# Copy excluding certain pages (supports wildcards)
-confluence copy-tree 123456789 987654321 --exclude "임시*,테스트*,*draft*"
+# Exclude pages by title (supports wildcards * and ?; case-insensitive)
+confluence copy-tree 123456789 987654321 --exclude "temp*,test*,*draft*"
 
-# Quiet mode (no progress output)
+# Quiet mode (suppress progress output)
 confluence copy-tree 123456789 987654321 --quiet
 ```
+
+Notes:
+- Preserves the original parent-child hierarchy when copying.
+- Continues on errors: failed pages are logged and the copy proceeds.
+- Exclude patterns use simple globbing: `*` matches any sequence, `?` matches any single character, and special regex characters are treated literally.
+- Large trees may take time; the CLI applies a small delay between creations to avoid rate limits.
 
 ### Update an Existing Page
 ```bash
