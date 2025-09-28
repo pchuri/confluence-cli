@@ -1,3 +1,10 @@
+# [1.8.0](https://github.com/pchuri/confluence-cli/compare/v1.7.0...v1.8.0) (2025-09-28)
+
+
+### Features
+
+* make Confluence API path configurable ([#14](https://github.com/pchuri/confluence-cli/issues/14)) ([be000e0](https://github.com/pchuri/confluence-cli/commit/be000e0d92881d65329b84bad6555dcad0bbb455)), closes [#13](https://github.com/pchuri/confluence-cli/issues/13)
+
 ## [Unreleased]
 
 ### Added
