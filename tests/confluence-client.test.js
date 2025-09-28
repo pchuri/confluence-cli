@@ -10,6 +10,27 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('api path handling', () => {
+    test('defaults to /rest/api when path is not provided', () => {
+      const defaultClient = new ConfluenceClient({
+        domain: 'example.com',
+        token: 'no-path-token'
+      });
+
+      expect(defaultClient.baseURL).toBe('https://example.com/rest/api');
+    });
+
+    test('normalizes custom api paths', () => {
+      const customClient = new ConfluenceClient({
+        domain: 'cloud.example',
+        token: 'custom-path',
+        apiPath: 'wiki/rest/api/'
+      });
+
+      expect(customClient.baseURL).toBe('https://cloud.example/wiki/rest/api');
+    });
+  });
+
   describe('authentication setup', () => {
     test('uses bearer token headers by default', () => {
       const bearerClient = new ConfluenceClient({

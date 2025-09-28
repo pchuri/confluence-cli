@@ -1,3 +1,8 @@
+## [Unreleased]
+
+### Added
+- Make the Confluence REST base path configurable to support both `/rest/api` and `/wiki/rest/api`.
+
 # [1.7.0](https://github.com/pchuri/confluence-cli/compare/v1.6.0...v1.7.0) (2025-09-28)
 
 

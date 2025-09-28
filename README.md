@@ -58,18 +58,19 @@ npx confluence-cli
 confluence init
 ```
 
-The wizard now asks for your authentication method. Choose **Basic** to supply your Atlassian email and API token, or switch to **Bearer** when working with self-hosted/Data Center environments.
+The wizard now helps you choose the right API endpoint and authentication method. It recommends `/wiki/rest/api` for Atlassian Cloud domains (e.g., `*.atlassian.net`) and `/rest/api` for self-hosted/Data Center instances, then prompts for Basic (email + token) or Bearer authentication.
 
 ### Option 2: Environment Variables
 ```bash
 export CONFLUENCE_DOMAIN="your-domain.atlassian.net"
 export CONFLUENCE_API_TOKEN="your-api-token"
 export CONFLUENCE_EMAIL="your.email@example.com"  # required when using Atlassian Cloud
+export CONFLUENCE_API_PATH="/wiki/rest/api"         # Cloud default; use /rest/api for Server/DC
 # Optional: set to 'bearer' for self-hosted/Data Center instances
 export CONFLUENCE_AUTH_TYPE="basic"
 ```
 
-`CONFLUENCE_AUTH_TYPE` defaults to `basic` when an email is present and falls back to `bearer` otherwise. Provide an email for Atlassian Cloud (Basic auth) or set `CONFLUENCE_AUTH_TYPE=bearer` to keep bearer-token flows for on-premises installations.
+`CONFLUENCE_API_PATH` defaults to `/wiki/rest/api` for Atlassian Cloud domains and `/rest/api` otherwise. Override it when your site lives under a custom reverse proxy or on-premises path. `CONFLUENCE_AUTH_TYPE` defaults to `basic` when an email is present and falls back to `bearer` otherwise.
 
 ### Getting Your API Token
 
