@@ -10,6 +10,37 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('authentication setup', () => {
+    test('uses bearer token headers by default', () => {
+      const bearerClient = new ConfluenceClient({
+        domain: 'test.atlassian.net',
+        token: 'bearer-token'
+      });
+
+      expect(bearerClient.client.defaults.headers.Authorization).toBe('Bearer bearer-token');
+    });
+
+    test('builds basic auth headers when email is provided', () => {
+      const basicClient = new ConfluenceClient({
+        domain: 'test.atlassian.net',
+        token: 'basic-token',
+        authType: 'basic',
+        email: 'user@example.com'
+      });
+
+      const encoded = Buffer.from('user@example.com:basic-token').toString('base64');
+      expect(basicClient.client.defaults.headers.Authorization).toBe(`Basic ${encoded}`);
+    });
+
+    test('throws when basic auth is missing an email', () => {
+      expect(() => new ConfluenceClient({
+        domain: 'test.atlassian.net',
+        token: 'missing-email',
+        authType: 'basic'
+      })).toThrow('Basic authentication requires an email address.');
+    });
+  });
+
   describe('extractPageId', () => {
     test('should return numeric page ID as is', () => {
       expect(client.extractPageId('123456789')).toBe('123456789');

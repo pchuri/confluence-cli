@@ -1,3 +1,8 @@
+## [Unreleased]
+
+### Added
+- Support Basic authentication with Atlassian email + API token while retaining bearer token compatibility.
+
 # [1.5.0](https://github.com/pchuri/confluence-cli/compare/v1.4.1...v1.5.0) (2025-08-13)
 
 
