@@ -1,3 +1,10 @@
+# [1.7.0](https://github.com/pchuri/confluence-cli/compare/v1.6.0...v1.7.0) (2025-09-28)
+
+
+### Features
+
+* support basic auth for Atlassian API tokens ([#12](https://github.com/pchuri/confluence-cli/issues/12)) ([e80ea9b](https://github.com/pchuri/confluence-cli/commit/e80ea9b7913d5f497b60bf72149737b6f704c6b8))
+
 # [1.6.0](https://github.com/pchuri/confluence-cli/compare/v1.5.0...v1.6.0) (2025-09-05)
 
 
