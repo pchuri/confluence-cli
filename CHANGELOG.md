@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/pchuri/confluence-cli/compare/v1.8.0...v1.9.0) (2025-12-04)
+
+
+### Features
+
+* add attachments list and download command ([#17](https://github.com/pchuri/confluence-cli/issues/17)) ([fb3d4f8](https://github.com/pchuri/confluence-cli/commit/fb3d4f81a3926fec832a39c78f4eda3b4a22130a))
+
 # [1.8.0](https://github.com/pchuri/confluence-cli/compare/v1.7.0...v1.8.0) (2025-09-28)
 
 
