@@ -274,4 +274,26 @@ describe('ConfluenceClient', () => {
       expect(client.shouldExcludePage('production', patterns)).toBe(false);
     });
   });
+
+  describe('attachments', () => {
+    test('should have required methods for attachment handling', () => {
+      expect(typeof client.listAttachments).toBe('function');
+      expect(typeof client.getAllAttachments).toBe('function');
+      expect(typeof client.downloadAttachment).toBe('function');
+    });
+
+    test('matchesPattern should respect glob patterns', () => {
+      expect(client.matchesPattern('report.png', '*.png')).toBe(true);
+      expect(client.matchesPattern('report.png', '*.jpg')).toBe(false);
+      expect(client.matchesPattern('report.png', ['*.jpg', 'report.*'])).toBe(true);
+      expect(client.matchesPattern('report.png', null)).toBe(true);
+      expect(client.matchesPattern('report.png', [])).toBe(true);
+    });
+
+    test('parseNextStart should read start query param when present', () => {
+      expect(client.parseNextStart('/rest/api/content/1/child/attachment?start=25')).toBe(25);
+      expect(client.parseNextStart('/rest/api/content/1/child/attachment?limit=50')).toBeNull();
+      expect(client.parseNextStart(null)).toBeNull();
+    });
+  });
 });

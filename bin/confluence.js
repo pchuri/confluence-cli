@@ -337,6 +337,90 @@ program
     }
   });
 
+// Attachments command
+program
+  .command('attachments <pageId>')
+  .description('List or download attachments for a page')
+  .option('-l, --limit <limit>', 'Maximum number of attachments to fetch (default: all)')
+  .option('-p, --pattern <glob>', 'Filter attachments by filename (e.g., "*.png")')
+  .option('-d, --download', 'Download matching attachments')
+  .option('--dest <directory>', 'Directory to save downloads (default: current directory)', '.')
+  .action(async (pageId, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+      const maxResults = options.limit ? parseInt(options.limit, 10) : null;
+      const pattern = options.pattern ? options.pattern.trim() : null;
+
+      if (options.limit && (Number.isNaN(maxResults) || maxResults <= 0)) {
+        throw new Error('Limit must be a positive number.');
+      }
+
+      const attachments = await client.getAllAttachments(pageId, { maxResults });
+      const filtered = pattern ? attachments.filter(att => client.matchesPattern(att.title, pattern)) : attachments;
+
+      if (filtered.length === 0) {
+        console.log(chalk.yellow('No attachments found.'));
+        analytics.track('attachments', true);
+        return;
+      }
+
+      console.log(chalk.blue(`Found ${filtered.length} attachment${filtered.length === 1 ? '' : 's'}:`));
+      filtered.forEach((att, index) => {
+        const sizeKb = att.fileSize ? `${Math.max(1, Math.round(att.fileSize / 1024))} KB` : 'unknown size';
+        const typeLabel = att.mediaType || 'unknown';
+        console.log(`${index + 1}. ${chalk.green(att.title)} (ID: ${att.id})`);
+        console.log(`   Type: ${chalk.gray(typeLabel)} • Size: ${chalk.gray(sizeKb)} • Version: ${chalk.gray(att.version)}`);
+      });
+
+      if (options.download) {
+        const fs = require('fs');
+        const path = require('path');
+        const destDir = path.resolve(options.dest || '.');
+        fs.mkdirSync(destDir, { recursive: true });
+
+        const uniquePathFor = (dir, filename) => {
+          const parsed = path.parse(filename);
+          let attempt = path.join(dir, filename);
+          let counter = 1;
+          while (fs.existsSync(attempt)) {
+            const suffix = ` (${counter})`;
+            const nextName = `${parsed.name}${suffix}${parsed.ext}`;
+            attempt = path.join(dir, nextName);
+            counter += 1;
+          }
+          return attempt;
+        };
+
+        const writeStream = (stream, targetPath) => new Promise((resolve, reject) => {
+          const writer = fs.createWriteStream(targetPath);
+          stream.pipe(writer);
+          stream.on('error', reject);
+          writer.on('error', reject);
+          writer.on('finish', resolve);
+        });
+
+        let downloaded = 0;
+        for (const attachment of filtered) {
+          const targetPath = uniquePathFor(destDir, attachment.title);
+          const dataStream = await client.downloadAttachment(pageId, attachment.id);
+          await writeStream(dataStream, targetPath);
+          downloaded += 1;
+          console.log(`⬇️  ${chalk.green(attachment.title)} -> ${chalk.gray(targetPath)}`);
+        }
+
+        console.log(chalk.green(`Downloaded ${downloaded} attachment${downloaded === 1 ? '' : 's'} to ${destDir}`));
+      }
+
+      analytics.track('attachments', true);
+    } catch (error) {
+      analytics.track('attachments', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
 // Copy page tree command
 program
   .command('copy-tree <sourcePageId> <targetParentId> [newTitle]')

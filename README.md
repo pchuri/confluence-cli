@@ -10,6 +10,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - 🏠 **List spaces** - View all available Confluence spaces
 - ✏️ **Create pages** - Create new pages with support for Markdown, HTML, or Storage format
 - 📝 **Update pages** - Update existing page content and titles
+- 📎 **Attachments** - List or download page attachments
 - 🛠️ **Edit workflow** - Export page content for editing and re-import
 - 🔧 **Easy setup** - Simple configuration with environment variables or interactive setup
 
@@ -105,6 +106,18 @@ confluence search "search term"
 
 # Limit results
 confluence search "search term" --limit 5
+```
+
+### List or Download Attachments
+```bash
+# List all attachments on a page
+confluence attachments 123456789
+
+# Filter by filename and limit the number returned
+confluence attachments 123456789 --pattern "*.png" --limit 5
+
+# Download matching attachments to a directory
+confluence attachments 123456789 --pattern "*.png" --download --dest ./downloads
 ```
 
 ### List Spaces
