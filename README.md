@@ -11,6 +11,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - ✏️ **Create pages** - Create new pages with support for Markdown, HTML, or Storage format
 - 📝 **Update pages** - Update existing page content and titles
 - 📎 **Attachments** - List or download page attachments
+- 📦 **Export** - Save a page and its attachments to a local folder
 - 🛠️ **Edit workflow** - Export page content for editing and re-import
 - 🔧 **Easy setup** - Simple configuration with environment variables or interactive setup
 
@@ -118,6 +119,18 @@ confluence attachments 123456789 --pattern "*.png" --limit 5
 
 # Download matching attachments to a directory
 confluence attachments 123456789 --pattern "*.png" --download --dest ./downloads
+```
+
+### Export a Page with Attachments
+```bash
+# Export page content (markdown by default) and all attachments
+confluence export 123456789 --dest ./exports
+
+# Custom content format/filename and attachment filtering
+confluence export 123456789 --format html --file content.html --pattern "*.png"
+
+# Skip attachments if you only need the content file
+confluence export 123456789 --skip-attachments
 ```
 
 ### List Spaces

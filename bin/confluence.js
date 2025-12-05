@@ -421,6 +421,107 @@ program
     }
   });
 
+// Export page content with attachments
+program
+  .command('export <pageId>')
+  .description('Export a page to a directory with its attachments')
+  .option('--format <format>', 'Content format (html, text, markdown)', 'markdown')
+  .option('--dest <directory>', 'Base directory to export into', '.')
+  .option('--file <filename>', 'Content filename (default: page.<ext>)')
+  .option('--attachments-dir <name>', 'Subdirectory for attachments', 'attachments')
+  .option('--pattern <glob>', 'Filter attachments by filename (e.g., "*.png")')
+  .option('--skip-attachments', 'Do not download attachments')
+  .action(async (pageId, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+      const fs = require('fs');
+      const path = require('path');
+
+      const format = (options.format || 'markdown').toLowerCase();
+      const formatExt = { markdown: 'md', html: 'html', text: 'txt' };
+      const contentExt = formatExt[format] || 'txt';
+
+      const pageInfo = await client.getPageInfo(pageId);
+      const content = await client.readPage(pageId, format);
+
+      const baseDir = path.resolve(options.dest || '.');
+      const folderName = sanitizeTitle(pageInfo.title || 'page');
+      const exportDir = path.join(baseDir, folderName);
+      fs.mkdirSync(exportDir, { recursive: true });
+
+      const contentFile = options.file || `page.${contentExt}`;
+      const contentPath = path.join(exportDir, contentFile);
+      fs.writeFileSync(contentPath, content);
+
+      console.log(chalk.green('✅ Page exported'));
+      console.log(`Title: ${chalk.blue(pageInfo.title)}`);
+      console.log(`Content: ${chalk.gray(contentPath)}`);
+
+      if (!options.skipAttachments) {
+        const pattern = options.pattern ? options.pattern.trim() : null;
+        const attachments = await client.getAllAttachments(pageId);
+        const filtered = pattern ? attachments.filter(att => client.matchesPattern(att.title, pattern)) : attachments;
+
+        if (filtered.length === 0) {
+          console.log(chalk.yellow('No attachments to download.'));
+        } else {
+          const attachmentsDirName = options.attachmentsDir || 'attachments';
+          const attachmentsDir = path.join(exportDir, attachmentsDirName);
+          fs.mkdirSync(attachmentsDir, { recursive: true });
+
+          const uniquePathFor = (dir, filename) => {
+            const parsed = path.parse(filename);
+            let attempt = path.join(dir, filename);
+            let counter = 1;
+            while (fs.existsSync(attempt)) {
+              const suffix = ` (${counter})`;
+              const nextName = `${parsed.name}${suffix}${parsed.ext}`;
+              attempt = path.join(dir, nextName);
+              counter += 1;
+            }
+            return attempt;
+          };
+
+          const writeStream = (stream, targetPath) => new Promise((resolve, reject) => {
+            const writer = fs.createWriteStream(targetPath);
+            stream.pipe(writer);
+            stream.on('error', reject);
+            writer.on('error', reject);
+            writer.on('finish', resolve);
+          });
+
+          let downloaded = 0;
+          for (const attachment of filtered) {
+            const targetPath = uniquePathFor(attachmentsDir, attachment.title);
+            const dataStream = await client.downloadAttachment(pageId, attachment.id);
+            await writeStream(dataStream, targetPath);
+            downloaded += 1;
+            console.log(`⬇️  ${chalk.green(attachment.title)} -> ${chalk.gray(targetPath)}`);
+          }
+
+          console.log(chalk.green(`Downloaded ${downloaded} attachment${downloaded === 1 ? '' : 's'} to ${attachmentsDir}`));
+        }
+      }
+
+      analytics.track('export', true);
+    } catch (error) {
+      analytics.track('export', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+function sanitizeTitle(value) {
+  const fallback = 'page';
+  if (!value || typeof value !== 'string') {
+    return fallback;
+  }
+  const cleaned = value.replace(/[\\/:*?"<>|]/g, ' ').trim();
+  return cleaned || fallback;
+}
+
 // Copy page tree command
 program
   .command('copy-tree <sourcePageId> <targetParentId> [newTitle]')
