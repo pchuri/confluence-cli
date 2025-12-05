@@ -1,3 +1,10 @@
+# [1.10.0](https://github.com/pchuri/confluence-cli/compare/v1.9.0...v1.10.0) (2025-12-05)
+
+
+### Features
+
+* export page with attachments ([#18](https://github.com/pchuri/confluence-cli/issues/18)) ([bdd9da4](https://github.com/pchuri/confluence-cli/commit/bdd9da474f13a8b6f96e64836443f65f846257a2))
+
 # [1.9.0](https://github.com/pchuri/confluence-cli/compare/v1.8.0...v1.9.0) (2025-12-04)
 
 
