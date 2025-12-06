@@ -404,7 +404,8 @@ program
         let downloaded = 0;
         for (const attachment of filtered) {
           const targetPath = uniquePathFor(destDir, attachment.title);
-          const dataStream = await client.downloadAttachment(pageId, attachment.id);
+          // Pass the full attachment object so downloadAttachment can use downloadLink directly
+          const dataStream = await client.downloadAttachment(pageId, attachment);
           await writeStream(dataStream, targetPath);
           downloaded += 1;
           console.log(`⬇️  ${chalk.green(attachment.title)} -> ${chalk.gray(targetPath)}`);
@@ -495,7 +496,8 @@ program
           let downloaded = 0;
           for (const attachment of filtered) {
             const targetPath = uniquePathFor(attachmentsDir, attachment.title);
-            const dataStream = await client.downloadAttachment(pageId, attachment.id);
+            // Pass the full attachment object so downloadAttachment can use downloadLink directly
+            const dataStream = await client.downloadAttachment(pageId, attachment);
             await writeStream(dataStream, targetPath);
             downloaded += 1;
             console.log(`⬇️  ${chalk.green(attachment.title)} -> ${chalk.gray(targetPath)}`);
