@@ -1,3 +1,10 @@
+## [1.10.1](https://github.com/pchuri/confluence-cli/compare/v1.10.0...v1.10.1) (2025-12-08)
+
+
+### Bug Fixes
+
+* improve markdown export and attachment download ([#19](https://github.com/pchuri/confluence-cli/issues/19)) ([978275d](https://github.com/pchuri/confluence-cli/commit/978275dbe71eea83138bbd537ce7d4edda8180f8))
+
 # [1.10.0](https://github.com/pchuri/confluence-cli/compare/v1.9.0...v1.10.0) (2025-12-05)
 
 
