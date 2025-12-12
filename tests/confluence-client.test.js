@@ -92,6 +92,24 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('should resolve nested display URLs', async () => {
+      // Mock the API response for display URL resolution
+      const mock = new MockAdapter(client.client);
+
+      mock.onGet('/content').reply(200, {
+        results: [{
+          id: '67890',
+          title: 'Child Page',
+          _links: { webui: '/display/TEST/Parent/Child+Page' }
+        }]
+      });
+
+      const displayUrl = 'https://test.atlassian.net/display/TEST/Parent/Child+Page';
+      expect(await client.extractPageId(displayUrl)).toBe('67890');
+
+      mock.restore();
+    });
+
     test('should throw error when display URL cannot be resolved', async () => {
       const mock = new MockAdapter(client.client);
 
