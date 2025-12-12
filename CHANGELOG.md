@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/pchuri/confluence-cli/compare/v1.10.1...v1.11.0) (2025-12-12)
+
+
+### Features
+
+* Support for Confluence display URLs ([#20](https://github.com/pchuri/confluence-cli/issues/20)) ([3bda7c2](https://github.com/pchuri/confluence-cli/commit/3bda7c2aad8ec02dac60f3b7c34c31b549a31cce))
+
 ## [1.10.1](https://github.com/pchuri/confluence-cli/compare/v1.10.0...v1.10.1) (2025-12-08)
 
 
