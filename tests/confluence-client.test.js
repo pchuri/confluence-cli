@@ -1,4 +1,5 @@
 const ConfluenceClient = require('../lib/confluence-client');
+const MockAdapter = require('axios-mock-adapter');
 
 describe('ConfluenceClient', () => {
   let client;
@@ -75,7 +76,6 @@ describe('ConfluenceClient', () => {
 
     test('should resolve display URLs', async () => {
       // Mock the API response for display URL resolution
-      const MockAdapter = require('axios-mock-adapter');
       const mock = new MockAdapter(client.client);
 
       mock.onGet('/content').reply(200, {
@@ -93,7 +93,6 @@ describe('ConfluenceClient', () => {
     });
 
     test('should throw error when display URL cannot be resolved', async () => {
-      const MockAdapter = require('axios-mock-adapter');
       const mock = new MockAdapter(client.client);
 
       // Mock empty result
