@@ -1,4 +1,5 @@
 const ConfluenceClient = require('../lib/confluence-client');
+const MockAdapter = require('axios-mock-adapter');
 
 describe('ConfluenceClient', () => {
   let client;
@@ -63,19 +64,64 @@ describe('ConfluenceClient', () => {
   });
 
   describe('extractPageId', () => {
-    test('should return numeric page ID as is', () => {
-      expect(client.extractPageId('123456789')).toBe('123456789');
-      expect(client.extractPageId(123456789)).toBe(123456789);
+    test('should return numeric page ID as is', async () => {
+      expect(await client.extractPageId('123456789')).toBe('123456789');
+      expect(await client.extractPageId(123456789)).toBe(123456789);
     });
 
-    test('should extract page ID from URL with pageId parameter', () => {
+    test('should extract page ID from URL with pageId parameter', async () => {
       const url = 'https://test.atlassian.net/wiki/spaces/TEST/pages/123456789/Page+Title';
-      expect(client.extractPageId(url + '?pageId=987654321')).toBe('987654321');
+      expect(await client.extractPageId(url + '?pageId=987654321')).toBe('987654321');
     });
 
-    test('should throw error for display URLs', () => {
+    test('should resolve display URLs', async () => {
+      // Mock the API response for display URL resolution
+      const mock = new MockAdapter(client.client);
+
+      mock.onGet('/content').reply(200, {
+        results: [{
+          id: '12345',
+          title: 'Page Title',
+          _links: { webui: '/display/TEST/Page+Title' }
+        }]
+      });
+
       const displayUrl = 'https://test.atlassian.net/display/TEST/Page+Title';
-      expect(() => client.extractPageId(displayUrl)).toThrow('Display URLs not yet supported');
+      expect(await client.extractPageId(displayUrl)).toBe('12345');
+
+      mock.restore();
+    });
+
+    test('should resolve nested display URLs', async () => {
+      // Mock the API response for display URL resolution
+      const mock = new MockAdapter(client.client);
+
+      mock.onGet('/content').reply(200, {
+        results: [{
+          id: '67890',
+          title: 'Child Page',
+          _links: { webui: '/display/TEST/Parent/Child+Page' }
+        }]
+      });
+
+      const displayUrl = 'https://test.atlassian.net/display/TEST/Parent/Child+Page';
+      expect(await client.extractPageId(displayUrl)).toBe('67890');
+
+      mock.restore();
+    });
+
+    test('should throw error when display URL cannot be resolved', async () => {
+      const mock = new MockAdapter(client.client);
+
+      // Mock empty result
+      mock.onGet('/content').reply(200, {
+        results: []
+      });
+
+      const displayUrl = 'https://test.atlassian.net/display/TEST/NonExistentPage';
+      await expect(client.extractPageId(displayUrl)).rejects.toThrow(/Could not resolve page ID/);
+
+      mock.restore();
     });
   });
 
