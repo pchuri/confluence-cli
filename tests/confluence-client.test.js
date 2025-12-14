@@ -181,6 +181,23 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('markdownToNativeStorage', () => {
+    test('should act as an alias to htmlToConfluenceStorage via markdown render', () => {
+      const markdown = '# Native Storage Test';
+      const result = client.markdownToNativeStorage(markdown);
+
+      expect(result).toContain('<h1>Native Storage Test</h1>');
+    });
+
+    test('should handle code blocks correctly', () => {
+      const markdown = '```javascript\nconst a = 1;\n```';
+      const result = client.markdownToNativeStorage(markdown);
+
+      expect(result).toContain('<ac:structured-macro ac:name="code">');
+      expect(result).toContain('const a = 1;');
+    });
+  });
+
   describe('storageToMarkdown', () => {
     test('should convert Confluence storage format to markdown', () => {
       const storage = '<h1>Hello World</h1><p>This is a <strong>test</strong> page.</p>';
