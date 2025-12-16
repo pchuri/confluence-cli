@@ -445,7 +445,9 @@ program
       const contentExt = formatExt[format] || 'txt';
 
       const pageInfo = await client.getPageInfo(pageId);
-      const content = await client.readPage(pageId, format);
+      // Read page with attachment extraction enabled
+      const content = await client.readPage(pageId, format, { extractReferencedAttachments: true });
+      const referencedAttachments = client._referencedAttachments || new Set();
 
       const baseDir = path.resolve(options.dest || '.');
       const folderName = sanitizeTitle(pageInfo.title || 'page');
@@ -462,8 +464,16 @@ program
 
       if (!options.skipAttachments) {
         const pattern = options.pattern ? options.pattern.trim() : null;
-        const attachments = await client.getAllAttachments(pageId);
-        const filtered = pattern ? attachments.filter(att => client.matchesPattern(att.title, pattern)) : attachments;
+        const allAttachments = await client.getAllAttachments(pageId);
+        
+        // Filter: only referenced attachments (unless pattern is specified, then use pattern)
+        let filtered;
+        if (pattern) {
+          filtered = allAttachments.filter(att => client.matchesPattern(att.title, pattern));
+        } else {
+          // Only download attachments that are referenced in the page content
+          filtered = allAttachments.filter(att => referencedAttachments.has(att.title));
+        }
 
         if (filtered.length === 0) {
           console.log(chalk.yellow('No attachments to download.'));
