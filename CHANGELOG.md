@@ -1,3 +1,10 @@
+## [1.11.1](https://github.com/pchuri/confluence-cli/compare/v1.11.0...v1.11.1) (2025-12-17)
+
+
+### Bug Fixes
+
+* support children macro, improve macro handling, and filter attachments ([#23](https://github.com/pchuri/confluence-cli/issues/23)) ([15b721a](https://github.com/pchuri/confluence-cli/commit/15b721acdc296e72470ee438c9fe3470e09ae52e))
+
 # [1.11.0](https://github.com/pchuri/confluence-cli/compare/v1.10.1...v1.11.0) (2025-12-12)
 
 
