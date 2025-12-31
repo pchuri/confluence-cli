@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/pchuri/confluence-cli/compare/v1.11.1...v1.12.0) (2025-12-31)
+
+
+### Features
+
+* add page delete command ([#25](https://github.com/pchuri/confluence-cli/issues/25)) ([bc3e412](https://github.com/pchuri/confluence-cli/commit/bc3e412a6ccd0774d62ab0816a6c2735cbd470a4))
+
 ## [1.11.1](https://github.com/pchuri/confluence-cli/compare/v1.11.0...v1.11.1) (2025-12-17)
 
 
