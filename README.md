@@ -10,6 +10,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - 🏠 **List spaces** - View all available Confluence spaces
 - ✏️ **Create pages** - Create new pages with support for Markdown, HTML, or Storage format
 - 📝 **Update pages** - Update existing page content and titles
+- 🗑️ **Delete pages** - Delete (or move to trash) pages by ID or URL
 - 📎 **Attachments** - List or download page attachments
 - 📦 **Export** - Save a page and its attachments to a local folder
 - 🛠️ **Edit workflow** - Export page content for editing and re-import
@@ -207,6 +208,18 @@ confluence update 123456789 --file ./updated-content.md --format markdown
 
 # Update both title and content
 confluence update 123456789 --title "New Title" --content "And new content"
+```
+
+### Delete a Page
+```bash
+# Delete by page ID (prompts for confirmation)
+confluence delete 123456789
+
+# Delete by URL
+confluence delete "https://your-domain.atlassian.net/wiki/viewpage.action?pageId=123456789"
+
+# Skip confirmation (useful for scripts)
+confluence delete 123456789 --yes
 ```
 
 ### Edit Workflow

@@ -267,6 +267,29 @@ describe('ConfluenceClient', () => {
       expect(typeof client.getPageForEdit).toBe('function');
       expect(typeof client.createChildPage).toBe('function');
       expect(typeof client.findPageByTitle).toBe('function');
+      expect(typeof client.deletePage).toBe('function');
+    });
+  });
+
+  describe('deletePage', () => {
+    test('should delete a page by ID', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onDelete('/content/123456789').reply(204);
+
+      await expect(client.deletePage('123456789')).resolves.toEqual({ id: '123456789' });
+
+      mock.restore();
+    });
+
+    test('should delete a page by URL', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onDelete('/content/987654321').reply(204);
+
+      await expect(
+        client.deletePage('https://test.atlassian.net/wiki/viewpage.action?pageId=987654321')
+      ).resolves.toEqual({ id: '987654321' });
+
+      mock.restore();
     });
   });
 
