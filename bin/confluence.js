@@ -475,6 +475,7 @@ program
   .option('--file <filename>', 'Content filename (default: page.<ext>)')
   .option('--attachments-dir <name>', 'Subdirectory for attachments', 'attachments')
   .option('--pattern <glob>', 'Filter attachments by filename (e.g., "*.png")')
+  .option('--referenced-only', 'Download only attachments referenced in the page content')
   .option('--skip-attachments', 'Do not download attachments')
   .action(async (pageId, options) => {
     const analytics = new Analytics();
@@ -489,9 +490,14 @@ program
       const contentExt = formatExt[format] || 'txt';
 
       const pageInfo = await client.getPageInfo(pageId);
-      // Read page with attachment extraction enabled
-      const content = await client.readPage(pageId, format, { extractReferencedAttachments: true });
-      const referencedAttachments = client._referencedAttachments || new Set();
+      const content = await client.readPage(
+        pageId,
+        format,
+        options.referencedOnly ? { extractReferencedAttachments: true } : {}
+      );
+      const referencedAttachments = options.referencedOnly
+        ? (client._referencedAttachments || new Set())
+        : null;
 
       const baseDir = path.resolve(options.dest || '.');
       const folderName = sanitizeTitle(pageInfo.title || 'page');
@@ -510,13 +516,13 @@ program
         const pattern = options.pattern ? options.pattern.trim() : null;
         const allAttachments = await client.getAllAttachments(pageId);
         
-        // Filter: only referenced attachments (unless pattern is specified, then use pattern)
         let filtered;
         if (pattern) {
           filtered = allAttachments.filter(att => client.matchesPattern(att.title, pattern));
+        } else if (options.referencedOnly) {
+          filtered = allAttachments.filter(att => referencedAttachments?.has(att.title));
         } else {
-          // Only download attachments that are referenced in the page content
-          filtered = allAttachments.filter(att => referencedAttachments.has(att.title));
+          filtered = allAttachments;
         }
 
         if (filtered.length === 0) {
@@ -700,4 +706,8 @@ program
     }
   });
 
-program.parse();
+if (process.argv.length <= 2) {
+  program.help({ error: false });
+}
+
+program.parse(process.argv);
