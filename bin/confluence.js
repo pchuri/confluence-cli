@@ -2,6 +2,7 @@
 
 const { program } = require('commander');
 const chalk = require('chalk');
+const inquirer = require('inquirer');
 const ConfluenceClient = require('../lib/confluence-client');
 const { getConfig, initConfig } = require('../lib/config');
 const Analytics = require('../lib/analytics');
@@ -269,6 +270,49 @@ program
       analytics.track('update', true);
     } catch (error) {
       analytics.track('update', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Delete command
+program
+  .command('delete <pageIdOrUrl>')
+  .description('Delete a Confluence page by ID or URL')
+  .option('-y, --yes', 'Skip confirmation prompt')
+  .action(async (pageIdOrUrl, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+      const pageInfo = await client.getPageInfo(pageIdOrUrl);
+
+      if (!options.yes) {
+        const spaceLabel = pageInfo.space?.key ? ` (${pageInfo.space.key})` : '';
+        const { confirmed } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'confirmed',
+            default: false,
+            message: `Delete "${pageInfo.title}" (ID: ${pageInfo.id})${spaceLabel}?`
+          }
+        ]);
+
+        if (!confirmed) {
+          console.log(chalk.yellow('Cancelled.'));
+          analytics.track('delete_cancel', true);
+          return;
+        }
+      }
+
+      const result = await client.deletePage(pageInfo.id);
+
+      console.log(chalk.green('✅ Page deleted successfully!'));
+      console.log(`Title: ${chalk.blue(pageInfo.title)}`);
+      console.log(`ID: ${chalk.blue(result.id)}`);
+      analytics.track('delete', true);
+    } catch (error) {
+      analytics.track('delete', false);
       console.error(chalk.red('Error:'), error.message);
       process.exit(1);
     }
