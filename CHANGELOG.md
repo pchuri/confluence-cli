@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/pchuri/confluence-cli/compare/v1.12.0...v1.12.1) (2025-12-31)
+
+
+### Bug Fixes
+
+* align README with CLI behavior ([#26](https://github.com/pchuri/confluence-cli/issues/26)) ([b24c7cf](https://github.com/pchuri/confluence-cli/commit/b24c7cf4a645383812a1cb7239b1db41ded77f8d))
+
 # [1.12.0](https://github.com/pchuri/confluence-cli/compare/v1.11.1...v1.12.0) (2025-12-31)
 
 
