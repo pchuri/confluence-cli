@@ -254,7 +254,10 @@ confluence stats
 | `create-child <title> <parentId>` | Create a child page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
 | `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--copy-suffix <text>`, `--dry-run`, `--fail-on-error`, `--quiet` |
 | `update <pageId>` | Update a page's title or content | `--title <string>`, `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
+| `delete <pageId_or_url>` | Delete a page by ID or URL | `--yes` |
 | `edit <pageId>` | Export page content for editing | `--output <file>` |
+| `attachments <pageId_or_url>` | List or download attachments for a page | `--limit <number>`, `--pattern <glob>`, `--download`, `--dest <directory>` |
+| `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--referenced-only`, `--skip-attachments` |
 | `stats` | View your usage statistics | |
 
 ## Examples
