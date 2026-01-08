@@ -44,12 +44,17 @@ npx confluence-cli
    confluence search "my search term"
    ```
 
-4. **Create a new page:**
+4. **List child pages:**
+   ```bash
+   confluence children 123456789
+   ```
+
+5. **Create a new page:**
    ```bash
    confluence create "My New Page" SPACEKEY --content "Hello World!"
    ```
 
-5. **Update a page:**
+6. **Update a page:**
    ```bash
    confluence update 123456789 --content "Updated content"
    ```
@@ -137,6 +142,27 @@ confluence export 123456789 --skip-attachments
 ### List Spaces
 ```bash
 confluence spaces
+```
+
+### List Child Pages
+```bash
+# List direct child pages
+confluence children 123456789
+
+# List all descendants recursively
+confluence children 123456789 --recursive
+
+# Display as tree structure
+confluence children 123456789 --recursive --format tree
+
+# Show page IDs and URLs
+confluence children 123456789 --show-id --show-url
+
+# Limit recursion depth
+confluence children 123456789 --recursive --max-depth 3
+
+# Output as JSON for scripting
+confluence children 123456789 --recursive --format json > children.json
 ```
 
 ### Find a Page by Title
@@ -250,6 +276,7 @@ confluence stats
 | `search <query>` | Search for pages | `--limit <number>` |
 | `spaces` | List all available spaces | |
 | `find <title>` | Find a page by its title | `--space <spaceKey>` |
+| `children <pageId>` | List child pages of a page | `--recursive`, `--max-depth <number>`, `--format <list\|tree\|json>`, `--show-url`, `--show-id` |
 | `create <title> <spaceKey>` | Create a new page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`|
 | `create-child <title> <parentId>` | Create a child page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
 | `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--copy-suffix <text>`, `--dry-run`, `--fail-on-error`, `--quiet` |
