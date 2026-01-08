@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/pchuri/confluence-cli/compare/v1.12.1...v1.13.0) (2026-01-08)
+
+
+### Features
+
+* add children command to list child pages ([#27](https://github.com/pchuri/confluence-cli/issues/27)) ([7e8b4ed](https://github.com/pchuri/confluence-cli/commit/7e8b4ed1b0ed69a7e1de52dfaf0c1ff36973f78b))
+
 ## [1.12.1](https://github.com/pchuri/confluence-cli/compare/v1.12.0...v1.12.1) (2025-12-31)
 
 
