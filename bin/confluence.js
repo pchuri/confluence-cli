@@ -706,6 +706,159 @@ program
     }
   });
 
+// List children command
+program
+  .command('children <pageId>')
+  .description('List child pages of a Confluence page')
+  .option('-r, --recursive', 'List all descendants recursively', false)
+  .option('--max-depth <number>', 'Maximum depth for recursive listing', '10')
+  .option('--format <format>', 'Output format (list, tree, json)', 'list')
+  .option('--show-url', 'Show page URLs', false)
+  .option('--show-id', 'Show page IDs', false)
+  .action(async (pageId, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+      
+      // Extract page ID from URL if needed
+      const resolvedPageId = await client.extractPageId(pageId);
+      
+      // Get children
+      let children;
+      if (options.recursive) {
+        const maxDepth = parseInt(options.maxDepth) || 10;
+        children = await client.getAllDescendantPages(resolvedPageId, maxDepth);
+      } else {
+        children = await client.getChildPages(resolvedPageId);
+      }
+      
+      if (children.length === 0) {
+        console.log(chalk.yellow('No child pages found.'));
+        analytics.track('children', true);
+        return;
+      }
+      
+      // Format output
+      const format = options.format.toLowerCase();
+      
+      if (format === 'json') {
+        // JSON output
+        const output = {
+          pageId: resolvedPageId,
+          childCount: children.length,
+          children: children.map(page => ({
+            id: page.id,
+            title: page.title,
+            type: page.type,
+            status: page.status,
+            spaceKey: page.space?.key,
+            url: `https://${config.domain}/wiki/spaces/${page.space?.key}/pages/${page.id}`,
+            parentId: page.parentId || resolvedPageId
+          }))
+        };
+        console.log(JSON.stringify(output, null, 2));
+      } else if (format === 'tree' && options.recursive) {
+        // Tree format (only for recursive mode)
+        const pageInfo = await client.getPageInfo(resolvedPageId);
+        console.log(chalk.blue(`📁 ${pageInfo.title}`));
+        
+        // Build tree structure
+        const tree = buildTree(children, resolvedPageId);
+        printTree(tree, config, options, 1);
+        
+        console.log('');
+        console.log(chalk.gray(`Total: ${children.length} child page${children.length === 1 ? '' : 's'}`));
+      } else {
+        // List format (default)
+        console.log(chalk.blue('Child pages:'));
+        console.log('');
+        
+        children.forEach((page, index) => {
+          let output = `${index + 1}. ${chalk.green(page.title)}`;
+          
+          if (options.showId) {
+            output += ` ${chalk.gray(`(ID: ${page.id})`)}`;
+          }
+          
+          if (options.showUrl) {
+            const url = `https://${config.domain}/wiki/spaces/${page.space?.key}/pages/${page.id}`;
+            output += `\n   ${chalk.gray(url)}`;
+          }
+          
+          if (options.recursive && page.parentId && page.parentId !== resolvedPageId) {
+            output += ` ${chalk.dim('(nested)')}`;
+          }
+          
+          console.log(output);
+        });
+        
+        console.log('');
+        console.log(chalk.gray(`Total: ${children.length} child page${children.length === 1 ? '' : 's'}`));
+      }
+      
+      analytics.track('children', true);
+    } catch (error) {
+      analytics.track('children', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Helper function to build tree structure
+function buildTree(pages, rootId) {
+  const tree = [];
+  const pageMap = new Map();
+  
+  // Create a map of all pages
+  pages.forEach(page => {
+    pageMap.set(page.id, { ...page, children: [] });
+  });
+  
+  // Build tree structure
+  pages.forEach(page => {
+    const node = pageMap.get(page.id);
+    const parentId = page.parentId || rootId;
+    
+    if (parentId === rootId) {
+      tree.push(node);
+    } else {
+      const parent = pageMap.get(parentId);
+      if (parent) {
+        parent.children.push(node);
+      }
+    }
+  });
+  
+  return tree;
+}
+
+// Helper function to print tree
+function printTree(nodes, config, options, depth = 1) {
+  nodes.forEach((node, index) => {
+    const isLast = index === nodes.length - 1;
+    const indent = '  '.repeat(depth - 1);
+    const prefix = isLast ? '└── ' : '├── ';
+    
+    let output = `${indent}${prefix}📄 ${chalk.green(node.title)}`;
+    
+    if (options.showId) {
+      output += ` ${chalk.gray(`(ID: ${node.id})`)}`;
+    }
+    
+    if (options.showUrl) {
+      const url = `https://${config.domain}/wiki/spaces/${node.space?.key}/pages/${node.id}`;
+      output += `\n${indent}${isLast ? '    ' : '│   '}${chalk.gray(url)}`;
+    }
+    
+    console.log(output);
+    
+    if (node.children && node.children.length > 0) {
+      printTree(node.children, config, options, depth + 1);
+    }
+  });
+}
+
 if (process.argv.length <= 2) {
   program.help({ error: false });
 }
