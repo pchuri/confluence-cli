@@ -361,6 +361,80 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('comments', () => {
+    test('should list comments with location filter', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/child/comment').reply(config => {
+        expect(config.params.location).toBe('inline');
+        expect(config.params.expand).toContain('body.storage');
+        expect(config.params.expand).toContain('ancestors');
+        return [200, {
+          results: [
+            {
+              id: 'c1',
+              status: 'current',
+              body: { storage: { value: '<p>Hello</p>' } },
+              history: { createdBy: { displayName: 'Ada' }, createdDate: '2025-01-01' },
+              version: { number: 1 },
+              ancestors: [{ id: 'c0', type: 'comment' }],
+              extensions: {
+                location: 'inline',
+                inlineProperties: { selection: 'Hello', originalSelection: 'Hello' },
+                resolution: { status: 'open' }
+              }
+            }
+          ],
+          _links: { next: '/rest/api/content/123/child/comment?start=2' }
+        }];
+      });
+
+      const page = await client.listComments('123', { location: 'inline' });
+      expect(page.results).toHaveLength(1);
+      expect(page.results[0].location).toBe('inline');
+      expect(page.results[0].resolution).toBe('open');
+      expect(page.results[0].parentId).toBe('c0');
+      expect(page.nextStart).toBe(2);
+
+      mock.restore();
+    });
+
+    test('should create inline comment with inline properties', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onPost('/content').reply(config => {
+        const payload = JSON.parse(config.data);
+        expect(payload.type).toBe('comment');
+        expect(payload.container.id).toBe('123');
+        expect(payload.body.storage.value).toBe('<p>Hi</p>');
+        expect(payload.ancestors[0].id).toBe('c0');
+        expect(payload.extensions.location).toBe('inline');
+        expect(payload.extensions.inlineProperties.originalSelection).toBe('Hi');
+        expect(payload.extensions.inlineProperties.markerRef).toBe('comment-1');
+        return [200, { id: 'c1', type: 'comment' }];
+      });
+
+      await client.createComment('123', '<p>Hi</p>', 'storage', {
+        parentId: 'c0',
+        location: 'inline',
+        inlineProperties: {
+          selection: 'Hi',
+          originalSelection: 'Hi',
+          markerRef: 'comment-1'
+        }
+      });
+
+      mock.restore();
+    });
+
+    test('should delete a comment by ID', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onDelete('/content/456').reply(204);
+
+      await expect(client.deleteComment('456')).resolves.toEqual({ id: '456' });
+
+      mock.restore();
+    });
+  });
+
   describe('attachments', () => {
     test('should have required methods for attachment handling', () => {
       expect(typeof client.listAttachments).toBe('function');
