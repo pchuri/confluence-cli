@@ -1,5 +1,12 @@
+const util = require('util');
 const js = require('@eslint/js');
 const globals = require('globals');
+
+if (typeof global.structuredClone !== 'function') {
+  global.structuredClone = typeof util.structuredClone === 'function'
+    ? util.structuredClone
+    : (value) => JSON.parse(JSON.stringify(value));
+}
 
 module.exports = [
   js.configs.recommended,
