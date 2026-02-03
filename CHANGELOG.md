@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/pchuri/confluence-cli/compare/v1.13.0...v1.14.0) (2026-02-03)
+
+
+### Features
+
+* add comments support to CLI ([d40de55](https://github.com/pchuri/confluence-cli/commit/d40de55573aa71409b3aa2743531f2a4cb5a4eda)), closes [#28](https://github.com/pchuri/confluence-cli/issues/28)
+
 # [1.13.0](https://github.com/pchuri/confluence-cli/compare/v1.12.1...v1.13.0) (2026-01-08)
 
 
