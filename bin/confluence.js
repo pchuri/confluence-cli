@@ -17,8 +17,13 @@ program
 program
   .command('init')
   .description('Initialize Confluence CLI configuration')
-  .action(async () => {
-    await initConfig();
+  .option('-d, --domain <domain>', 'Confluence domain')
+  .option('-p, --api-path <path>', 'REST API path')
+  .option('-a, --auth-type <type>', 'Authentication type (basic or bearer)')
+  .option('-e, --email <email>', 'Email for basic auth')
+  .option('-t, --token <token>', 'API token')
+  .action(async (options) => {
+    await initConfig(options);
   });
 
 // Read command
