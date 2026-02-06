@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/pchuri/confluence-cli/compare/v1.14.0...v1.15.0) (2026-02-06)
+
+
+### Features
+
+* Add CLI flags to confluence init for non-interactive setup ([#30](https://github.com/pchuri/confluence-cli/issues/30)) ([09b6b85](https://github.com/pchuri/confluence-cli/commit/09b6b85a243da5ab86eb61a1a2376a64ce6979c7))
+
 # [1.14.0](https://github.com/pchuri/confluence-cli/compare/v1.13.0...v1.14.0) (2026-02-03)
 
 
