@@ -67,13 +67,45 @@ npx confluence-cli
 confluence init
 ```
 
-The wizard now helps you choose the right API endpoint and authentication method. It recommends `/wiki/rest/api` for Atlassian Cloud domains (e.g., `*.atlassian.net`) and `/rest/api` for self-hosted/Data Center instances, then prompts for Basic (email + token) or Bearer authentication.
+The wizard helps you choose the right API endpoint and authentication method. It recommends `/wiki/rest/api` for Atlassian Cloud domains (e.g., `*.atlassian.net`) and `/rest/api` for self-hosted/Data Center instances, then prompts for Basic (email + token) or Bearer authentication.
 
-### Option 2: Environment Variables
+### Option 2: Non-interactive Setup (CLI Flags)
+
+Provide all required configuration via command-line flags. Perfect for CI/CD pipelines, Docker builds, and AI coding agents.
+
+**Complete non-interactive mode** (all required fields provided):
+```bash
+confluence init \
+  --domain "company.atlassian.net" \
+  --api-path "/wiki/rest/api" \
+  --auth-type "basic" \
+  --email "user@example.com" \
+  --token "your-api-token"
+```
+
+**Hybrid mode** (some fields provided, rest via prompts):
+```bash
+# Domain and token provided, will prompt for auth method and email
+confluence init --domain "company.atlassian.net" --token "your-api-token"
+
+# Email indicates basic auth, will prompt for domain and token
+confluence init --email "user@example.com" --token "your-api-token"
+```
+
+**Available flags:**
+- `-d, --domain <domain>` - Confluence domain (e.g., `company.atlassian.net`)
+- `-p, --api-path <path>` - REST API path (e.g., `/wiki/rest/api`)
+- `-a, --auth-type <type>` - Authentication type: `basic` or `bearer`
+- `-e, --email <email>` - Email for basic authentication
+- `-t, --token <token>` - API token
+
+⚠️ **Security note:** While flags work, storing tokens in shell history is risky. Prefer environment variables (Option 3) for production environments.
+
+### Option 3: Environment Variables
 ```bash
 export CONFLUENCE_DOMAIN="your-domain.atlassian.net"
 export CONFLUENCE_API_TOKEN="your-api-token"
-export CONFLUENCE_EMAIL="your.email@example.com"  # required when using Atlassian Cloud
+export CONFLUENCE_EMAIL="your.email@example.com"  # required when using basic auth
 export CONFLUENCE_API_PATH="/wiki/rest/api"         # Cloud default; use /rest/api for Server/DC
 # Optional: set to 'bearer' for self-hosted/Data Center instances
 export CONFLUENCE_AUTH_TYPE="basic"
