@@ -293,6 +293,62 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('movePage', () => {
+    test('should move a page by ID', async () => {
+      const mock = new MockAdapter(client.client);
+
+      mock.onGet('/content/123456789').reply(200, {
+        id: '123456789',
+        title: 'Original Title',
+        version: { number: 5 },
+        body: { storage: { value: '<p>Original content</p>' } },
+        space: { key: 'TEST' }
+      });
+
+      mock.onPut('/content/123456789').reply(200, {
+        id: '123456789',
+        title: 'Original Title',
+        version: { number: 6 },
+        ancestors: [{ id: '987654321' }]
+      });
+
+      const result = await client.movePage('123456789', '987654321');
+
+      expect(result.id).toBe('123456789');
+      expect(result.version.number).toBe(6);
+      expect(result.ancestors).toEqual([{ id: '987654321' }]);
+
+      mock.restore();
+    });
+
+    test('should move a page with new title', async () => {
+      const mock = new MockAdapter(client.client);
+
+      mock.onGet('/content/555666777').reply(200, {
+        id: '555666777',
+        title: 'Old Title',
+        version: { number: 2 },
+        body: { storage: { value: '<p>Page content</p>' } },
+        space: { key: 'DOCS' }
+      });
+
+      mock.onPut('/content/555666777').reply(200, {
+        id: '555666777',
+        title: 'New Title',
+        version: { number: 3 },
+        ancestors: [{ id: '888999000' }]
+      });
+
+      const result = await client.movePage('555666777', '888999000', 'New Title');
+
+      expect(result.title).toBe('New Title');
+      expect(result.version.number).toBe(3);
+      expect(result.ancestors).toEqual([{ id: '888999000' }]);
+
+      mock.restore();
+    });
+  });
+
   describe('page tree operations', () => {
     test('should have required methods for tree operations', () => {
       expect(typeof client.getChildPages).toBe('function');
