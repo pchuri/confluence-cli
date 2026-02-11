@@ -287,7 +287,6 @@ program
     try {
       const config = getConfig();
       const client = new ConfluenceClient(config);
-
       const result = await client.movePage(pageId, newParentId, options.title);
 
       console.log(chalk.green('✅ Page moved successfully!'));
