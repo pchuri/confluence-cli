@@ -277,6 +277,34 @@ program
     }
   });
 
+// Move command
+program
+  .command('move <pageId> <newParentId>')
+  .description('Move a page to a new parent location')
+  .option('-t, --title <title>', 'New page title (optional)')
+  .action(async (pageId, newParentId, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+
+      const result = await client.movePage(pageId, newParentId, options.title);
+
+      console.log(chalk.green('✅ Page moved successfully!'));
+      console.log(`Title: ${chalk.blue(result.title)}`);
+      console.log(`ID: ${chalk.blue(result.id)}`);
+      console.log(`New Parent: ${chalk.blue(newParentId)}`);
+      console.log(`Version: ${chalk.blue(result.version.number)}`);
+      console.log(`URL: ${chalk.gray(`https://${config.domain}/wiki${result._links.webui}`)}`);
+
+      analytics.track('move', true);
+    } catch (error) {
+      analytics.track('move', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
 // Delete command
 program
   .command('delete <pageIdOrUrl>')
