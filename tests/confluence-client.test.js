@@ -74,6 +74,11 @@ describe('ConfluenceClient', () => {
       expect(await client.extractPageId(url + '?pageId=987654321')).toBe('987654321');
     });
 
+    test('should extract page ID from pretty URL path', async () => {
+      const url = 'https://test.atlassian.net/wiki/spaces/TEST/pages/123456789/Page+Title';
+      expect(await client.extractPageId(url)).toBe('123456789');
+    });
+
     test('should resolve display URLs', async () => {
       // Mock the API response for display URL resolution
       const mock = new MockAdapter(client.client);
