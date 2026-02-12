@@ -279,8 +279,8 @@ program
 
 // Move command
 program
-  .command('move <pageId> <newParentId>')
-  .description('Move a page to a new parent location')
+  .command('move <pageId_or_url> <newParentId_or_url>')
+  .description('Move a page to a new parent location (within same space)')
   .option('-t, --title <title>', 'New page title (optional)')
   .action(async (pageId, newParentId, options) => {
     const analytics = new Analytics();

@@ -296,6 +296,22 @@ confluence update 123456789 --file ./updated-content.md --format markdown
 confluence update 123456789 --title "New Title" --content "And new content"
 ```
 
+### Move a Page to New Parent
+
+```bash
+# Move page by ID
+confluence move 123456789 987654321
+
+# Move page and rename it
+confluence move 123456789 987654321 --title "Relocated Page"
+
+# Move using URLs (for convenience)
+confluence move "https://domain.atlassian.net/wiki/viewpage.action?pageId=123456789" \
+                "https://domain.atlassian.net/wiki/viewpage.action?pageId=987654321"
+```
+
+**Note:** Pages can only be moved within the same Confluence space. Cross-space moves are not supported.
+
 ### Delete a Page
 ```bash
 # Delete by page ID (prompts for confirmation)
@@ -341,6 +357,7 @@ confluence stats
 | `create-child <title> <parentId>` | Create a child page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
 | `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--copy-suffix <text>`, `--dry-run`, `--fail-on-error`, `--quiet` |
 | `update <pageId>` | Update a page's title or content | `--title <string>`, `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
+| `move <pageId_or_url> <newParentId_or_url>` | Move a page to a new parent location | `--title <string>` |
 | `delete <pageId_or_url>` | Delete a page by ID or URL | `--yes` |
 | `edit <pageId>` | Export page content for editing | `--output <file>` |
 | `attachments <pageId_or_url>` | List or download attachments for a page | `--limit <number>`, `--pattern <glob>`, `--download`, `--dest <directory>` |
@@ -370,6 +387,12 @@ confluence search "API documentation" --limit 3
 
 # List all spaces
 confluence spaces
+
+# Move a page to a new parent
+confluence move 123456789 987654321
+
+# Move and rename
+confluence move 123456789 987654321 --title "New Title"
 
 # View usage statistics
 confluence stats

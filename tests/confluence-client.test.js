@@ -305,6 +305,11 @@ describe('ConfluenceClient', () => {
         space: { key: 'TEST' }
       });
 
+      mock.onGet('/content/987654321').reply(200, {
+        id: '987654321',
+        space: { key: 'TEST' }
+      });
+
       mock.onPut('/content/123456789').reply(200, {
         id: '123456789',
         title: 'Original Title',
@@ -332,6 +337,11 @@ describe('ConfluenceClient', () => {
         space: { key: 'DOCS' }
       });
 
+      mock.onGet('/content/888999000').reply(200, {
+        id: '888999000',
+        space: { key: 'DOCS' }
+      });
+
       mock.onPut('/content/555666777').reply(200, {
         id: '555666777',
         title: 'New Title',
@@ -344,6 +354,94 @@ describe('ConfluenceClient', () => {
       expect(result.title).toBe('New Title');
       expect(result.version.number).toBe(3);
       expect(result.ancestors).toEqual([{ id: '888999000' }]);
+
+      mock.restore();
+    });
+
+    test('should move a page using URL for pageId', async () => {
+      const mock = new MockAdapter(client.client);
+      const pageUrl = 'https://test.atlassian.net/wiki/viewpage.action?pageId=111222333';
+
+      mock.onGet('/content/111222333').reply(200, {
+        id: '111222333',
+        title: 'Test Page',
+        version: { number: 1 },
+        body: { storage: { value: '<p>Content</p>' } },
+        space: { key: 'TEST' }
+      });
+
+      mock.onGet('/content/444555666').reply(200, {
+        id: '444555666',
+        space: { key: 'TEST' }
+      });
+
+      mock.onPut('/content/111222333').reply(200, {
+        id: '111222333',
+        title: 'Test Page',
+        version: { number: 2 },
+        ancestors: [{ id: '444555666' }]
+      });
+
+      const result = await client.movePage(pageUrl, '444555666');
+
+      expect(result.id).toBe('111222333');
+      expect(result.version.number).toBe(2);
+
+      mock.restore();
+    });
+
+    test('should move a page using URLs for both parameters', async () => {
+      const mock = new MockAdapter(client.client);
+      const pageUrl = 'https://test.atlassian.net/wiki/viewpage.action?pageId=777888999';
+      const parentUrl = 'https://test.atlassian.net/wiki/viewpage.action?pageId=111000111';
+
+      mock.onGet('/content/777888999').reply(200, {
+        id: '777888999',
+        title: 'Source Page',
+        version: { number: 3 },
+        body: { storage: { value: '<p>Page content</p>' } },
+        space: { key: 'DOCS' }
+      });
+
+      mock.onGet('/content/111000111').reply(200, {
+        id: '111000111',
+        space: { key: 'DOCS' }
+      });
+
+      mock.onPut('/content/777888999').reply(200, {
+        id: '777888999',
+        title: 'Source Page',
+        version: { number: 4 },
+        ancestors: [{ id: '111000111' }]
+      });
+
+      const result = await client.movePage(pageUrl, parentUrl);
+
+      expect(result.id).toBe('777888999');
+      expect(result.version.number).toBe(4);
+
+      mock.restore();
+    });
+
+    test('should throw error when moving page across spaces', async () => {
+      const mock = new MockAdapter(client.client);
+
+      mock.onGet('/content/123456789').reply(200, {
+        id: '123456789',
+        title: 'Page in Space A',
+        version: { number: 1 },
+        body: { storage: { value: '<p>Content</p>' } },
+        space: { key: 'SPACEA' }
+      });
+
+      mock.onGet('/content/987654321').reply(200, {
+        id: '987654321',
+        space: { key: 'SPACEB' }
+      });
+
+      await expect(
+        client.movePage('123456789', '987654321')
+      ).rejects.toThrow('Cannot move page across spaces');
 
       mock.restore();
     });
