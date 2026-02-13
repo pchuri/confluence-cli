@@ -5,6 +5,37 @@ const FormData = require('form-data');
 const ConfluenceClient = require('../lib/confluence-client');
 const MockAdapter = require('axios-mock-adapter');
 
+const removeDirRecursive = (dir) => {
+  if (!dir) return;
+  try {
+    if (fs.rmSync) {
+      fs.rmSync(dir, { recursive: true, force: true });
+      return;
+    }
+  } catch (error) {
+  }
+
+  if (!fs.existsSync(dir)) return;
+
+  fs.readdirSync(dir).forEach((entry) => {
+    const entryPath = path.join(dir, entry);
+    const stats = fs.lstatSync(entryPath);
+    if (stats.isDirectory()) {
+      removeDirRecursive(entryPath);
+    } else {
+      try {
+        fs.unlinkSync(entryPath);
+      } catch (error) {
+      }
+    }
+  });
+
+  try {
+    fs.rmdirSync(dir);
+  } catch (error) {
+  }
+};
+
 describe('ConfluenceClient', () => {
   let client;
   
@@ -627,27 +658,28 @@ describe('ConfluenceClient', () => {
       const tempFile = path.join(tempDir, 'upload.txt');
       fs.writeFileSync(tempFile, 'hello');
 
-      mock.onPost('/content/123/child/attachment').reply((config) => {
-        expect(config.headers['X-Atlassian-Token']).toBe('nocheck');
-        const contentType = config.headers['content-type'] || config.headers['Content-Type'];
-        expect(contentType).toContain('multipart/form-data');
-        expect(config.data).toBeInstanceOf(FormData);
-        return [200, {
-          results: [{
-            id: '1',
-            title: 'upload.txt',
-            version: { number: 2 },
-            _links: { download: '/download' }
-          }]
-        }];
-      });
+      try {
+        mock.onPost('/content/123/child/attachment').reply((config) => {
+          expect(config.headers['X-Atlassian-Token']).toBe('nocheck');
+          const contentType = config.headers['content-type'] || config.headers['Content-Type'];
+          expect(contentType).toContain('multipart/form-data');
+          expect(config.data).toBeInstanceOf(FormData);
+          return [200, {
+            results: [{
+              id: '1',
+              title: 'upload.txt',
+              version: { number: 2 },
+              _links: { download: '/download' }
+            }]
+          }];
+        });
 
-      const response = await client.uploadAttachment('123', tempFile, { comment: 'note', minorEdit: true });
-      expect(response.results[0].title).toBe('upload.txt');
-
-      fs.unlinkSync(tempFile);
-      fs.rmdirSync(tempDir);
-      mock.restore();
+        const response = await client.uploadAttachment('123', tempFile, { comment: 'note', minorEdit: true });
+        expect(response.results[0].title).toBe('upload.txt');
+      } finally {
+        mock.restore();
+        removeDirRecursive(tempDir);
+      }
     });
 
     test('uploadAttachment should use PUT when replace is true', async () => {
@@ -656,21 +688,22 @@ describe('ConfluenceClient', () => {
       const tempFile = path.join(tempDir, 'replace.txt');
       fs.writeFileSync(tempFile, 'replace');
 
-      mock.onPut('/content/456/child/attachment').reply(200, {
-        results: [{
-          id: '2',
-          title: 'replace.txt',
-          version: { number: 3 },
-          _links: { download: '/download' }
-        }]
-      });
+      try {
+        mock.onPut('/content/456/child/attachment').reply(200, {
+          results: [{
+            id: '2',
+            title: 'replace.txt',
+            version: { number: 3 },
+            _links: { download: '/download' }
+          }]
+        });
 
-      const response = await client.uploadAttachment('456', tempFile, { replace: true });
-      expect(response.results[0].title).toBe('replace.txt');
-
-      fs.unlinkSync(tempFile);
-      fs.rmdirSync(tempDir);
-      mock.restore();
+        const response = await client.uploadAttachment('456', tempFile, { replace: true });
+        expect(response.results[0].title).toBe('replace.txt');
+      } finally {
+        mock.restore();
+        removeDirRecursive(tempDir);
+      }
     });
 
     test('deleteAttachment should call delete endpoint', async () => {
