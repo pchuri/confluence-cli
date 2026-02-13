@@ -468,6 +468,108 @@ program
     }
   });
 
+// Attachment upload command
+program
+  .command('attachment-upload <pageId>')
+  .description('Upload one or more attachments to a page')
+  .option('-f, --file <file>', 'File to upload (repeatable)', (value, previous) => {
+    const files = Array.isArray(previous) ? previous : [];
+    files.push(value);
+    return files;
+  }, [])
+  .option('--comment <comment>', 'Comment for the attachment(s)')
+  .option('--replace', 'Replace an existing attachment with the same filename')
+  .option('--minor-edit', 'Mark the upload as a minor edit')
+  .action(async (pageId, options) => {
+    const analytics = new Analytics();
+    try {
+      const files = Array.isArray(options.file) ? options.file.filter(Boolean) : [];
+      if (files.length === 0) {
+        throw new Error('At least one --file option is required.');
+      }
+
+      const fs = require('fs');
+      const path = require('path');
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+
+      const resolvedFiles = files.map((filePath) => ({
+        original: filePath,
+        resolved: path.resolve(filePath)
+      }));
+
+      resolvedFiles.forEach((file) => {
+        if (!fs.existsSync(file.resolved)) {
+          throw new Error(`File not found: ${file.original}`);
+        }
+      });
+
+      let uploaded = 0;
+      for (const file of resolvedFiles) {
+        const result = await client.uploadAttachment(pageId, file.resolved, {
+          comment: options.comment,
+          replace: options.replace,
+          minorEdit: options.minorEdit === true ? true : undefined
+        });
+        const attachment = result.results[0];
+        if (attachment) {
+          console.log(`⬆️  ${chalk.green(attachment.title)} (ID: ${attachment.id}, Version: ${attachment.version})`);
+        } else {
+          console.log(`⬆️  ${chalk.green(path.basename(file.resolved))}`);
+        }
+        uploaded += 1;
+      }
+
+      console.log(chalk.green(`Uploaded ${uploaded} attachment${uploaded === 1 ? '' : 's'} to page ${pageId}`));
+      analytics.track('attachment_upload', true);
+    } catch (error) {
+      analytics.track('attachment_upload', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Attachment delete command
+program
+  .command('attachment-delete <pageId> <attachmentId>')
+  .description('Delete an attachment by ID from a page')
+  .option('-y, --yes', 'Skip confirmation prompt')
+  .action(async (pageId, attachmentId, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+
+      if (!options.yes) {
+        const { confirmed } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'confirmed',
+            default: false,
+            message: `Delete attachment ${attachmentId} from page ${pageId}?`
+          }
+        ]);
+
+        if (!confirmed) {
+          console.log(chalk.yellow('Cancelled.'));
+          analytics.track('attachment_delete_cancel', true);
+          return;
+        }
+      }
+
+      const result = await client.deleteAttachment(pageId, attachmentId);
+
+      console.log(chalk.green('✅ Attachment deleted successfully!'));
+      console.log(`ID: ${chalk.blue(result.id)}`);
+      console.log(`Page ID: ${chalk.blue(result.pageId)}`);
+      analytics.track('attachment_delete', true);
+    } catch (error) {
+      analytics.track('attachment_delete', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
 // Comments command
 program
   .command('comments <pageId>')

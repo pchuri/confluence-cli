@@ -1,3 +1,7 @@
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const FormData = require('form-data');
 const ConfluenceClient = require('../lib/confluence-client');
 const MockAdapter = require('axios-mock-adapter');
 
@@ -445,6 +449,8 @@ describe('ConfluenceClient', () => {
       expect(typeof client.listAttachments).toBe('function');
       expect(typeof client.getAllAttachments).toBe('function');
       expect(typeof client.downloadAttachment).toBe('function');
+      expect(typeof client.uploadAttachment).toBe('function');
+      expect(typeof client.deleteAttachment).toBe('function');
     });
 
     test('matchesPattern should respect glob patterns', () => {
@@ -459,6 +465,67 @@ describe('ConfluenceClient', () => {
       expect(client.parseNextStart('/rest/api/content/1/child/attachment?start=25')).toBe(25);
       expect(client.parseNextStart('/rest/api/content/1/child/attachment?limit=50')).toBeNull();
       expect(client.parseNextStart(null)).toBeNull();
+    });
+
+    test('uploadAttachment should send multipart request with Atlassian token header', async () => {
+      const mock = new MockAdapter(client.client);
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-cli-'));
+      const tempFile = path.join(tempDir, 'upload.txt');
+      fs.writeFileSync(tempFile, 'hello');
+
+      mock.onPost('/content/123/child/attachment').reply((config) => {
+        expect(config.headers['X-Atlassian-Token']).toBe('nocheck');
+        const contentType = config.headers['content-type'] || config.headers['Content-Type'];
+        expect(contentType).toContain('multipart/form-data');
+        expect(config.data).toBeInstanceOf(FormData);
+        return [200, {
+          results: [{
+            id: '1',
+            title: 'upload.txt',
+            version: { number: 2 },
+            _links: { download: '/download' }
+          }]
+        }];
+      });
+
+      const response = await client.uploadAttachment('123', tempFile, { comment: 'note', minorEdit: true });
+      expect(response.results[0].title).toBe('upload.txt');
+
+      fs.unlinkSync(tempFile);
+      fs.rmdirSync(tempDir);
+      mock.restore();
+    });
+
+    test('uploadAttachment should use PUT when replace is true', async () => {
+      const mock = new MockAdapter(client.client);
+      const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-cli-'));
+      const tempFile = path.join(tempDir, 'replace.txt');
+      fs.writeFileSync(tempFile, 'replace');
+
+      mock.onPut('/content/456/child/attachment').reply(200, {
+        results: [{
+          id: '2',
+          title: 'replace.txt',
+          version: { number: 3 },
+          _links: { download: '/download' }
+        }]
+      });
+
+      const response = await client.uploadAttachment('456', tempFile, { replace: true });
+      expect(response.results[0].title).toBe('replace.txt');
+
+      fs.unlinkSync(tempFile);
+      fs.rmdirSync(tempDir);
+      mock.restore();
+    });
+
+    test('deleteAttachment should call delete endpoint', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onDelete('/content/123/child/attachment/999').reply(204);
+
+      await expect(client.deleteAttachment('123', '999')).resolves.toEqual({ id: '999', pageId: '123' });
+
+      mock.restore();
     });
   });
 });

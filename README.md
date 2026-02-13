@@ -11,7 +11,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - ✏️ **Create pages** - Create new pages with support for Markdown, HTML, or Storage format
 - 📝 **Update pages** - Update existing page content and titles
 - 🗑️ **Delete pages** - Delete (or move to trash) pages by ID or URL
-- 📎 **Attachments** - List or download page attachments
+- 📎 **Attachments** - List, download, upload, or delete page attachments
 - 💬 **Comments** - List, create, and delete page comments (footer or inline)
 - 📦 **Export** - Save a page and its attachments to a local folder
 - 🛠️ **Edit workflow** - Export page content for editing and re-import
@@ -158,6 +158,27 @@ confluence attachments 123456789 --pattern "*.png" --limit 5
 
 # Download matching attachments to a directory
 confluence attachments 123456789 --pattern "*.png" --download --dest ./downloads
+```
+
+### Upload Attachments
+```bash
+# Upload a single attachment
+confluence attachment-upload 123456789 --file ./report.pdf
+
+# Upload multiple files with a comment
+confluence attachment-upload 123456789 --file ./a.pdf --file ./b.png --comment "v2"
+
+# Replace an existing attachment by filename
+confluence attachment-upload 123456789 --file ./diagram.png --replace
+```
+
+### Delete Attachments
+```bash
+# Delete an attachment by ID
+confluence attachment-delete 123456789 998877
+
+# Skip confirmation
+confluence attachment-delete 123456789 998877 --yes
 ```
 
 ### Comments
@@ -344,6 +365,8 @@ confluence stats
 | `delete <pageId_or_url>` | Delete a page by ID or URL | `--yes` |
 | `edit <pageId>` | Export page content for editing | `--output <file>` |
 | `attachments <pageId_or_url>` | List or download attachments for a page | `--limit <number>`, `--pattern <glob>`, `--download`, `--dest <directory>` |
+| `attachment-upload <pageId_or_url>` | Upload attachments to a page | `--file <path>`, `--comment <text>`, `--replace`, `--minor-edit` |
+| `attachment-delete <pageId_or_url> <attachmentId>` | Delete an attachment from a page | `--yes` |
 | `comments <pageId_or_url>` | List comments for a page | `--format <text\|markdown\|json>`, `--limit <number>`, `--start <number>`, `--location <inline\|footer\|resolved>`, `--depth <root\|all>`, `--all` |
 | `comment <pageId_or_url>` | Create a comment on a page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`, `--parent <commentId>`, `--location <inline\|footer>`, `--inline-selection <text>`, `--inline-original-selection <text>`, `--inline-marker-ref <ref>`, `--inline-properties <json>` |
 | `comment-delete <commentId>` | Delete a comment by ID | `--yes` |
@@ -370,6 +393,10 @@ confluence search "API documentation" --limit 3
 
 # List all spaces
 confluence spaces
+
+# Upload and delete an attachment
+confluence attachment-upload 123456789 --file ./report.pdf
+confluence attachment-delete 123456789 998877 --yes
 
 # View usage statistics
 confluence stats
@@ -414,7 +441,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [ ] Bulk operations
 - [ ] Export pages to different formats
 - [ ] Integration with other Atlassian tools (Jira)
-- [ ] Page attachments management
+- [x] Page attachments management (list, download, upload, delete)
 - [x] Comments
 - [ ] Reviews
 
