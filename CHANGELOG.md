@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/pchuri/confluence-cli/compare/v1.15.1...v1.16.0) (2026-02-13)
+
+
+### Features
+
+* Add move command to relocate pages ([#32](https://github.com/pchuri/confluence-cli/issues/32)) ([a37f9b8](https://github.com/pchuri/confluence-cli/commit/a37f9b83174ef08a6517fe279dcce1b39fc1fb1a))
+
 ## [1.15.1](https://github.com/pchuri/confluence-cli/compare/v1.15.0...v1.15.1) (2026-02-12)
 
 
