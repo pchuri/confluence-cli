@@ -13,6 +13,7 @@ const removeDirRecursive = (dir) => {
       return;
     }
   } catch (error) {
+    void error;
   }
 
   if (!fs.existsSync(dir)) return;
@@ -26,6 +27,7 @@ const removeDirRecursive = (dir) => {
       try {
         fs.unlinkSync(entryPath);
       } catch (error) {
+        void error;
       }
     }
   });
@@ -33,6 +35,7 @@ const removeDirRecursive = (dir) => {
   try {
     fs.rmdirSync(dir);
   } catch (error) {
+    void error;
   }
 };
 
