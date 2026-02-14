@@ -409,10 +409,10 @@ confluence stats
 | `comments <pageId_or_url>` | List comments for a page | `--format <text\|markdown\|json>`, `--limit <number>`, `--start <number>`, `--location <inline\|footer\|resolved>`, `--depth <root\|all>`, `--all` |
 | `comment <pageId_or_url>` | Create a comment on a page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`, `--parent <commentId>`, `--location <inline\|footer>`, `--inline-selection <text>`, `--inline-original-selection <text>`, `--inline-marker-ref <ref>`, `--inline-properties <json>` |
 | `comment-delete <commentId>` | Delete a comment by ID | `--yes` |
-| `property-list <pageId>` | List all content properties for a page | `--format <text\|json>` |
-| `property-get <pageId> <key>` | Get a content property by key | `--format <text\|json>` |
-| `property-set <pageId> <key>` | Set a content property (create or update) | `--value <json>`, `--file <path>`, `--format <text\|json>` |
-| `property-delete <pageId> <key>` | Delete a content property by key | `--yes` |
+| `property-list <pageId_or_url>` | List all content properties for a page | `--format <text\|json>` |
+| `property-get <pageId_or_url> <key>` | Get a content property by key | `--format <text\|json>` |
+| `property-set <pageId_or_url> <key>` | Set a content property (create or update) | `--value <json>`, `--file <path>`, `--format <text\|json>` |
+| `property-delete <pageId_or_url> <key>` | Delete a content property by key | `--yes` |
 | `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--referenced-only`, `--skip-attachments` |
 | `stats` | View your usage statistics | |
 

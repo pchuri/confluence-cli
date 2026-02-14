@@ -842,6 +842,21 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('getProperty should URL-encode keys with reserved characters', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/property/my%20prop%2Fkey').reply(200, {
+        key: 'my prop/key',
+        value: { ok: true },
+        version: { number: 1 }
+      });
+
+      const result = await client.getProperty('123', 'my prop/key');
+      expect(result.key).toBe('my prop/key');
+      expect(result.value.ok).toBe(true);
+
+      mock.restore();
+    });
+
     test('deleteProperty should resolve page URLs', async () => {
       const mock = new MockAdapter(client.client);
       mock.onDelete('/content/789/property/status').reply(204);
