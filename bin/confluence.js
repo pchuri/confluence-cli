@@ -602,6 +602,9 @@ program
   .command('property-list <pageId>')
   .description('List all content properties for a page')
   .option('-f, --format <format>', 'Output format (text, json)', 'text')
+  .option('-l, --limit <limit>', 'Maximum number of properties to fetch (default: 25)')
+  .option('--start <start>', 'Start index for results (default: 0)', '0')
+  .option('--all', 'Fetch all properties (ignores pagination)')
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
@@ -613,10 +616,39 @@ program
         throw new Error('Format must be one of: text, json');
       }
 
-      const properties = await client.listProperties(pageId);
+      const limit = options.limit ? parseInt(options.limit, 10) : null;
+      if (options.limit && (Number.isNaN(limit) || limit <= 0)) {
+        throw new Error('Limit must be a positive number.');
+      }
+
+      const start = options.start ? parseInt(options.start, 10) : 0;
+      if (options.start && (Number.isNaN(start) || start < 0)) {
+        throw new Error('Start must be a non-negative number.');
+      }
+
+      let properties = [];
+      let nextStart = null;
+
+      if (options.all) {
+        properties = await client.getAllProperties(pageId, {
+          maxResults: limit || null,
+          start
+        });
+      } else {
+        const response = await client.listProperties(pageId, {
+          limit: limit || undefined,
+          start
+        });
+        properties = response.results;
+        nextStart = response.nextStart;
+      }
 
       if (format === 'json') {
-        console.log(JSON.stringify(properties, null, 2));
+        const output = { properties };
+        if (!options.all) {
+          output.nextStart = nextStart;
+        }
+        console.log(JSON.stringify(output, null, 2));
       } else if (properties.length === 0) {
         console.log(chalk.yellow('No properties found.'));
       } else {
@@ -625,6 +657,10 @@ program
           const truncated = preview.length > 80 ? preview.slice(0, 77) + '...' : preview;
           console.log(`${chalk.blue(i + 1 + '.')} ${chalk.green(prop.key)} (v${prop.version.number}): ${truncated}`);
         });
+
+        if (!options.all && nextStart !== null && nextStart !== undefined) {
+          console.log(chalk.gray(`Next start: ${nextStart}`));
+        }
       }
       analytics.track('property_list', true);
     } catch (error) {
