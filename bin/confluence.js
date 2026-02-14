@@ -597,6 +597,176 @@ program
     }
   });
 
+// Property list command
+program
+  .command('property-list <pageId>')
+  .description('List all content properties for a page')
+  .option('-f, --format <format>', 'Output format (text, json)', 'text')
+  .action(async (pageId, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+
+      const format = (options.format || 'text').toLowerCase();
+      if (!['text', 'json'].includes(format)) {
+        throw new Error('Format must be one of: text, json');
+      }
+
+      const properties = await client.listProperties(pageId);
+
+      if (format === 'json') {
+        console.log(JSON.stringify(properties, null, 2));
+      } else if (properties.length === 0) {
+        console.log(chalk.yellow('No properties found.'));
+      } else {
+        properties.forEach((prop, i) => {
+          const preview = JSON.stringify(prop.value);
+          const truncated = preview.length > 80 ? preview.slice(0, 77) + '...' : preview;
+          console.log(`${chalk.blue(i + 1 + '.')} ${chalk.green(prop.key)} (v${prop.version.number}): ${truncated}`);
+        });
+      }
+      analytics.track('property_list', true);
+    } catch (error) {
+      analytics.track('property_list', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Property get command
+program
+  .command('property-get <pageId> <key>')
+  .description('Get a content property by key')
+  .option('-f, --format <format>', 'Output format (text, json)', 'text')
+  .action(async (pageId, key, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+
+      const format = (options.format || 'text').toLowerCase();
+      if (!['text', 'json'].includes(format)) {
+        throw new Error('Format must be one of: text, json');
+      }
+
+      const property = await client.getProperty(pageId, key);
+
+      if (format === 'json') {
+        console.log(JSON.stringify(property, null, 2));
+      } else {
+        console.log(`${chalk.green('Key:')} ${property.key}`);
+        console.log(`${chalk.green('Version:')} ${property.version.number}`);
+        console.log(`${chalk.green('Value:')}`);
+        console.log(JSON.stringify(property.value, null, 2));
+      }
+      analytics.track('property_get', true);
+    } catch (error) {
+      analytics.track('property_get', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Property set command
+program
+  .command('property-set <pageId> <key>')
+  .description('Set a content property (create or update)')
+  .option('-v, --value <json>', 'Property value as JSON')
+  .option('--file <file>', 'Read property value from a JSON file')
+  .option('-f, --format <format>', 'Output format (text, json)', 'text')
+  .action(async (pageId, key, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+
+      if (!options.value && !options.file) {
+        throw new Error('Provide a value with --value or --file.');
+      }
+
+      let value;
+      if (options.file) {
+        const fs = require('fs');
+        const raw = fs.readFileSync(options.file, 'utf-8');
+        try {
+          value = JSON.parse(raw);
+        } catch {
+          throw new Error(`Invalid JSON in file ${options.file}`);
+        }
+      } else {
+        try {
+          value = JSON.parse(options.value);
+        } catch {
+          throw new Error('Invalid JSON in --value');
+        }
+      }
+
+      const format = (options.format || 'text').toLowerCase();
+      if (!['text', 'json'].includes(format)) {
+        throw new Error('Format must be one of: text, json');
+      }
+
+      const result = await client.setProperty(pageId, key, value);
+
+      if (format === 'json') {
+        console.log(JSON.stringify(result, null, 2));
+      } else {
+        console.log(chalk.green('✅ Property set successfully!'));
+        console.log(`${chalk.green('Key:')} ${result.key}`);
+        console.log(`${chalk.green('Version:')} ${result.version.number}`);
+        console.log(`${chalk.green('Value:')}`);
+        console.log(JSON.stringify(result.value, null, 2));
+      }
+      analytics.track('property_set', true);
+    } catch (error) {
+      analytics.track('property_set', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+// Property delete command
+program
+  .command('property-delete <pageId> <key>')
+  .description('Delete a content property by key')
+  .option('-y, --yes', 'Skip confirmation prompt')
+  .action(async (pageId, key, options) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig();
+      const client = new ConfluenceClient(config);
+
+      if (!options.yes) {
+        const { confirmed } = await inquirer.prompt([
+          {
+            type: 'confirm',
+            name: 'confirmed',
+            default: false,
+            message: `Delete property "${key}" from page ${pageId}?`
+          }
+        ]);
+
+        if (!confirmed) {
+          console.log(chalk.yellow('Cancelled.'));
+          analytics.track('property_delete_cancel', true);
+          return;
+        }
+      }
+
+      const result = await client.deleteProperty(pageId, key);
+
+      console.log(chalk.green('✅ Property deleted successfully!'));
+      console.log(`${chalk.green('Key:')} ${chalk.blue(result.key)}`);
+      console.log(`${chalk.green('Page ID:')} ${chalk.blue(result.pageId)}`);
+      analytics.track('property_delete', true);
+    } catch (error) {
+      analytics.track('property_delete', false);
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
 // Comments command
 program
   .command('comments <pageId>')

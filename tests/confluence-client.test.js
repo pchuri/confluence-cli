@@ -718,4 +718,141 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
   });
+
+  describe('content properties', () => {
+    test('should have required methods for property handling', () => {
+      expect(typeof client.listProperties).toBe('function');
+      expect(typeof client.getProperty).toBe('function');
+      expect(typeof client.setProperty).toBe('function');
+      expect(typeof client.deleteProperty).toBe('function');
+    });
+
+    test('listProperties should return results array', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/property').reply(200, {
+        results: [
+          { key: 'color', value: { hex: '#ff0000' }, version: { number: 1 } },
+          { key: 'status', value: 'active', version: { number: 3 } }
+        ]
+      });
+
+      const results = await client.listProperties('123');
+      expect(results).toHaveLength(2);
+      expect(results[0].key).toBe('color');
+      expect(results[1].key).toBe('status');
+
+      mock.restore();
+    });
+
+    test('listProperties should return empty array when no properties exist', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/456/property').reply(200, { results: [] });
+
+      const results = await client.listProperties('456');
+      expect(results).toEqual([]);
+
+      mock.restore();
+    });
+
+    test('listProperties should resolve page URLs', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/789/property').reply(200, { results: [] });
+
+      const results = await client.listProperties('https://test.atlassian.net/wiki/viewpage.action?pageId=789');
+      expect(results).toEqual([]);
+
+      mock.restore();
+    });
+
+    test('getProperty should return property data', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/property/color').reply(200, {
+        key: 'color',
+        value: { hex: '#ff0000' },
+        version: { number: 2 }
+      });
+
+      const result = await client.getProperty('123', 'color');
+      expect(result.key).toBe('color');
+      expect(result.value.hex).toBe('#ff0000');
+
+      mock.restore();
+    });
+
+    test('getProperty should throw on 404', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/property/missing').reply(404, { message: 'Not found' });
+
+      await expect(client.getProperty('123', 'missing')).rejects.toThrow();
+
+      mock.restore();
+    });
+
+    test('setProperty should create new property with version 1', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/property/newkey').reply(404);
+      mock.onPut('/content/123/property/newkey').reply((config) => {
+        const body = JSON.parse(config.data);
+        expect(body.version.number).toBe(1);
+        expect(body.key).toBe('newkey');
+        return [200, body];
+      });
+
+      const result = await client.setProperty('123', 'newkey', { data: true });
+      expect(result.version.number).toBe(1);
+
+      mock.restore();
+    });
+
+    test('setProperty should auto-increment version for existing property', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/property/existing').reply(200, {
+        key: 'existing',
+        value: 'old',
+        version: { number: 5 }
+      });
+      mock.onPut('/content/123/property/existing').reply((config) => {
+        const body = JSON.parse(config.data);
+        expect(body.version.number).toBe(6);
+        return [200, body];
+      });
+
+      const result = await client.setProperty('123', 'existing', 'new');
+      expect(result.version.number).toBe(6);
+
+      mock.restore();
+    });
+
+    test('setProperty should propagate non-404 errors', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/property/broken').reply(500);
+
+      await expect(client.setProperty('123', 'broken', 'val')).rejects.toThrow();
+
+      mock.restore();
+    });
+
+    test('deleteProperty should call delete endpoint', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onDelete('/content/123/property/color').reply(204);
+
+      const result = await client.deleteProperty('123', 'color');
+      expect(result).toEqual({ pageId: '123', key: 'color' });
+
+      mock.restore();
+    });
+
+    test('deleteProperty should resolve page URLs', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onDelete('/content/789/property/status').reply(204);
+
+      const result = await client.deleteProperty(
+        'https://test.atlassian.net/wiki/viewpage.action?pageId=789',
+        'status'
+      );
+      expect(result).toEqual({ pageId: '789', key: 'status' });
+
+      mock.restore();
+    });
+  });
 });

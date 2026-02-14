@@ -12,6 +12,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - 📝 **Update pages** - Update existing page content and titles
 - 🗑️ **Delete pages** - Delete (or move to trash) pages by ID or URL
 - 📎 **Attachments** - List, download, upload, or delete page attachments
+- 🏷️ **Properties** - List, get, set, and delete content properties (key-value metadata)
 - 💬 **Comments** - List, create, and delete page comments (footer or inline)
 - 📦 **Export** - Save a page and its attachments to a local folder
 - 🛠️ **Edit workflow** - Export page content for editing and re-import
@@ -179,6 +180,27 @@ confluence attachment-delete 123456789 998877
 
 # Skip confirmation
 confluence attachment-delete 123456789 998877 --yes
+```
+
+### Content Properties
+```bash
+# List all properties on a page
+confluence property-list 123456789
+
+# Get a specific property
+confluence property-get 123456789 my-key
+
+# Set a property (creates or updates with auto-versioning)
+confluence property-set 123456789 my-key --value '{"color":"#ff0000"}'
+
+# Set a property from a JSON file
+confluence property-set 123456789 my-key --file ./property.json
+
+# Delete a property
+confluence property-delete 123456789 my-key
+
+# Skip confirmation on delete
+confluence property-delete 123456789 my-key --yes
 ```
 
 ### Comments
@@ -387,6 +409,10 @@ confluence stats
 | `comments <pageId_or_url>` | List comments for a page | `--format <text\|markdown\|json>`, `--limit <number>`, `--start <number>`, `--location <inline\|footer\|resolved>`, `--depth <root\|all>`, `--all` |
 | `comment <pageId_or_url>` | Create a comment on a page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`, `--parent <commentId>`, `--location <inline\|footer>`, `--inline-selection <text>`, `--inline-original-selection <text>`, `--inline-marker-ref <ref>`, `--inline-properties <json>` |
 | `comment-delete <commentId>` | Delete a comment by ID | `--yes` |
+| `property-list <pageId>` | List all content properties for a page | `--format <text\|json>` |
+| `property-get <pageId> <key>` | Get a content property by key | `--format <text\|json>` |
+| `property-set <pageId> <key>` | Set a content property (create or update) | `--value <json>`, `--file <path>`, `--format <text\|json>` |
+| `property-delete <pageId> <key>` | Delete a content property by key | `--yes` |
 | `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--referenced-only`, `--skip-attachments` |
 | `stats` | View your usage statistics | |
 
