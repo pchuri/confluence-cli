@@ -339,6 +339,19 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('should escape double quotes in text search query', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/search').reply((config) => {
+        expect(config.params.cql).toBe('text ~ "test \\"quoted\\" term"');
+        return [200, { results: [] }];
+      });
+
+      const results = await client.search('test "quoted" term');
+      expect(results).toEqual([]);
+
+      mock.restore();
+    });
+
     test('should respect limit parameter', async () => {
       const mock = new MockAdapter(client.client);
       mock.onGet('/search').reply((config) => {
