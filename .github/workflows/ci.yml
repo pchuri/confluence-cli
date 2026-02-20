@@ -31,8 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: Run npm audit
-      run: npm audit --audit-level moderate
+    - run: npm ci
+    - name: Run npm audit (production only)
+      run: npm audit --audit-level moderate --omit=dev
 
   publish:
     needs: [test, security]
