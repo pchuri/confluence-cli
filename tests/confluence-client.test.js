@@ -97,7 +97,7 @@ describe('ConfluenceClient', () => {
         domain: 'test.atlassian.net',
         token: 'missing-email',
         authType: 'basic'
-      })).toThrow('Basic authentication requires an email address.');
+      })).toThrow('Basic authentication requires an email address or username.');
     });
   });
 

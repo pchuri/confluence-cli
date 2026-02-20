@@ -20,7 +20,7 @@ program
   .option('-d, --domain <domain>', 'Confluence domain')
   .option('-p, --api-path <path>', 'REST API path')
   .option('-a, --auth-type <type>', 'Authentication type (basic or bearer)')
-  .option('-e, --email <email>', 'Email for basic auth')
+  .option('-e, --email <email>', 'Email or username for basic auth')
   .option('-t, --token <token>', 'API token')
   .action(async (options) => {
     await initConfig(options);
