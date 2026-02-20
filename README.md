@@ -68,7 +68,7 @@ npx confluence-cli
 confluence init
 ```
 
-The wizard helps you choose the right API endpoint and authentication method. It recommends `/wiki/rest/api` for Atlassian Cloud domains (e.g., `*.atlassian.net`) and `/rest/api` for self-hosted/Data Center instances, then prompts for Basic (email + token) or Bearer authentication.
+The wizard helps you choose the right API endpoint and authentication method. It recommends `/wiki/rest/api` for Atlassian Cloud domains (e.g., `*.atlassian.net`) and `/rest/api` for self-hosted/Data Center instances, then prompts for Basic (email/username + token/password) or Bearer authentication.
 
 ### Option 2: Non-interactive Setup (CLI Flags)
 
@@ -97,16 +97,16 @@ confluence init --email "user@example.com" --token "your-api-token"
 - `-d, --domain <domain>` - Confluence domain (e.g., `company.atlassian.net`)
 - `-p, --api-path <path>` - REST API path (e.g., `/wiki/rest/api`)
 - `-a, --auth-type <type>` - Authentication type: `basic` or `bearer`
-- `-e, --email <email>` - Email for basic authentication
-- `-t, --token <token>` - API token
+- `-e, --email <email>` - Email or username for basic authentication
+- `-t, --token <token>` - API token or password
 
 ⚠️ **Security note:** While flags work, storing tokens in shell history is risky. Prefer environment variables (Option 3) for production environments.
 
 ### Option 3: Environment Variables
 ```bash
 export CONFLUENCE_DOMAIN="your-domain.atlassian.net"
-export CONFLUENCE_API_TOKEN="your-api-token"
-export CONFLUENCE_EMAIL="your.email@example.com"  # required when using basic auth
+export CONFLUENCE_API_TOKEN="your-api-token"      # or password for on-premise
+export CONFLUENCE_EMAIL="your.email@example.com"  # required for basic auth (use username for on-premise)
 export CONFLUENCE_API_PATH="/wiki/rest/api"         # Cloud default; use /rest/api for Server/DC
 # Optional: set to 'bearer' for self-hosted/Data Center instances
 export CONFLUENCE_AUTH_TYPE="basic"
@@ -116,10 +116,13 @@ export CONFLUENCE_AUTH_TYPE="basic"
 
 ### Getting Your API Token
 
+**Atlassian Cloud:**
 1. Go to [Atlassian Account Settings](https://id.atlassian.com/manage-profile/security/api-tokens)
 2. Click "Create API token"
 3. Give it a label (e.g., "confluence-cli")
 4. Copy the generated token
+
+**On-premise / Data Center:** Use your Confluence username and password for basic authentication.
 
 ## Usage
 
