@@ -75,11 +75,12 @@ program
   .command('search <query>')
   .description('Search for Confluence pages')
   .option('-l, --limit <limit>', 'Limit number of results', '10')
+  .option('--cql', 'Pass query as raw CQL instead of text search')
   .action(async (query, options) => {
     const analytics = new Analytics();
     try {
       const client = new ConfluenceClient(getConfig());
-      const results = await client.search(query, parseInt(options.limit));
+      const results = await client.search(query, parseInt(options.limit), options.cql);
       
       if (results.length === 0) {
         console.log(chalk.yellow('No results found.'));

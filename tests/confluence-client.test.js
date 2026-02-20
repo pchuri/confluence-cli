@@ -303,6 +303,55 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('search', () => {
+    test('should wrap query in text search by default', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/search').reply((config) => {
+        expect(config.params.cql).toBe('text ~ "architecture decisions"');
+        expect(config.params.limit).toBe(10);
+        return [200, { results: [] }];
+      });
+
+      const results = await client.search('architecture decisions');
+      expect(results).toEqual([]);
+
+      mock.restore();
+    });
+
+    test('should pass raw CQL when rawCql is true', async () => {
+      const mock = new MockAdapter(client.client);
+      const rawQuery = 'contributor = currentUser() order by lastmodified desc';
+      mock.onGet('/search').reply((config) => {
+        expect(config.params.cql).toBe(rawQuery);
+        return [200, {
+          results: [{
+            content: { id: '123', title: 'Test Page', type: 'page' },
+            excerpt: 'test excerpt'
+          }]
+        }];
+      });
+
+      const results = await client.search(rawQuery, 10, true);
+      expect(results).toHaveLength(1);
+      expect(results[0].id).toBe('123');
+      expect(results[0].title).toBe('Test Page');
+
+      mock.restore();
+    });
+
+    test('should respect limit parameter', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/search').reply((config) => {
+        expect(config.params.limit).toBe(5);
+        return [200, { results: [] }];
+      });
+
+      await client.search('test', 5);
+
+      mock.restore();
+    });
+  });
+
   describe('page creation and updates', () => {
     test('should have required methods for page management', () => {
       expect(typeof client.createPage).toBe('function');
