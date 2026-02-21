@@ -105,8 +105,8 @@ confluence init --email "user@example.com" --token "your-api-token"
 ### Option 3: Environment Variables
 ```bash
 export CONFLUENCE_DOMAIN="your-domain.atlassian.net"
-export CONFLUENCE_API_TOKEN="your-api-token"      # or password for on-premise
-export CONFLUENCE_EMAIL="your.email@example.com"  # required for basic auth (use username for on-premise)
+export CONFLUENCE_API_TOKEN="your-api-token"      # or password for on-premise (alias: CONFLUENCE_PASSWORD)
+export CONFLUENCE_EMAIL="your.email@example.com"  # required for basic auth (alias: CONFLUENCE_USERNAME for on-premise)
 export CONFLUENCE_API_PATH="/wiki/rest/api"         # Cloud default; use /rest/api for Server/DC
 # Optional: set to 'bearer' for self-hosted/Data Center instances
 export CONFLUENCE_AUTH_TYPE="basic"
