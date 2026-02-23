@@ -1,5 +1,9 @@
 # Confluence CLI
 
+[![npm version](https://img.shields.io/npm/v/confluence-cli)](https://www.npmjs.com/package/confluence-cli)
+[![Homebrew](https://img.shields.io/badge/homebrew-available-orange)](https://github.com/pchuri/homebrew-confluence-cli)
+[![Winget](https://img.shields.io/badge/winget-available-blue)](https://github.com/microsoft/winget-pkgs/tree/master/manifests/p/pchuri/confluence-cli)
+
 A powerful command-line interface for Atlassian Confluence that allows you to read, search, and manage your Confluence content from the terminal.
 
 ## Features
@@ -20,14 +24,41 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 
 ## Installation
 
+### Option 1: npm (Node.js Package Manager)
+
 ```bash
 npm install -g confluence-cli
 ```
 
-Or run directly with npx:
+Or run directly with npx (no installation required):
 ```bash
 npx confluence-cli
 ```
+
+### Option 2: Homebrew (macOS/Linux)
+
+```bash
+brew tap pchuri/confluence-cli
+brew install confluence-cli
+```
+
+To update:
+```bash
+brew upgrade confluence-cli
+```
+
+### Option 3: Winget (Windows)
+
+```bash
+winget install pchuri.confluence-cli
+```
+
+To update:
+```bash
+winget upgrade pchuri.confluence-cli
+```
+
+**Note:** All installation methods require Node.js 14.0.0 or higher to be installed on your system.
 
 ## Quick Start
 

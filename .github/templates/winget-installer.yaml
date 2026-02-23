@@ -1,0 +1,9 @@
+PackageIdentifier: pchuri.confluence-cli
+PackageVersion: 1.19.0
+InstallerType: zip
+Installers:
+  - Architecture: x64
+    InstallerUrl: https://github.com/pchuri/confluence-cli/releases/download/v1.19.0/confluence-cli-1.19.0-win.zip
+    InstallerSha256: b40acdea5c89e410abd04bf644adb01c359ca0849d0d57454d9b07ffc560e7c9
+ManifestType: installer
+ManifestVersion: 1.6.0
