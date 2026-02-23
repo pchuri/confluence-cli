@@ -1,0 +1,20 @@
+PackageIdentifier: pchuri.confluence-cli
+PackageVersion: 1.19.0
+PackageLocale: en-US
+Publisher: pchuri
+PublisherUrl: https://github.com/pchuri
+PublisherSupportUrl: https://github.com/pchuri/confluence-cli/issues
+PackageName: Confluence CLI
+PackageUrl: https://github.com/pchuri/confluence-cli
+License: MIT
+LicenseUrl: https://github.com/pchuri/confluence-cli/blob/main/LICENSE
+ShortDescription: Command-line interface for Atlassian Confluence
+Description: A powerful command-line interface for Atlassian Confluence that allows you to read, search, and manage your Confluence content from the terminal.
+Tags:
+  - cli
+  - confluence
+  - atlassian
+  - documentation
+  - wiki
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0

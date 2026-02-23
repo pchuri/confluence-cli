@@ -1,0 +1,89 @@
+name: Update Package Managers
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  update-homebrew:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Update Homebrew tap
+        uses: mislav/bump-homebrew-formula-action@v3
+        with:
+          formula-name: confluence-cli
+          formula-path: Formula/confluence-cli.rb
+          homebrew-tap: pchuri/homebrew-confluence-cli
+          base-branch: main
+          download-url: https://registry.npmjs.org/confluence-cli/-/confluence-cli-${{ steps.version.outputs.version }}.tgz
+          commit-message: |
+            confluence-cli ${{ steps.version.outputs.version }}
+
+            Created by https://github.com/mislav/bump-homebrew-formula-action
+        env:
+          COMMITTER_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+  update-winget:
+    name: Update Winget Package
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Extract version from tag
+        id: version
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+
+      - name: Install production dependencies
+        run: npm ci --omit=dev
+
+      - name: Install archiver for packaging
+        run: npm install archiver
+
+      - name: Create Windows ZIP package
+        run: npm run package:win
+
+      - name: Calculate ZIP SHA256
+        id: hash
+        shell: bash
+        run: |
+          SHA256=$(sha256sum dist/confluence-cli-${{ steps.version.outputs.version }}-win.zip | cut -d ' ' -f 1)
+          echo "sha256=${SHA256}" >> $GITHUB_OUTPUT
+          echo "SHA256: ${SHA256}"
+
+      - name: Upload ZIP to release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/confluence-cli-${{ steps.version.outputs.version }}-win.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Winget package
+        uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: pchuri.confluence-cli
+          version: ${{ steps.version.outputs.version }}
+          installers-regex: 'confluence-cli-.*-win\.zip$'
+          token: ${{ secrets.WINGET_TOKEN }}
+          fork-user: pchuri
