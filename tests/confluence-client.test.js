@@ -771,6 +771,66 @@ describe('ConfluenceClient', () => {
       }
     });
 
+    test('normalizeAttachment should return all fields needed for JSON output', () => {
+      const raw = {
+        id: '101',
+        title: 'diagram.png',
+        metadata: { mediaType: 'image/png' },
+        extensions: { fileSize: 204800 },
+        version: { number: 3 },
+        _links: { download: '/download/attachments/123/diagram.png' }
+      };
+      const result = client.normalizeAttachment(raw);
+      expect(result).toEqual({
+        id: '101',
+        title: 'diagram.png',
+        mediaType: 'image/png',
+        fileSize: 204800,
+        version: 3,
+        downloadLink: expect.stringContaining('/download/attachments/123/diagram.png')
+      });
+    });
+
+    test('normalizeAttachment should handle missing metadata gracefully', () => {
+      const raw = {
+        id: '102',
+        title: 'readme.txt',
+        version: { number: 1 },
+        _links: {}
+      };
+      const result = client.normalizeAttachment(raw);
+      expect(result.mediaType).toBe('');
+      expect(result.fileSize).toBe(0);
+      expect(result.version).toBe(1);
+      expect(result.downloadLink).toBeNull();
+    });
+
+    test('getAllAttachments should return normalized attachment objects', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/child/attachment').reply(200, {
+        results: [{
+          id: '201',
+          title: 'report.pdf',
+          metadata: { mediaType: 'application/pdf' },
+          extensions: { fileSize: 512000 },
+          version: { number: 2 },
+          _links: { download: '/download/attachments/123/report.pdf' }
+        }],
+        _links: {}
+      });
+
+      const attachments = await client.getAllAttachments('123');
+      expect(attachments).toHaveLength(1);
+      expect(attachments[0]).toHaveProperty('id', '201');
+      expect(attachments[0]).toHaveProperty('title', 'report.pdf');
+      expect(attachments[0]).toHaveProperty('mediaType', 'application/pdf');
+      expect(attachments[0]).toHaveProperty('fileSize', 512000);
+      expect(attachments[0]).toHaveProperty('version', 2);
+      expect(attachments[0]).toHaveProperty('downloadLink');
+
+      mock.restore();
+    });
+
     test('deleteAttachment should call delete endpoint', async () => {
       const mock = new MockAdapter(client.client);
       mock.onDelete('/content/123/child/attachment/999').reply(204);
