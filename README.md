@@ -534,7 +534,7 @@ Check out our [Contributing Guide](CONTRIBUTING.md) - all contributions are welc
 ### 📈 Usage Analytics
 
 confluence-cli tracks command usage statistics **locally** on your machine (`~/.confluence-cli/stats.json`). No data is sent to any external server. This includes:
-- Command usage counts (success/failure)
+- Command usage counts (success/error)
 
 You can view your stats with `confluence stats`, or disable tracking by setting: `export CONFLUENCE_CLI_ANALYTICS=false`
 
