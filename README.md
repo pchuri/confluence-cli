@@ -533,12 +533,10 @@ Check out our [Contributing Guide](CONTRIBUTING.md) - all contributions are welc
 
 ### 📈 Usage Analytics
 
-To help us understand how confluence-cli is being used and improve it, we collect anonymous usage statistics. This includes:
-- Command usage frequency (no personal data)
-- Error patterns (to fix bugs faster)
-- Feature adoption metrics
+confluence-cli tracks command usage statistics **locally** on your machine (`~/.confluence-cli/stats.json`). No data is sent to any external server. This includes:
+- Command usage counts (success/failure)
 
-You can opt-out anytime by setting: `export CONFLUENCE_CLI_ANALYTICS=false`
+You can view your stats with `confluence stats`, or disable tracking by setting: `export CONFLUENCE_CLI_ANALYTICS=false`
 
 ---
 
