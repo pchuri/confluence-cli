@@ -139,6 +139,50 @@ program
     }
   });
 
+// Install skill command
+program
+  .command('install-skill')
+  .description('Copy Claude Code skill files into your project\'s .claude/skills/ directory')
+  .option('--dest <directory>', 'Target directory', './.claude/skills/confluence')
+  .option('-y, --yes', 'Skip confirmation prompt')
+  .action(async (options) => {
+    const fs = require('fs');
+    const path = require('path');
+
+    const skillSrc = path.join(__dirname, '..', '.claude', 'skills', 'confluence', 'SKILL.md');
+
+    if (!fs.existsSync(skillSrc)) {
+      console.error(chalk.red('Error: skill file not found in package. Try reinstalling confluence-cli.'));
+      process.exit(1);
+    }
+
+    const destDir = path.resolve(options.dest);
+    const destFile = path.join(destDir, 'SKILL.md');
+
+    if (fs.existsSync(destFile) && !options.yes) {
+      const { confirmed } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirmed',
+          default: true,
+          message: `Overwrite existing skill file at ${destFile}?`
+        }
+      ]);
+
+      if (!confirmed) {
+        console.log(chalk.yellow('Cancelled.'));
+        return;
+      }
+    }
+
+    fs.mkdirSync(destDir, { recursive: true });
+    fs.copyFileSync(skillSrc, destFile);
+
+    console.log(chalk.green('✅ Skill installed successfully!'));
+    console.log(`Location: ${chalk.gray(destFile)}`);
+    console.log(chalk.yellow('Claude Code will now pick up confluence-cli knowledge from this file.'));
+  });
+
 // Create command
 program
   .command('create <title> <spaceKey>')

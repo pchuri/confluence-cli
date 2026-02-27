@@ -28,6 +28,18 @@ Or run directly with npx:
 npx confluence-cli
 ```
 
+## Claude Code AI Skills
+
+If you use [Claude Code](https://claude.ai/code) or any AI agent that reads `.claude/skills/`, install the skill documentation so the agent understands all confluence-cli commands automatically.
+
+Run this from your project root after installing confluence-cli:
+
+```bash
+confluence install-skill
+```
+
+This creates `.claude/skills/confluence/SKILL.md` in your current directory. Claude Code picks it up automatically and can help you with any confluence-cli command.
+
 ## Quick Start
 
 1. **Initialize configuration:**

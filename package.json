@@ -54,5 +54,10 @@
   "bugs": {
     "url": "https://github.com/pchuri/confluence-cli/issues"
   },
-  "homepage": "https://github.com/pchuri/confluence-cli#readme"
+  "homepage": "https://github.com/pchuri/confluence-cli#readme",
+  "files": [
+    "bin/",
+    "lib/",
+    ".claude/skills/"
+  ]
 }
