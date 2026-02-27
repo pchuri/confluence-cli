@@ -38,14 +38,24 @@ confluence init \
 
 ## Page ID Resolution
 
-Most commands accept `<pageId>` — either a numeric ID or a URL containing `?pageId=`.
+Most commands accept `<pageId>` — a numeric ID or any of the supported URL formats below.
+
+**Supported formats:**
+
+| Format | Example |
+|---|---|
+| Numeric ID | `123456789` |
+| `?pageId=` URL | `https://company.atlassian.net/wiki/viewpage.action?pageId=123456789` |
+| Pretty `/pages/<id>` URL | `https://company.atlassian.net/wiki/spaces/SPACE/pages/123456789/Page+Title` |
+| Display `/display/<space>/<title>` URL | `https://company.atlassian.net/wiki/display/SPACE/Page+Title` |
 
 ```sh
 confluence read 123456789
 confluence read "https://company.atlassian.net/wiki/viewpage.action?pageId=123456789"
+confluence read "https://company.atlassian.net/wiki/spaces/MYSPACE/pages/123456789/My+Page"
 ```
 
-Pretty/display-style URLs (e.g. `/wiki/spaces/SPACE/pages/123456789/Page+Title`) are **not** supported — extract the numeric `pageId` from the URL or use `confluence find` to look up an ID by title.
+> **Note:** Display-style URLs (`/display/<space>/<title>`) perform a title-based lookup, so the page title in the URL must match exactly. When possible, prefer numeric IDs or `/pages/<id>` URLs for reliability.
 
 ## Content Formats
 
@@ -459,6 +469,37 @@ confluence comment-delete <commentId> [--yes]
 
 ```sh
 confluence comment-delete 456789 --yes
+```
+
+---
+
+### `copy-tree <sourcePageId> <targetParentId> [newTitle]`
+
+Copy a page and all its children to a new location.
+
+```sh
+confluence copy-tree <sourcePageId> <targetParentId> [newTitle] [--max-depth <depth>] [--exclude <patterns>] [--delay-ms <ms>] [--copy-suffix <suffix>] [--dry-run] [--fail-on-error] [--quiet]
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--max-depth` | `10` | Maximum depth to copy |
+| `--exclude` | — | Comma-separated title patterns to exclude (supports wildcards) |
+| `--delay-ms` | `100` | Delay between sibling creations in ms |
+| `--copy-suffix` | `" (Copy)"` | Suffix appended to the root page title |
+| `--dry-run` | false | Preview operations without creating pages |
+| `--fail-on-error` | false | Exit with non-zero code if any page fails |
+| `--quiet` | false | Suppress progress output |
+
+```sh
+# Preview first
+confluence copy-tree 123456789 987654321 --dry-run
+
+# Copy with a custom title
+confluence copy-tree 123456789 987654321 "Backup Copy"
+
+# Copy excluding certain pages
+confluence copy-tree 123456789 987654321 --exclude "Draft*,Archive*"
 ```
 
 ---
