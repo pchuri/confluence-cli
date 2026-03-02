@@ -791,6 +791,22 @@ describe('ConfluenceClient', () => {
       });
     });
 
+    test('normalizeAttachment should include api context path for relative download links', () => {
+      const cloudClient = new ConfluenceClient({
+        domain: 'test.atlassian.net',
+        token: 'cloud-token',
+        apiPath: '/wiki/rest/api'
+      });
+      const raw = {
+        id: '301',
+        title: 'image.png',
+        _links: { download: '/download/attachments/123/image.png' }
+      };
+      const result = cloudClient.normalizeAttachment(raw);
+
+      expect(result.downloadLink).toBe('https://test.atlassian.net/wiki/download/attachments/123/image.png');
+    });
+
     test('normalizeAttachment should handle missing metadata gracefully', () => {
       const raw = {
         id: '102',
@@ -827,6 +843,24 @@ describe('ConfluenceClient', () => {
       expect(attachments[0]).toHaveProperty('fileSize', 512000);
       expect(attachments[0]).toHaveProperty('version', 2);
       expect(attachments[0]).toHaveProperty('downloadLink');
+
+      mock.restore();
+    });
+
+    test('listAttachments should use response context path when normalizing download links', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/child/attachment').reply(200, {
+        results: [{
+          id: '401',
+          title: 'report.pdf',
+          _links: { download: '/download/attachments/123/report.pdf' }
+        }],
+        _links: { context: '/wiki' }
+      });
+
+      const response = await client.listAttachments('123');
+      expect(response.results).toHaveLength(1);
+      expect(response.results[0].downloadLink).toBe('https://test.atlassian.net/wiki/download/attachments/123/report.pdf');
 
       mock.restore();
     });
