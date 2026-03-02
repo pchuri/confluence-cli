@@ -259,6 +259,14 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('```');
     });
 
+    test('should add a newline after code fence before following prose', () => {
+      const storage = '<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">erl</ac:parameter><ac:plain-text-body><![CDATA[cdr; smbe script/vault/add_secret.rb -c meraki.com -r deploy_coordinator -s deploy_sudo_password -f $files_to_upload]]></ac:plain-text-body></ac:structured-macro><p>When you add new secret to vault you might be asked to test changes.</p>';
+      const result = client.storageToMarkdown(storage);
+
+      expect(result).toContain('```\n\nWhen you add new secret to vault');
+      expect(result).not.toContain('```When you add new secret to vault');
+    });
+
     test('should convert Confluence macros to admonitions', () => {
       const storage = '<ac:structured-macro ac:name="info"><ac:rich-text-body><p>This is info</p></ac:rich-text-body></ac:structured-macro>';
       const result = client.storageToMarkdown(storage);
