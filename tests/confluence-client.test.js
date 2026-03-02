@@ -273,6 +273,13 @@ describe('ConfluenceClient', () => {
       
       expect(result).toContain('[Example](https://example.com)');
     });
+
+    test('should preserve html anchor links in storage content', () => {
+      const storage = '<p>See <a href="https://gerrit.ikarem.io/c/manage/+/346578">this example commit</a></p>';
+      const result = client.storageToMarkdown(storage);
+
+      expect(result).toContain('See [this example commit](https://gerrit.ikarem.io/c/manage/+/346578)');
+    });
   });
 
   describe('htmlToMarkdown', () => {
@@ -300,6 +307,13 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('| Header |');
       expect(result).toContain('| --- |');
       expect(result).toContain('| Cell |');
+    });
+
+    test('should convert html anchors to markdown links', () => {
+      const html = '<p>See <a href="https://gerrit.ikarem.io/c/manage/+/347251">this example commit</a></p>';
+      const result = client.htmlToMarkdown(html);
+
+      expect(result).toContain('See [this example commit](https://gerrit.ikarem.io/c/manage/+/347251)');
     });
   });
 
