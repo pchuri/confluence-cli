@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/pchuri/confluence-cli/compare/v1.21.1...v1.22.0) (2026-03-03)
+
+
+### Features
+
+* adds unescape for nordic alphabets ([#54](https://github.com/pchuri/confluence-cli/issues/54)) ([7f834dd](https://github.com/pchuri/confluence-cli/commit/7f834ddbe6190588ef28d6044a3f51b4d3a5eb2b))
+
 ## [1.21.1](https://github.com/pchuri/confluence-cli/compare/v1.21.0...v1.21.1) (2026-03-03)
 
 
