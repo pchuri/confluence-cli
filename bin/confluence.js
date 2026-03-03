@@ -1215,6 +1215,7 @@ program
   .option('--exclude <patterns>', 'Comma-separated title glob patterns to skip')
   .option('--delay-ms <ms>', 'Delay between page exports in ms (default: 100)', parseInt)
   .option('--dry-run', 'Preview pages without writing files')
+  .option('--overwrite', 'Overwrite existing export directory (replaces content, removes stale files)')
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
@@ -1246,6 +1247,9 @@ program
       const baseDir = path.resolve(options.dest || '.');
       const folderName = sanitizeTitle(pageInfo.title || 'page');
       const exportDir = path.join(baseDir, folderName);
+      if (options.overwrite && fs.existsSync(exportDir)) {
+        fs.rmSync(exportDir, { recursive: true, force: true });
+      }
       fs.mkdirSync(exportDir, { recursive: true });
 
       const contentFile = options.file || `page.${contentExt}`;
@@ -1372,7 +1376,16 @@ async function exportRecursive(client, fs, path, pageId, options) {
     return;
   }
 
-  // 6. Walk tree depth-first and export each page
+  // 6. Overwrite — remove existing root export directory for a clean slate
+  if (options.overwrite) {
+    const rootFolderName = sanitizeTitle(rootPage.title);
+    const rootExportDir = path.join(baseDir, rootFolderName);
+    if (fs.existsSync(rootExportDir)) {
+      fs.rmSync(rootExportDir, { recursive: true, force: true });
+    }
+  }
+
+  // 7. Walk tree depth-first and export each page
   const failures = [];
   let exported = 0;
 
