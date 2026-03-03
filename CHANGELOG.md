@@ -1,3 +1,10 @@
+## [1.21.1](https://github.com/pchuri/confluence-cli/compare/v1.21.0...v1.21.1) (2026-03-03)
+
+
+### Bug Fixes
+
+* add required YAML frontmatter to SKILL.md ([#53](https://github.com/pchuri/confluence-cli/issues/53)) ([a427f90](https://github.com/pchuri/confluence-cli/commit/a427f90fc562264ec7f3c8cf98453c7d553a4810)), closes [#52](https://github.com/pchuri/confluence-cli/issues/52)
+
 # [1.21.0](https://github.com/pchuri/confluence-cli/compare/v1.20.0...v1.21.0) (2026-02-27)
 
 
