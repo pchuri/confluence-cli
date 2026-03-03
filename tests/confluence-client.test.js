@@ -301,6 +301,13 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('| --- |');
       expect(result).toContain('| Cell |');
     });
+
+    test('should convert nordic alpha characters correctly', () => {
+      const html = '<p>Nordic characters: å, ä, ö</p>';
+      const result = client.htmlToMarkdown(html);
+
+      expect(result).toContain('Nordic characters: å, ä, ö');
+    });
   });
 
   describe('search', () => {
