@@ -301,6 +301,16 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('| --- |');
       expect(result).toContain('| Cell |');
     });
+
+    test('should convert named characters correctly', () => {
+      const NAMED_ENTITIES = ConfluenceClient.NAMED_ENTITIES;
+      
+      for (const [entity, char] of Object.entries(NAMED_ENTITIES)) {
+        const html = `<p>Character: &${entity};</p>`;
+        const result = client.htmlToMarkdown(html);
+        expect(result).toContain(`Character: ${char}`);
+      }
+    });
   });
 
   describe('search', () => {
