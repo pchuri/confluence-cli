@@ -1,3 +1,8 @@
+---
+name: confluence
+description: Use confluence-cli to read, search, create, update, move, and delete Confluence pages and attachments from the terminal.
+---
+
 # confluence-cli Skill
 
 A CLI tool for Atlassian Confluence. Lets you read, search, create, update, move, and delete pages and attachments from the terminal or from an agent.
