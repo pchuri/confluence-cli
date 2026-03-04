@@ -1,3 +1,10 @@
+# [1.24.0](https://github.com/pchuri/confluence-cli/compare/v1.23.0...v1.24.0) (2026-03-04)
+
+
+### Features
+
+* add configurable protocol support (http/https) ([#62](https://github.com/pchuri/confluence-cli/issues/62)) ([37ad206](https://github.com/pchuri/confluence-cli/commit/37ad20645afa35b744e6195afdf0e5acdf01b822)), closes [#59](https://github.com/pchuri/confluence-cli/issues/59)
+
 # [1.23.0](https://github.com/pchuri/confluence-cli/compare/v1.22.0...v1.23.0) (2026-03-04)
 
 
