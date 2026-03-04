@@ -1854,6 +1854,7 @@ function printTree(nodes, config, options, depth = 1) {
 
 // Exported for testing
 module.exports = {
+  program,
   _test: {
     EXPORT_MARKER,
     writeExportMarker,
