@@ -1864,7 +1864,7 @@ module.exports = {
   },
 };
 
-if (require.main === module) {
+if (require.main === module || require.main.endsWith("index.js")) {
   if (process.argv.length <= 2) {
     program.help({ error: false });
   }
