@@ -5,6 +5,11 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update Homebrew formula (e.g. 1.24.0)'
+        required: true
 
 jobs:
   test:
@@ -43,13 +48,16 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-    
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
-    
+
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
@@ -57,11 +65,12 @@ jobs:
         registry-url: 'https://registry.npmjs.org'
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-    
+
     - run: npm ci
     - run: npm test
-    
+
     - name: Semantic Release
+      id: semantic
       uses: cycjimmy/semantic-release-action@v3
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -70,21 +79,14 @@ jobs:
   update-homebrew:
     needs: [publish]
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main'
+    if: needs.publish.outputs.new_release_published == 'true' || github.event_name == 'workflow_dispatch'
     permissions:
       contents: read
+    env:
+      VERSION: ${{ github.event.inputs.version || needs.publish.outputs.new_release_version }}
     steps:
-      - name: Get latest release tag
-        id: release
-        run: |
-          TAG=$(gh api repos/${{ github.repository }}/releases/latest --jq '.tag_name')
-          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Wait for npm publish propagation
         run: |
-          VERSION="${{ steps.release.outputs.version }}"
           PACKAGE_URL="https://registry.npmjs.org/confluence-cli/${VERSION}"
           for i in $(seq 1 30); do
             STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$PACKAGE_URL")
@@ -101,7 +103,6 @@ jobs:
       - name: Download npm tarball and compute sha256
         id: sha
         run: |
-          VERSION="${{ steps.release.outputs.version }}"
           URL="https://registry.npmjs.org/confluence-cli/-/confluence-cli-${VERSION}.tgz"
           if ! curl -fsSL "$URL" -o package.tgz; then
             echo "Failed to download npm tarball from ${URL}" >&2
@@ -137,7 +138,6 @@ jobs:
 
       - name: Commit and push
         run: |
-          VERSION="${{ steps.release.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/confluence-cli.rb
