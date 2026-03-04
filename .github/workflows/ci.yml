@@ -5,6 +5,11 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to update Homebrew formula (e.g. 1.24.0)'
+        required: true
 
 jobs:
   test:
@@ -43,13 +48,16 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
-    
+    outputs:
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
+      new_release_version: ${{ steps.semantic.outputs.new_release_version }}
+
     steps:
     - uses: actions/checkout@v3
       with:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
-    
+
     - name: Setup Node.js
       uses: actions/setup-node@v3
       with:
@@ -57,12 +65,82 @@ jobs:
         registry-url: 'https://registry.npmjs.org'
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-    
+
     - run: npm ci
     - run: npm test
-    
+
     - name: Semantic Release
+      id: semantic
       uses: cycjimmy/semantic-release-action@v3
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  update-homebrew:
+    needs: [publish]
+    runs-on: ubuntu-latest
+    if: needs.publish.outputs.new_release_published == 'true' || github.event_name == 'workflow_dispatch'
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ github.event.inputs.version || needs.publish.outputs.new_release_version }}
+    steps:
+      - name: Wait for npm publish propagation
+        run: |
+          PACKAGE_URL="https://registry.npmjs.org/confluence-cli/${VERSION}"
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$PACKAGE_URL")
+            if [ "$STATUS" = "200" ]; then
+              echo "npm package version ${VERSION} is available"
+              exit 0
+            fi
+            echo "Waiting for npm publish... attempt ${i}/30"
+            sleep 10
+          done
+          echo "Timed out waiting for npm package"
+          exit 1
+
+      - name: Download npm tarball and compute sha256
+        id: sha
+        run: |
+          URL="https://registry.npmjs.org/confluence-cli/-/confluence-cli-${VERSION}.tgz"
+          if ! curl -fsSL "$URL" -o package.tgz; then
+            echo "Failed to download npm tarball from ${URL}" >&2
+            exit 1
+          fi
+          SHA256=$(shasum -a 256 package.tgz | awk '{print $1}')
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: pchuri/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Update formula
+        run: |
+          set -e
+          URL="${{ steps.sha.outputs.url }}"
+          SHA256="${{ steps.sha.outputs.sha256 }}"
+          sed -i \
+            -e "s|url \"https://registry.npmjs.org/confluence-cli/-/confluence-cli-.*\.tgz\"|url \"${URL}\"|" \
+            -e "s|sha256 \".*\"|sha256 \"${SHA256}\"|" \
+            Formula/confluence-cli.rb
+          if ! grep -q "url \"${URL}\"" Formula/confluence-cli.rb; then
+            echo "Error: Failed to update url in Homebrew formula" >&2
+            exit 1
+          fi
+          if ! grep -q "sha256 \"${SHA256}\"" Formula/confluence-cli.rb; then
+            echo "Error: Failed to update sha256 in Homebrew formula" >&2
+            exit 1
+          fi
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/confluence-cli.rb
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "feat: update confluence-cli to ${VERSION}"
+          git push
