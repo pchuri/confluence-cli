@@ -1,3 +1,10 @@
+# [1.25.0](https://github.com/pchuri/confluence-cli/compare/v1.24.1...v1.25.0) (2026-03-04)
+
+
+### Features
+
+* add recursive export and --overwrite flag ([#58](https://github.com/pchuri/confluence-cli/issues/58)) ([00aa839](https://github.com/pchuri/confluence-cli/commit/00aa8396cc0edd83a872a6d1dec0a96fb4511dfc))
+
 ## [1.24.1](https://github.com/pchuri/confluence-cli/compare/v1.24.0...v1.24.1) (2026-03-04)
 
 
