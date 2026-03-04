@@ -4,8 +4,8 @@
   "description": "A command-line interface for Atlassian Confluence with page creation and editing capabilities",
   "main": "index.js",
   "bin": {
-    "confluence": "bin/index.js",
-    "confluence-cli": "bin/index.js"
+    "confluence": "bin/confluence.js",
+    "confluence-cli": "bin/confluence.js"
   },
   "scripts": {
     "start": "node bin/confluence.js",
