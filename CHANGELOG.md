@@ -1,3 +1,10 @@
+# [1.23.0](https://github.com/pchuri/confluence-cli/compare/v1.22.0...v1.23.0) (2026-03-04)
+
+
+### Features
+
+* add Homebrew tap support ([#56](https://github.com/pchuri/confluence-cli/issues/56)) ([e7bfb38](https://github.com/pchuri/confluence-cli/commit/e7bfb38e1cbc2c63d878508c4623d6b46e2f47fe)), closes [#55](https://github.com/pchuri/confluence-cli/issues/55)
+
 # [1.22.0](https://github.com/pchuri/confluence-cli/compare/v1.21.1...v1.22.0) (2026-03-03)
 
 
