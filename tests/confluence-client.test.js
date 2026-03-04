@@ -65,6 +65,16 @@ describe('ConfluenceClient', () => {
       expect(httpClient.baseURL).toBe('http://internal.example.com/rest/api');
     });
 
+    test('falls back to https for invalid protocol', () => {
+      const invalidClient = new ConfluenceClient({
+        domain: 'example.com',
+        token: 'token',
+        protocol: 'ftp'
+      });
+      expect(invalidClient.protocol).toBe('https');
+      expect(invalidClient.baseURL).toBe('https://example.com/rest/api');
+    });
+
     test('buildUrl uses configured protocol', () => {
       const httpClient = new ConfluenceClient({
         domain: 'internal.example.com',
