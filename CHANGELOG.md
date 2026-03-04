@@ -1,3 +1,10 @@
+## [1.24.1](https://github.com/pchuri/confluence-cli/compare/v1.24.0...v1.24.1) (2026-03-04)
+
+
+### Bug Fixes
+
+* move Homebrew formula update into CI/CD workflow ([#64](https://github.com/pchuri/confluence-cli/issues/64)) ([34b477b](https://github.com/pchuri/confluence-cli/commit/34b477be84596957a2f39900a5643cf45b9b46af))
+
 # [1.24.0](https://github.com/pchuri/confluence-cli/compare/v1.23.0...v1.24.0) (2026-03-04)
 
 
