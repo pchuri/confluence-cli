@@ -7,6 +7,8 @@ on:
 jobs:
   update-homebrew:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Extract version from tag
         id: version
@@ -33,7 +35,11 @@ jobs:
         run: |
           VERSION="${{ steps.version.outputs.version }}"
           URL="https://registry.npmjs.org/confluence-cli/-/confluence-cli-${VERSION}.tgz"
-          SHA256=$(curl -sL "$URL" | shasum -a 256 | awk '{print $1}')
+          if ! curl -fsSL "$URL" -o package.tgz; then
+            echo "Failed to download npm tarball from ${URL}" >&2
+            exit 1
+          fi
+          SHA256=$(shasum -a 256 package.tgz | awk '{print $1}')
           echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
           echo "url=${URL}" >> "$GITHUB_OUTPUT"
 
@@ -45,11 +51,21 @@ jobs:
 
       - name: Update formula
         run: |
-          VERSION="${{ steps.version.outputs.version }}"
+          set -e
+          URL="${{ steps.sha.outputs.url }}"
+          SHA256="${{ steps.sha.outputs.sha256 }}"
           sed -i \
-            -e "s|url \"https://registry.npmjs.org/confluence-cli/-/confluence-cli-.*\.tgz\"|url \"${{ steps.sha.outputs.url }}\"|" \
-            -e "s|sha256 \".*\"|sha256 \"${{ steps.sha.outputs.sha256 }}\"|" \
+            -e "s|url \"https://registry.npmjs.org/confluence-cli/-/confluence-cli-.*\.tgz\"|url \"${URL}\"|" \
+            -e "s|sha256 \".*\"|sha256 \"${SHA256}\"|" \
             Formula/confluence-cli.rb
+          if ! grep -q "url \"${URL}\"" Formula/confluence-cli.rb; then
+            echo "Error: Failed to update url in Homebrew formula" >&2
+            exit 1
+          fi
+          if ! grep -q "sha256 \"${SHA256}\"" Formula/confluence-cli.rb; then
+            echo "Error: Failed to update sha256 in Homebrew formula" >&2
+            exit 1
+          fi
 
       - name: Commit and push
         run: |
