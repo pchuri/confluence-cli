@@ -20,6 +20,14 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 
 ## Installation
 
+### Homebrew (macOS/Linux)
+
+```bash
+brew install pchuri/tap/confluence-cli
+```
+
+### npm
+
 ```bash
 npm install -g confluence-cli
 ```

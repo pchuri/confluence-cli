@@ -1,0 +1,78 @@
+name: Update Homebrew Formula
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  update-homebrew:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Extract version from tag
+        id: version
+        run: echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for npm publish propagation
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PACKAGE_URL="https://registry.npmjs.org/confluence-cli/${VERSION}"
+          for i in $(seq 1 30); do
+            STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$PACKAGE_URL")
+            if [ "$STATUS" = "200" ]; then
+              echo "npm package version ${VERSION} is available"
+              exit 0
+            fi
+            echo "Waiting for npm publish... attempt ${i}/30"
+            sleep 10
+          done
+          echo "Timed out waiting for npm package"
+          exit 1
+
+      - name: Download npm tarball and compute sha256
+        id: sha
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          URL="https://registry.npmjs.org/confluence-cli/-/confluence-cli-${VERSION}.tgz"
+          if ! curl -fsSL "$URL" -o package.tgz; then
+            echo "Failed to download npm tarball from ${URL}" >&2
+            exit 1
+          fi
+          SHA256=$(shasum -a 256 package.tgz | awk '{print $1}')
+          echo "sha256=${SHA256}" >> "$GITHUB_OUTPUT"
+          echo "url=${URL}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout homebrew-tap
+        uses: actions/checkout@v4
+        with:
+          repository: pchuri/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+      - name: Update formula
+        run: |
+          set -e
+          URL="${{ steps.sha.outputs.url }}"
+          SHA256="${{ steps.sha.outputs.sha256 }}"
+          sed -i \
+            -e "s|url \"https://registry.npmjs.org/confluence-cli/-/confluence-cli-.*\.tgz\"|url \"${URL}\"|" \
+            -e "s|sha256 \".*\"|sha256 \"${SHA256}\"|" \
+            Formula/confluence-cli.rb
+          if ! grep -q "url \"${URL}\"" Formula/confluence-cli.rb; then
+            echo "Error: Failed to update url in Homebrew formula" >&2
+            exit 1
+          fi
+          if ! grep -q "sha256 \"${SHA256}\"" Formula/confluence-cli.rb; then
+            echo "Error: Failed to update sha256 in Homebrew formula" >&2
+            exit 1
+          fi
+
+      - name: Commit and push
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/confluence-cli.rb
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "feat: update confluence-cli to ${VERSION}"
+          git push
