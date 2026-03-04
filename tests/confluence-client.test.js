@@ -49,6 +49,64 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('protocol handling', () => {
+    test('defaults to https when protocol is not specified', () => {
+      expect(client.protocol).toBe('https');
+      expect(client.baseURL).toMatch(/^https:\/\//);
+    });
+
+    test('uses http protocol when configured', () => {
+      const httpClient = new ConfluenceClient({
+        domain: 'internal.example.com',
+        token: 'token',
+        protocol: 'http'
+      });
+      expect(httpClient.protocol).toBe('http');
+      expect(httpClient.baseURL).toBe('http://internal.example.com/rest/api');
+    });
+
+    test('falls back to https for invalid protocol', () => {
+      const invalidClient = new ConfluenceClient({
+        domain: 'example.com',
+        token: 'token',
+        protocol: 'ftp'
+      });
+      expect(invalidClient.protocol).toBe('https');
+      expect(invalidClient.baseURL).toBe('https://example.com/rest/api');
+    });
+
+    test('buildUrl uses configured protocol', () => {
+      const httpClient = new ConfluenceClient({
+        domain: 'internal.example.com',
+        token: 'token',
+        protocol: 'http'
+      });
+      expect(httpClient.buildUrl('/wiki/spaces/TEST')).toBe('http://internal.example.com/wiki/spaces/TEST');
+    });
+
+    test('buildUrl defaults to https', () => {
+      expect(client.buildUrl('/wiki/test')).toBe('https://test.atlassian.net/wiki/test');
+    });
+
+    test('toAbsoluteUrl uses configured protocol', () => {
+      const httpClient = new ConfluenceClient({
+        domain: 'internal.example.com',
+        token: 'token',
+        protocol: 'http'
+      });
+      expect(httpClient.toAbsoluteUrl('/download/file.pdf')).toBe('http://internal.example.com/download/file.pdf');
+    });
+
+    test('toAbsoluteUrl preserves existing full URLs regardless of protocol config', () => {
+      const httpClient = new ConfluenceClient({
+        domain: 'internal.example.com',
+        token: 'token',
+        protocol: 'http'
+      });
+      expect(httpClient.toAbsoluteUrl('https://cdn.example.com/file.pdf')).toBe('https://cdn.example.com/file.pdf');
+    });
+  });
+
   describe('api path handling', () => {
     test('defaults to /rest/api when path is not provided', () => {
       const defaultClient = new ConfluenceClient({
