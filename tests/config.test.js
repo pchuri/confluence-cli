@@ -5,7 +5,8 @@ const ENV_KEYS = [
   'CONFLUENCE_DOMAIN', 'CONFLUENCE_HOST',
   'CONFLUENCE_API_TOKEN', 'CONFLUENCE_PASSWORD',
   'CONFLUENCE_EMAIL', 'CONFLUENCE_USERNAME',
-  'CONFLUENCE_AUTH_TYPE', 'CONFLUENCE_API_PATH'
+  'CONFLUENCE_AUTH_TYPE', 'CONFLUENCE_API_PATH',
+  'CONFLUENCE_PROTOCOL'
 ];
 
 describe('getConfig env var aliases', () => {
@@ -75,5 +76,31 @@ describe('getConfig env var aliases', () => {
 
     const config = getConfig();
     expect(config.domain).toBe('host.example.com');
+  });
+
+  test('protocol defaults to https when CONFLUENCE_PROTOCOL is not set', () => {
+    process.env.CONFLUENCE_DOMAIN = 'example.com';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+
+    const config = getConfig();
+    expect(config.protocol).toBe('https');
+  });
+
+  test('CONFLUENCE_PROTOCOL=http is respected', () => {
+    process.env.CONFLUENCE_DOMAIN = 'example.com';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_PROTOCOL = 'http';
+
+    const config = getConfig();
+    expect(config.protocol).toBe('http');
+  });
+
+  test('CONFLUENCE_PROTOCOL invalid value defaults to https', () => {
+    process.env.CONFLUENCE_DOMAIN = 'example.com';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_PROTOCOL = 'ftp';
+
+    const config = getConfig();
+    expect(config.protocol).toBe('https');
   });
 });
