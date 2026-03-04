@@ -106,9 +106,10 @@ confluence init \
 
 **Scoped API token** (recommended for agents — least privilege):
 ```bash
+# Replace <your-cloud-id> with your actual Cloud ID
 confluence init \
   --domain "api.atlassian.com" \
-  --api-path "/ex/confluence/{cloudId}/wiki/rest/api" \
+  --api-path "/ex/confluence/<your-cloud-id>/wiki/rest/api" \
   --auth-type "basic" \
   --email "user@example.com" \
   --token "your-scoped-token"
@@ -145,7 +146,7 @@ export CONFLUENCE_AUTH_TYPE="basic"
 **Scoped API token** (recommended for agents):
 ```bash
 export CONFLUENCE_DOMAIN="api.atlassian.com"
-export CONFLUENCE_API_PATH="/ex/confluence/{cloudId}/wiki/rest/api"
+export CONFLUENCE_API_PATH="/ex/confluence/<your-cloud-id>/wiki/rest/api"
 export CONFLUENCE_AUTH_TYPE="basic"
 export CONFLUENCE_EMAIL="user@example.com"
 export CONFLUENCE_API_TOKEN="your-scoped-token"
