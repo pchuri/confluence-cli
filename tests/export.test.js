@@ -8,7 +8,6 @@ const {
     isExportDirectory,
     uniquePathFor,
     exportRecursive,
-    sanitizeTitle,
   },
 } = require('../bin/confluence.js');
 
@@ -226,9 +225,7 @@ describe('exportRecursive', () => {
     const consoleErrSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
     // Make readPage fail for the second child
-    let callCount = 0;
     client.readPage.mockImplementation(async (id) => {
-      callCount++;
       if (id === '3') throw new Error('network error');
       return '# content';
     });
