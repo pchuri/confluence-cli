@@ -68,6 +68,35 @@ describe('ConfluenceClient', () => {
 
       expect(customClient.baseURL).toBe('https://cloud.example/wiki/rest/api');
     });
+
+    test('defaults to https protocol when not specified', () => {
+      const defaultProtocolClient = new ConfluenceClient({
+        domain: 'example.com',
+        token: 'test-token'
+      });
+
+      expect(defaultProtocolClient.baseURL).toBe('https://example.com/rest/api');
+    });
+
+    test('supports http protocol configuration', () => {
+      const httpClient = new ConfluenceClient({
+        domain: 'example.com',
+        token: 'test-token',
+        protocol: 'http'
+      });
+
+      expect(httpClient.baseURL).toBe('http://example.com/rest/api');
+    });
+
+    test('normalizes protocol to lowercase', () => {
+      const upperCaseClient = new ConfluenceClient({
+        domain: 'example.com',
+        token: 'test-token',
+        protocol: 'HTTP'
+      });
+
+      expect(upperCaseClient.baseURL).toBe('http://example.com/rest/api');
+    });
   });
 
   describe('authentication setup', () => {
