@@ -1248,6 +1248,9 @@ program
       const folderName = sanitizeTitle(pageInfo.title || 'page');
       const exportDir = path.join(baseDir, folderName);
       if (options.overwrite && fs.existsSync(exportDir)) {
+        if (!isExportDirectory(fs, path, exportDir)) {
+          throw new Error(`Refusing to overwrite "${exportDir}" - it was not created by confluence-cli (missing ${EXPORT_MARKER}).`);
+        }
         fs.rmSync(exportDir, { recursive: true, force: true });
       }
       fs.mkdirSync(exportDir, { recursive: true });
@@ -1255,6 +1258,7 @@ program
       const contentFile = options.file || `page.${contentExt}`;
       const contentPath = path.join(exportDir, contentFile);
       fs.writeFileSync(contentPath, content);
+      writeExportMarker(fs, path, exportDir, { pageId, title: pageInfo.title });
 
       console.log(chalk.green('✅ Page exported'));
       console.log(`Title: ${chalk.blue(pageInfo.title)}`);
@@ -1282,7 +1286,7 @@ program
 
           let downloaded = 0;
           for (const attachment of filtered) {
-            const targetPath = uniquePathFor(fs, attachmentsDir, attachment.title);
+            const targetPath = uniquePathFor(fs, path, attachmentsDir, attachment.title);
             // Pass the full attachment object so downloadAttachment can use downloadLink directly
             const dataStream = await client.downloadAttachment(pageId, attachment);
             await writeStream(fs, dataStream, targetPath);
@@ -1302,8 +1306,23 @@ program
     }
   });
 
-function uniquePathFor(fs, dir, filename) {
-  const path = require('path');
+const EXPORT_MARKER = '.confluence-export.json';
+
+function writeExportMarker(fs, path, exportDir, meta) {
+  const marker = {
+    exportedAt: new Date().toISOString(),
+    pageId: meta.pageId,
+    title: meta.title,
+    tool: 'confluence-cli',
+  };
+  fs.writeFileSync(path.join(exportDir, EXPORT_MARKER), JSON.stringify(marker, null, 2));
+}
+
+function isExportDirectory(fs, path, dir) {
+  return fs.existsSync(path.join(dir, EXPORT_MARKER));
+}
+
+function uniquePathFor(fs, path, dir, filename) {
   const parsed = path.parse(filename);
   let attempt = path.join(dir, filename);
   let counter = 1;
@@ -1381,6 +1400,9 @@ async function exportRecursive(client, fs, path, pageId, options) {
     const rootFolderName = sanitizeTitle(rootPage.title);
     const rootExportDir = path.join(baseDir, rootFolderName);
     if (fs.existsSync(rootExportDir)) {
+      if (!isExportDirectory(fs, path, rootExportDir)) {
+        throw new Error(`Refusing to overwrite "${rootExportDir}" - it was not created by confluence-cli (missing ${EXPORT_MARKER}).`);
+      }
       fs.rmSync(rootExportDir, { recursive: true, force: true });
     }
   }
@@ -1437,7 +1459,7 @@ async function exportRecursive(client, fs, path, pageId, options) {
         fs.mkdirSync(attachmentsDir, { recursive: true });
 
         for (const attachment of filtered) {
-          const targetPath = uniquePathFor(fs, attachmentsDir, attachment.title);
+          const targetPath = uniquePathFor(fs, path, attachmentsDir, attachment.title);
           const dataStream = await client.downloadAttachment(page.id, attachment);
           await writeStream(fs, dataStream, targetPath);
         }
@@ -1471,6 +1493,7 @@ async function exportRecursive(client, fs, path, pageId, options) {
   let rootDir;
   try {
     rootDir = await exportPage(rootPage, baseDir);
+    writeExportMarker(fs, path, rootDir, { pageId, title: rootPage.title });
   } catch (error) {
     failures.push({ id: rootPage.id, title: rootPage.title, error: error.message });
     console.error(chalk.red(`  Failed: ${rootPage.title} — ${error.message}`));
@@ -1485,7 +1508,7 @@ async function exportRecursive(client, fs, path, pageId, options) {
   // Export descendants
   await walkTree(tree, rootDir);
 
-  // 7. Summary
+  // 8. Summary
   const succeeded = exported - failures.length;
   console.log(chalk.green(`\n✅ Exported ${succeeded}/${totalPages} page${totalPages === 1 ? '' : 's'} to ${rootDir}`));
   if (failures.length > 0) {
@@ -1823,8 +1846,21 @@ function printTree(nodes, config, options, depth = 1) {
   });
 }
 
-if (process.argv.length <= 2) {
-  program.help({ error: false });
-}
+// Exported for testing
+module.exports = {
+  _test: {
+    EXPORT_MARKER,
+    writeExportMarker,
+    isExportDirectory,
+    uniquePathFor,
+    exportRecursive,
+    sanitizeTitle,
+  },
+};
 
-program.parse(process.argv);
+if (require.main === module) {
+  if (process.argv.length <= 2) {
+    program.help({ error: false });
+  }
+  program.parse(process.argv);
+}
