@@ -104,6 +104,16 @@ confluence init \
   --token "your-api-token"
 ```
 
+**Scoped API token** (recommended for agents — least privilege):
+```bash
+confluence init \
+  --domain "api.atlassian.com" \
+  --api-path "/ex/confluence/{cloudId}/wiki/rest/api" \
+  --auth-type "basic" \
+  --email "user@example.com" \
+  --token "your-scoped-token"
+```
+
 **Hybrid mode** (some fields provided, rest via prompts):
 ```bash
 # Domain and token provided, will prompt for auth method and email
@@ -132,6 +142,15 @@ export CONFLUENCE_API_PATH="/wiki/rest/api"         # Cloud default; use /rest/a
 export CONFLUENCE_AUTH_TYPE="basic"
 ```
 
+**Scoped API token** (recommended for agents):
+```bash
+export CONFLUENCE_DOMAIN="api.atlassian.com"
+export CONFLUENCE_API_PATH="/ex/confluence/{cloudId}/wiki/rest/api"
+export CONFLUENCE_AUTH_TYPE="basic"
+export CONFLUENCE_EMAIL="user@example.com"
+export CONFLUENCE_API_TOKEN="your-scoped-token"
+```
+
 `CONFLUENCE_API_PATH` defaults to `/wiki/rest/api` for Atlassian Cloud domains and `/rest/api` otherwise. Override it when your site lives under a custom reverse proxy or on-premises path. `CONFLUENCE_AUTH_TYPE` defaults to `basic` when an email is present and falls back to `bearer` otherwise.
 
 ### Getting Your API Token
@@ -141,6 +160,17 @@ export CONFLUENCE_AUTH_TYPE="basic"
 2. Click "Create API token"
 3. Give it a label (e.g., "confluence-cli")
 4. Copy the generated token
+
+**Atlassian Cloud — Scoped API Token** (recommended for agents and automation):
+
+Scoped tokens restrict access to specific Atlassian products and permissions, following the principle of least privilege. They use a different API gateway (`api.atlassian.com`) instead of your site domain.
+
+1. Create a scoped token in your [Atlassian Admin settings](https://admin.atlassian.com)
+2. Find your Cloud ID by visiting `https://<your-site>.atlassian.net/_edge/tenant_info`
+3. Configure with:
+   - **Domain:** `api.atlassian.com`
+   - **API path:** `/ex/confluence/<your-cloud-id>/wiki/rest/api`
+   - **Auth type:** `basic` (email + scoped token)
 
 **On-premise / Data Center:** Use your Confluence username and password for basic authentication.
 

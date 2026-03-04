@@ -39,7 +39,18 @@ confluence init \
 
 **Cloud vs Server/DC:**
 - Atlassian Cloud (`*.atlassian.net`): use `--api-path "/wiki/rest/api"`, auth type `basic` with email + API token
+- Atlassian Cloud (scoped token): use `--domain "api.atlassian.com"`, `--api-path "/ex/confluence/{cloudId}/wiki/rest/api"`, auth type `basic` with email + scoped token. Get your Cloud ID from `https://<site>.atlassian.net/_edge/tenant_info`. Recommended for agents (least privilege).
 - Self-hosted / Data Center: use `--api-path "/rest/api"`, auth type `bearer` with a personal access token (no email needed)
+
+**Scoped API token for agents (recommended):**
+
+```sh
+export CONFLUENCE_DOMAIN="api.atlassian.com"
+export CONFLUENCE_API_PATH="/ex/confluence/{cloudId}/wiki/rest/api"
+export CONFLUENCE_AUTH_TYPE="basic"
+export CONFLUENCE_EMAIL="user@company.com"
+export CONFLUENCE_API_TOKEN="your-scoped-token"
+```
 
 ## Page ID Resolution
 
