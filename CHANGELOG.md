@@ -1,3 +1,10 @@
+## [1.25.1](https://github.com/pchuri/confluence-cli/compare/v1.25.0...v1.25.1) (2026-03-05)
+
+
+### Bug Fixes
+
+* resolve CLI silently exiting when installed via npm/Homebrew ([#66](https://github.com/pchuri/confluence-cli/issues/66)) ([#67](https://github.com/pchuri/confluence-cli/issues/67)) ([e4f14a3](https://github.com/pchuri/confluence-cli/commit/e4f14a3fe39265d58e020da6ed7fb0c02fea1407))
+
 # [1.25.0](https://github.com/pchuri/confluence-cli/compare/v1.24.1...v1.25.0) (2026-03-04)
 
 
