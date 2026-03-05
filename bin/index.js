@@ -21,4 +21,9 @@ if (!nodeVersion.startsWith('v') ||
 }
 
 // Load the main CLI application
-require('./confluence.js');
+const { program } = require('./confluence.js');
+
+if (process.argv.length <= 2) {
+  program.help({ error: false });
+}
+program.parse(process.argv);
