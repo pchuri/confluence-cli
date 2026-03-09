@@ -1,3 +1,10 @@
+# [1.26.0](https://github.com/pchuri/confluence-cli/compare/v1.25.1...v1.26.0) (2026-03-09)
+
+
+### Features
+
+* add multiple configuration profiles support ([#70](https://github.com/pchuri/confluence-cli/issues/70)) ([f83d8bf](https://github.com/pchuri/confluence-cli/commit/f83d8bfa549ef8d9784989f186ec7e05eed007e8)), closes [#69](https://github.com/pchuri/confluence-cli/issues/69) [#69](https://github.com/pchuri/confluence-cli/issues/69)
+
 ## [1.25.1](https://github.com/pchuri/confluence-cli/compare/v1.25.0...v1.25.1) (2026-03-05)
 
 
