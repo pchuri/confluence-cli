@@ -4,7 +4,7 @@ const { program } = require('commander');
 const chalk = require('chalk');
 const inquirer = require('inquirer');
 const ConfluenceClient = require('../lib/confluence-client');
-const { getConfig, initConfig } = require('../lib/config');
+const { getConfig, initConfig, listProfiles, setActiveProfile, deleteProfile, isValidProfileName } = require('../lib/config');
 const Analytics = require('../lib/analytics');
 const pkg = require('../package.json');
 
@@ -16,7 +16,13 @@ function buildPageUrl(config, path) {
 program
   .name('confluence')
   .description('CLI tool for Atlassian Confluence')
-  .version(pkg.version);
+  .version(pkg.version)
+  .option('--profile <name>', 'Use a specific configuration profile');
+
+// Helper: resolve profile name from global --profile flag
+function getProfileName() {
+  return program.opts().profile || undefined;
+}
 
 // Init command
 program
@@ -29,7 +35,8 @@ program
   .option('-e, --email <email>', 'Email or username for basic auth')
   .option('-t, --token <token>', 'API token')
   .action(async (options) => {
-    await initConfig(options);
+    const profile = getProfileName();
+    await initConfig({ ...options, profile });
   });
 
 // Read command
@@ -40,7 +47,7 @@ program
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
-      const client = new ConfluenceClient(getConfig());
+      const client = new ConfluenceClient(getConfig(getProfileName()));
       const content = await client.readPage(pageId, options.format);
       console.log(content);
       analytics.track('read', true);
@@ -58,7 +65,7 @@ program
   .action(async (pageId) => {
     const analytics = new Analytics();
     try {
-      const client = new ConfluenceClient(getConfig());
+      const client = new ConfluenceClient(getConfig(getProfileName()));
       const info = await client.getPageInfo(pageId);
       console.log(chalk.blue('Page Information:'));
       console.log(`Title: ${chalk.green(info.title)}`);
@@ -85,7 +92,7 @@ program
   .action(async (query, options) => {
     const analytics = new Analytics();
     try {
-      const client = new ConfluenceClient(getConfig());
+      const client = new ConfluenceClient(getConfig(getProfileName()));
       const results = await client.search(query, parseInt(options.limit), options.cql);
       
       if (results.length === 0) {
@@ -116,7 +123,7 @@ program
   .action(async () => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       const spaces = await client.getSpaces();
       
@@ -200,7 +207,7 @@ program
   .action(async (title, spaceKey, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       
       let content = '';
@@ -243,7 +250,7 @@ program
   .action(async (title, parentId, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       
       // Get parent page info to get space key
@@ -297,7 +304,7 @@ program
         throw new Error('At least one of --title, --file, or --content must be provided.');
       }
 
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       
       let content = null; // Use null to indicate no content change
@@ -336,7 +343,7 @@ program
   .action(async (pageId, newParentId, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       const result = await client.movePage(pageId, newParentId, options.title);
 
@@ -363,7 +370,7 @@ program
   .action(async (pageIdOrUrl, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       const pageInfo = await client.getPageInfo(pageIdOrUrl);
 
@@ -406,7 +413,7 @@ program
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       const pageData = await client.getPageForEdit(pageId);
       
@@ -443,7 +450,7 @@ program
   .action(async (title, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       const pageInfo = await client.findPageByTitle(title, options.space);
       
@@ -473,7 +480,7 @@ program
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       const maxResults = options.limit ? parseInt(options.limit, 10) : null;
       const pattern = options.pattern ? options.pattern.trim() : null;
@@ -605,7 +612,7 @@ program
 
       const fs = require('fs');
       const path = require('path');
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
 
       const resolvedFiles = files.map((filePath) => ({
@@ -652,7 +659,7 @@ program
   .action(async (pageId, attachmentId, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
 
       if (!options.yes) {
@@ -696,7 +703,7 @@ program
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
 
       const format = (options.format || 'text').toLowerCase();
@@ -766,7 +773,7 @@ program
   .action(async (pageId, key, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
 
       const format = (options.format || 'text').toLowerCase();
@@ -802,7 +809,7 @@ program
   .action(async (pageId, key, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
 
       if (!options.value && !options.file) {
@@ -858,7 +865,7 @@ program
   .action(async (pageId, key, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
 
       if (!options.yes) {
@@ -904,7 +911,7 @@ program
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
 
       const format = (options.format || 'text').toLowerCase();
@@ -1059,7 +1066,7 @@ program
     const analytics = new Analytics();
     let location = null;
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
 
       let content = '';
@@ -1173,7 +1180,7 @@ program
   .action(async (commentId, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
 
       if (!options.yes) {
@@ -1225,7 +1232,7 @@ program
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       const fs = require('fs');
       const path = require('path');
@@ -1591,7 +1598,7 @@ program
   .action(async (sourcePageId, targetParentId, newTitle, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       
       // Parse numeric flags with safe fallbacks
@@ -1711,7 +1718,7 @@ program
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig();
+      const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
       
       // Extract page ID from URL if needed
@@ -1851,6 +1858,80 @@ function printTree(nodes, config, options, depth = 1) {
     }
   });
 }
+
+// Profile management commands
+const profileCmd = program
+  .command('profile')
+  .description('Manage configuration profiles');
+
+profileCmd
+  .command('list')
+  .description('List all configuration profiles')
+  .action(() => {
+    const { profiles } = listProfiles();
+    if (profiles.length === 0) {
+      console.log(chalk.yellow('No profiles configured. Run "confluence init" to create one.'));
+      return;
+    }
+    console.log(chalk.blue('Configuration profiles:\n'));
+    profiles.forEach(p => {
+      const marker = p.active ? chalk.green(' (active)') : '';
+      console.log(`  ${p.active ? chalk.green('*') : ' '} ${chalk.cyan(p.name)}${marker} - ${chalk.gray(p.domain)}`);
+    });
+  });
+
+profileCmd
+  .command('use <name>')
+  .description('Set the active configuration profile')
+  .action((name) => {
+    try {
+      setActiveProfile(name);
+      console.log(chalk.green(`Switched to profile "${name}"`));
+    } catch (error) {
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
+
+profileCmd
+  .command('add <name>')
+  .description('Add a new configuration profile interactively')
+  .option('-d, --domain <domain>', 'Confluence domain')
+  .option('--protocol <protocol>', 'Protocol (http or https)')
+  .option('-p, --api-path <path>', 'REST API path')
+  .option('-a, --auth-type <type>', 'Authentication type (basic or bearer)')
+  .option('-e, --email <email>', 'Email or username for basic auth')
+  .option('-t, --token <token>', 'API token')
+  .action(async (name, options) => {
+    if (!isValidProfileName(name)) {
+      console.error(chalk.red('Invalid profile name. Use only letters, numbers, hyphens, and underscores.'));
+      process.exit(1);
+    }
+    await initConfig({ ...options, profile: name });
+  });
+
+profileCmd
+  .command('remove <name>')
+  .description('Remove a configuration profile')
+  .action(async (name) => {
+    try {
+      const { confirmed } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'confirmed',
+        message: `Delete profile "${name}"?`,
+        default: false
+      }]);
+      if (!confirmed) {
+        console.log(chalk.yellow('Cancelled.'));
+        return;
+      }
+      deleteProfile(name);
+      console.log(chalk.green(`Profile "${name}" removed.`));
+    } catch (error) {
+      console.error(chalk.red('Error:'), error.message);
+      process.exit(1);
+    }
+  });
 
 // Exported for testing
 module.exports = {
