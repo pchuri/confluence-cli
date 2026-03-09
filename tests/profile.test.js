@@ -326,5 +326,10 @@ describe('Profile management', () => {
       mockConfigFile(multiProfileConfig());
       expect(() => deleteProfile('nonexistent')).toThrow('not found');
     });
+
+    test('throws error when no config file', () => {
+      mockConfigFile(null);
+      expect(() => deleteProfile('default')).toThrow('No configuration file found');
+    });
   });
 });
