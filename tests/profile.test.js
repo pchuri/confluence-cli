@@ -84,13 +84,22 @@ function mockConfigFile(data) {
 // Capture what was written to config file
 function captureConfigWrite() {
   let captured = null;
-  fs.writeFileSync.mockImplementation((filePath, content) => {
+  let capturedOptions = null;
+  let capturedMkdirOptions = null;
+  fs.writeFileSync.mockImplementation((filePath, content, options) => {
     if (filePath === CONFIG_FILE) {
       captured = JSON.parse(content);
+      capturedOptions = options;
     }
   });
-  fs.mkdirSync.mockImplementation(() => {});
-  return () => captured;
+  fs.mkdirSync.mockImplementation((_path, options) => {
+    capturedMkdirOptions = options;
+  });
+  return {
+    getWritten: () => captured,
+    getWriteOptions: () => capturedOptions,
+    getMkdirOptions: () => capturedMkdirOptions,
+  };
 }
 
 describe('Profile management', () => {
@@ -261,7 +270,7 @@ describe('Profile management', () => {
   describe('setActiveProfile', () => {
     test('switches active profile', () => {
       mockConfigFile(multiProfileConfig());
-      const getWritten = captureConfigWrite();
+      const { getWritten } = captureConfigWrite();
 
       setActiveProfile('staging');
 
@@ -285,7 +294,7 @@ describe('Profile management', () => {
   describe('deleteProfile', () => {
     test('removes named profile', () => {
       mockConfigFile(multiProfileConfig());
-      const getWritten = captureConfigWrite();
+      const { getWritten } = captureConfigWrite();
 
       deleteProfile('staging');
 
@@ -296,7 +305,7 @@ describe('Profile management', () => {
 
     test('switches active profile if deleted profile was active', () => {
       mockConfigFile(multiProfileConfig());
-      const getWritten = captureConfigWrite();
+      const { getWritten } = captureConfigWrite();
 
       deleteProfile('default');
 
@@ -330,6 +339,29 @@ describe('Profile management', () => {
     test('throws error when no config file', () => {
       mockConfigFile(null);
       expect(() => deleteProfile('default')).toThrow('No configuration file found');
+    });
+  });
+
+  describe('file permissions', () => {
+    test('saves config file with 0o600 permissions', () => {
+      mockConfigFile(multiProfileConfig());
+      const { getWriteOptions } = captureConfigWrite();
+
+      setActiveProfile('staging');
+
+      expect(getWriteOptions()).toEqual({ mode: 0o600 });
+    });
+
+    test('creates config directory with 0o700 permissions when it does not exist', () => {
+      const { CONFIG_DIR } = require('../lib/config');
+      mockConfigFile(multiProfileConfig());
+      // CONFIG_FILE exists (to allow reading), but CONFIG_DIR does not exist (to trigger mkdir)
+      fs.existsSync.mockImplementation((filePath) => filePath !== CONFIG_DIR);
+      const { getMkdirOptions } = captureConfigWrite();
+
+      setActiveProfile('staging');
+
+      expect(getMkdirOptions()).toMatchObject({ mode: 0o700 });
     });
   });
 });
