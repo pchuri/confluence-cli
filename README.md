@@ -16,6 +16,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - 💬 **Comments** - List, create, and delete page comments (footer or inline)
 - 📦 **Export** - Save a page and its attachments to a local folder
 - 🛠️ **Edit workflow** - Export page content for editing and re-import
+- 🔀 **Profiles** - Manage multiple Confluence instances with named configuration profiles
 - 🔧 **Easy setup** - Simple configuration with environment variables or interactive setup
 
 ## Installation
@@ -115,6 +116,15 @@ confluence init \
   --token "your-scoped-token"
 ```
 
+**Named profile** (save to a specific profile):
+```bash
+confluence init --profile staging \
+  --domain "staging.example.com" \
+  --api-path "/rest/api" \
+  --auth-type "bearer" \
+  --token "your-personal-access-token"
+```
+
 **Hybrid mode** (some fields provided, rest via prompts):
 ```bash
 # Domain and token provided, will prompt for auth method and email
@@ -141,6 +151,8 @@ export CONFLUENCE_EMAIL="your.email@example.com"  # required for basic auth (ali
 export CONFLUENCE_API_PATH="/wiki/rest/api"         # Cloud default; use /rest/api for Server/DC
 # Optional: set to 'bearer' for self-hosted/Data Center instances
 export CONFLUENCE_AUTH_TYPE="basic"
+# Optional: select a named profile (overridden by --profile flag)
+export CONFLUENCE_PROFILE="default"
 ```
 
 **Scoped API token** (recommended for agents):
@@ -434,6 +446,27 @@ vim ./page-to-edit.xml
 confluence update 123456789 --file ./page-to-edit.xml --format storage
 ```
 
+### Profile Management
+```bash
+# List all profiles and see which is active
+confluence profile list
+
+# Switch the active profile
+confluence profile use staging
+
+# Add a new profile interactively
+confluence profile add staging
+
+# Add a new profile non-interactively
+confluence profile add staging --domain "staging.example.com" --auth-type bearer --token "xyz"
+
+# Remove a profile
+confluence profile remove staging
+
+# Use a specific profile for a single command
+confluence --profile staging spaces
+```
+
 ### View Usage Statistics
 ```bash
 confluence stats
@@ -468,7 +501,13 @@ confluence stats
 | `property-set <pageId_or_url> <key>` | Set a content property (create or update) | `--value <json>`, `--file <path>`, `--format <text\|json>` |
 | `property-delete <pageId_or_url> <key>` | Delete a content property by key | `--yes` |
 | `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--referenced-only`, `--skip-attachments` |
+| `profile list` | List all configuration profiles | |
+| `profile use <name>` | Set the active configuration profile | |
+| `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token` |
+| `profile remove <name>` | Remove a configuration profile | |
 | `stats` | View your usage statistics | |
+
+**Global option:** `--profile <name>` — Use a specific profile for any command (overrides `CONFLUENCE_PROFILE` env var and active profile).
 
 ## Examples
 
@@ -503,6 +542,11 @@ confluence attachment-delete 123456789 998877 --yes
 
 # View usage statistics
 confluence stats
+
+# Profile management
+confluence profile list
+confluence profile use staging
+confluence --profile staging spaces
 ```
 
 ## Development
