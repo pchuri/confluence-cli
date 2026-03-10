@@ -33,7 +33,9 @@ confluence --version   # verify install
 confluence --profile <name> <command>
 ```
 
-Config priority: env vars > `--profile` flag > `CONFLUENCE_PROFILE` env > `activeProfile` in config > `default`
+Config resolution works in two stages:
+- **Direct env config:** If both `CONFLUENCE_DOMAIN` and `CONFLUENCE_API_TOKEN` are set, they are used directly and the config file / profiles are not consulted.
+- **Profile-based config:** Otherwise, a profile is selected in this order: `--profile` flag > `CONFLUENCE_PROFILE` env > `activeProfile` in config > `default`.
 
 **Non-interactive init (good for CI/CD scripts):**
 
@@ -562,7 +564,7 @@ confluence profile use staging
 Add a new configuration profile. Supports the same options as `init` (interactive, non-interactive, or hybrid).
 
 ```sh
-confluence profile add <name> [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>]
+confluence profile add <name> [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>] [--protocol http|https]
 ```
 
 Profile names may contain letters, numbers, hyphens, and underscores only.
@@ -692,5 +694,5 @@ confluence search "release notes" --limit 20
 | 400 on inline comment creation | Editor metadata required | Use `--location footer` or reply to existing inline comment with `--parent` |
 | `File not found: <path>` | `--file` path doesn't exist | Check the path before calling the command |
 | `At least one of --title, --file, or --content must be provided` | `update` called with no content options | Provide at least one of the required options |
-| `Profile "X" not found` | Specified profile doesn't exist | Run `confluence profile list` to see available profiles |
-| `Cannot delete the only remaining profile` | Tried to remove the last profile | Add another profile before removing |
+| `Profile "<name>" not found!` | Specified profile doesn't exist | Run `confluence profile list` to see available profiles |
+| `Cannot delete the only remaining profile.` | Tried to remove the last profile | Add another profile before removing |

@@ -118,7 +118,7 @@ confluence init \
 
 **Named profile** (save to a specific profile):
 ```bash
-confluence init --profile staging \
+confluence --profile staging init \
   --domain "staging.example.com" \
   --api-path "/rest/api" \
   --auth-type "bearer" \
@@ -503,7 +503,7 @@ confluence stats
 | `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--referenced-only`, `--skip-attachments` |
 | `profile list` | List all configuration profiles | |
 | `profile use <name>` | Set the active configuration profile | |
-| `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token` |
+| `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol` |
 | `profile remove <name>` | Remove a configuration profile | |
 | `stats` | View your usage statistics | |
 
