@@ -25,6 +25,17 @@ confluence --version   # verify install
 | `CONFLUENCE_AUTH_TYPE` | `basic` or `bearer` | `basic` |
 | `CONFLUENCE_EMAIL` | Email address (basic auth only) | `user@company.com` |
 | `CONFLUENCE_API_TOKEN` | API token or personal access token | `ATATT3x...` |
+| `CONFLUENCE_PROFILE` | Named profile to use (optional) | `staging` |
+
+**Global `--profile` flag (use a named profile for any command):**
+
+```sh
+confluence --profile <name> <command>
+```
+
+Config resolution works in two stages:
+- **Direct env config:** If both `CONFLUENCE_DOMAIN` and `CONFLUENCE_API_TOKEN` are set, they are used directly and the config file / profiles are not consulted.
+- **Profile-based config:** Otherwise, a profile is selected in this order: `--profile` flag > `CONFLUENCE_PROFILE` env > `activeProfile` in config > `default`.
 
 **Non-interactive init (good for CI/CD scripts):**
 
@@ -94,7 +105,11 @@ Initialize configuration. Saves credentials to `~/.confluence-cli/config.json`.
 confluence init [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>]
 ```
 
-All flags are optional; omitting any flag triggers an interactive prompt for that field. Provide all flags to run fully non-interactive.
+All flags are optional; omitting any flag triggers an interactive prompt for that field. Provide all flags to run fully non-interactive. Use the global `--profile` flag to save to a named profile:
+
+```sh
+confluence --profile staging init --domain "staging.example.com" --auth-type bearer --token "your-token"
+```
 
 ---
 
@@ -520,6 +535,60 @@ confluence copy-tree 123456789 987654321 --exclude "Draft*,Archive*"
 
 ---
 
+### `profile list`
+
+List all configuration profiles with the active profile marked.
+
+```sh
+confluence profile list
+```
+
+---
+
+### `profile use <name>`
+
+Switch the active configuration profile.
+
+```sh
+confluence profile use <name>
+```
+
+```sh
+confluence profile use staging
+```
+
+---
+
+### `profile add <name>`
+
+Add a new configuration profile. Supports the same options as `init` (interactive, non-interactive, or hybrid).
+
+```sh
+confluence profile add <name> [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>] [--protocol http|https]
+```
+
+Profile names may contain letters, numbers, hyphens, and underscores only.
+
+```sh
+confluence profile add staging --domain "staging.example.com" --auth-type bearer --token "xyz"
+```
+
+---
+
+### `profile remove <name>`
+
+Remove a configuration profile (prompts for confirmation). Cannot remove the only remaining profile.
+
+```sh
+confluence profile remove <name>
+```
+
+```sh
+confluence profile remove staging
+```
+
+---
+
 ### `stats`
 
 Show local usage statistics.
@@ -614,6 +683,7 @@ confluence search "release notes" --limit 20
 - **ANSI color codes**: stdout may contain ANSI escape sequences. Pipe through `| cat` or use `NO_COLOR=1` if your downstream tool doesn't handle them.
 - **Page ID vs URL**: when you have a Confluence URL, extract `?pageId=<number>` and pass the number. Do not pass pretty/display URLs — they are not supported.
 - **Cross-space moves**: `confluence move` only works within the same space. Moving across spaces is not supported.
+- **Multiple instances**: Use `--profile <name>` or `CONFLUENCE_PROFILE` env var to target different Confluence instances without reconfiguring.
 
 ## Error Patterns
 
@@ -624,3 +694,5 @@ confluence search "release notes" --limit 20
 | 400 on inline comment creation | Editor metadata required | Use `--location footer` or reply to existing inline comment with `--parent` |
 | `File not found: <path>` | `--file` path doesn't exist | Check the path before calling the command |
 | `At least one of --title, --file, or --content must be provided` | `update` called with no content options | Provide at least one of the required options |
+| `Profile "<name>" not found!` | Specified profile doesn't exist | Run `confluence profile list` to see available profiles |
+| `Cannot delete the only remaining profile.` | Tried to remove the last profile | Add another profile before removing |
