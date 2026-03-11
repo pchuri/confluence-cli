@@ -1,3 +1,10 @@
+# [1.27.0](https://github.com/pchuri/confluence-cli/compare/v1.26.0...v1.27.0) (2026-03-11)
+
+
+### Features
+
+* add read-only mode for safe AI agent usage ([#74](https://github.com/pchuri/confluence-cli/issues/74)) ([20de9de](https://github.com/pchuri/confluence-cli/commit/20de9de4ff96b4c8173ead62cc6bac88e07bcc6f)), closes [#73](https://github.com/pchuri/confluence-cli/issues/73)
+
 # [1.26.0](https://github.com/pchuri/confluence-cli/compare/v1.25.1...v1.26.0) (2026-03-09)
 
 
