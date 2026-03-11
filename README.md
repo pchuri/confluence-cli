@@ -17,6 +17,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - 📦 **Export** - Save a page and its attachments to a local folder
 - 🛠️ **Edit workflow** - Export page content for editing and re-import
 - 🔀 **Profiles** - Manage multiple Confluence instances with named configuration profiles
+- 🔒 **Read-only mode** - Profile-level write protection for safe AI agent usage
 - 🔧 **Easy setup** - Simple configuration with environment variables or interactive setup
 
 ## Installation
@@ -140,6 +141,7 @@ confluence init --email "user@example.com" --token "your-api-token"
 - `-a, --auth-type <type>` - Authentication type: `basic` or `bearer`
 - `-e, --email <email>` - Email or username for basic authentication
 - `-t, --token <token>` - API token or password
+- `--read-only` - Enable read-only mode (blocks all write operations)
 
 ⚠️ **Security note:** While flags work, storing tokens in shell history is risky. Prefer environment variables (Option 3) for production environments.
 
@@ -165,6 +167,12 @@ export CONFLUENCE_API_TOKEN="your-scoped-token"
 ```
 
 `CONFLUENCE_API_PATH` defaults to `/wiki/rest/api` for Atlassian Cloud domains and `/rest/api` otherwise. Override it when your site lives under a custom reverse proxy or on-premises path. `CONFLUENCE_AUTH_TYPE` defaults to `basic` when an email is present and falls back to `bearer` otherwise.
+
+**Read-only mode** (recommended for AI agents):
+```bash
+export CONFLUENCE_READ_ONLY=true
+```
+When set, all write operations (`create`, `update`, `delete`, etc.) are blocked at the CLI level. The environment variable overrides the profile's `readOnly` setting.
 
 ### Getting Your API Token
 
@@ -460,12 +468,37 @@ confluence profile add staging
 # Add a new profile non-interactively
 confluence profile add staging --domain "staging.example.com" --auth-type bearer --token "xyz"
 
+# Add a read-only profile (blocks all write operations)
+confluence profile add agent --domain "company.atlassian.net" --auth-type basic --email "bot@example.com" --token "xyz" --read-only
+
 # Remove a profile
 confluence profile remove staging
 
 # Use a specific profile for a single command
 confluence --profile staging spaces
 ```
+
+### Read-Only Mode
+
+Read-only mode blocks all write operations at the CLI level, making it safe to hand the tool to AI agents (Claude Code, Copilot, etc.) without risking accidental edits.
+
+**Enable via profile:**
+```bash
+# During init
+confluence init --read-only
+
+# When adding a profile
+confluence profile add agent --domain "company.atlassian.net" --token "xyz" --read-only
+```
+
+**Enable via environment variable:**
+```bash
+export CONFLUENCE_READ_ONLY=true   # overrides profile setting
+```
+
+When read-only mode is active, any write command (`create`, `create-child`, `update`, `delete`, `move`, `edit`, `comment`, `attachment-upload`, `attachment-delete`, `property-set`, `property-delete`, `comment-delete`, `copy-tree`) exits with code 1 and prints an error message.
+
+`confluence profile list` shows a `[read-only]` badge next to protected profiles.
 
 ### View Usage Statistics
 ```bash
@@ -476,7 +509,7 @@ confluence stats
 
 | Command | Description | Options |
 |---|---|---|
-| `init` | Initialize CLI configuration | |
+| `init` | Initialize CLI configuration | `--read-only` |
 | `read <pageId_or_url>` | Read page content | `--format <html\|text\|markdown>` |
 | `info <pageId_or_url>` | Get page information | |
 | `search <query>` | Search for pages | `--limit <number>` |
@@ -503,7 +536,7 @@ confluence stats
 | `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--referenced-only`, `--skip-attachments` |
 | `profile list` | List all configuration profiles | |
 | `profile use <name>` | Set the active configuration profile | |
-| `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol` |
+| `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol`, `--read-only` |
 | `profile remove <name>` | Remove a configuration profile | |
 | `stats` | View your usage statistics | |
 

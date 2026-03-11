@@ -26,6 +26,7 @@ confluence --version   # verify install
 | `CONFLUENCE_EMAIL` | Email address (basic auth only) | `user@company.com` |
 | `CONFLUENCE_API_TOKEN` | API token or personal access token | `ATATT3x...` |
 | `CONFLUENCE_PROFILE` | Named profile to use (optional) | `staging` |
+| `CONFLUENCE_READ_ONLY` | Block all write operations when `true` | `true` |
 
 **Global `--profile` flag (use a named profile for any command):**
 
@@ -62,6 +63,27 @@ export CONFLUENCE_AUTH_TYPE="basic"
 export CONFLUENCE_EMAIL="user@company.com"
 export CONFLUENCE_API_TOKEN="your-scoped-token"
 ```
+
+**Read-only mode (recommended for AI agents):**
+
+Prevents all write operations (create, update, delete, move, etc.) at the profile level. Useful when giving an AI agent access to Confluence for reading only.
+
+```sh
+# Via profile flag
+confluence profile add agent --domain "company.atlassian.net" --token "xxx" --read-only
+
+# Via environment variable (overrides config file)
+export CONFLUENCE_READ_ONLY=true
+```
+
+When read-only mode is active, any write command exits with an error:
+```
+Error: This profile is in read-only mode. Write operations are not allowed.
+```
+
+`profile list` shows read-only profiles with a `[read-only]` badge.
+
+---
 
 ## Page ID Resolution
 
@@ -102,7 +124,7 @@ confluence read "https://company.atlassian.net/wiki/spaces/MYSPACE/pages/1234567
 Initialize configuration. Saves credentials to `~/.confluence-cli/config.json`.
 
 ```sh
-confluence init [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>]
+confluence init [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>] [--read-only]
 ```
 
 All flags are optional; omitting any flag triggers an interactive prompt for that field. Provide all flags to run fully non-interactive. Use the global `--profile` flag to save to a named profile:
@@ -564,7 +586,7 @@ confluence profile use staging
 Add a new configuration profile. Supports the same options as `init` (interactive, non-interactive, or hybrid).
 
 ```sh
-confluence profile add <name> [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>] [--protocol http|https]
+confluence profile add <name> [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>] [--protocol http|https] [--read-only]
 ```
 
 Profile names may contain letters, numbers, hyphens, and underscores only.
@@ -684,6 +706,7 @@ confluence search "release notes" --limit 20
 - **Page ID vs URL**: when you have a Confluence URL, extract `?pageId=<number>` and pass the number. Do not pass pretty/display URLs — they are not supported.
 - **Cross-space moves**: `confluence move` only works within the same space. Moving across spaces is not supported.
 - **Multiple instances**: Use `--profile <name>` or `CONFLUENCE_PROFILE` env var to target different Confluence instances without reconfiguring.
+- **Read-only mode**: Set `CONFLUENCE_READ_ONLY=true` or use `--read-only` when creating profiles to prevent accidental writes. This is enforced at the CLI level — all write commands will be blocked.
 
 ## Error Patterns
 
@@ -696,3 +719,4 @@ confluence search "release notes" --limit 20
 | `At least one of --title, --file, or --content must be provided` | `update` called with no content options | Provide at least one of the required options |
 | `Profile "<name>" not found!` | Specified profile doesn't exist | Run `confluence profile list` to see available profiles |
 | `Cannot delete the only remaining profile.` | Tried to remove the last profile | Add another profile before removing |
+| `This profile is in read-only mode` | Write command used with a read-only profile | Use a writable profile or remove `readOnly` from config |
