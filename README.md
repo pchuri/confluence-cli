@@ -496,7 +496,7 @@ confluence profile add agent --domain "company.atlassian.net" --token "xyz" --re
 export CONFLUENCE_READ_ONLY=true   # overrides profile setting
 ```
 
-When read-only mode is active, any write command (`create`, `update`, `delete`, `move`, `edit`, `comment`, `attachment-upload`, `attachment-delete`, `property-set`, `property-delete`, `comment-delete`, `copy-tree`) exits with code 1 and prints an error message.
+When read-only mode is active, any write command (`create`, `create-child`, `update`, `delete`, `move`, `edit`, `comment`, `attachment-upload`, `attachment-delete`, `property-set`, `property-delete`, `comment-delete`, `copy-tree`) exits with code 1 and prints an error message.
 
 `confluence profile list` shows a `[read-only]` badge next to protected profiles.
 

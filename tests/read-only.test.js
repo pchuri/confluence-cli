@@ -152,6 +152,45 @@ describe('readOnly mode via config file', () => {
       fs.readFileSync.mockRestore();
     }
   });
+
+  test('CONFLUENCE_READ_ONLY=false overrides config file readOnly=true', () => {
+    const originalReadFile = fs.readFileSync;
+    const originalExistsSync = fs.existsSync;
+
+    const mockConfig = {
+      activeProfile: 'default',
+      profiles: {
+        default: {
+          domain: 'example.com',
+          token: 'token',
+          authType: 'bearer',
+          protocol: 'https',
+          apiPath: '/rest/api',
+          readOnly: true
+        }
+      }
+    };
+
+    jest.spyOn(fs, 'existsSync').mockImplementation((filePath) => {
+      if (filePath === CONFIG_FILE) return true;
+      return originalExistsSync(filePath);
+    });
+
+    jest.spyOn(fs, 'readFileSync').mockImplementation((filePath, encoding) => {
+      if (filePath === CONFIG_FILE) return JSON.stringify(mockConfig);
+      return originalReadFile(filePath, encoding);
+    });
+
+    process.env.CONFLUENCE_READ_ONLY = 'false';
+
+    try {
+      const config = getConfig();
+      expect(config.readOnly).toBe(false);
+    } finally {
+      fs.existsSync.mockRestore();
+      fs.readFileSync.mockRestore();
+    }
+  });
 });
 
 describe('assertWritable', () => {
