@@ -1,3 +1,10 @@
+## [1.27.1](https://github.com/pchuri/confluence-cli/compare/v1.27.0...v1.27.1) (2026-03-11)
+
+
+### Bug Fixes
+
+* restrict config file permissions to owner only ([#72](https://github.com/pchuri/confluence-cli/issues/72)) ([25ec54d](https://github.com/pchuri/confluence-cli/commit/25ec54d80a55b2eba45a7d6adab2e2ae60e3cd4f))
+
 # [1.27.0](https://github.com/pchuri/confluence-cli/compare/v1.26.0...v1.27.0) (2026-03-11)
 
 
