@@ -9,6 +9,7 @@ jest.mock('fs', () => {
     readFileSync: jest.fn((...args) => actual.readFileSync(...args)),
     writeFileSync: jest.fn((...args) => actual.writeFileSync(...args)),
     mkdirSync: jest.fn((...args) => actual.mkdirSync(...args)),
+    chmodSync: jest.fn(),
   };
 });
 
@@ -100,6 +101,15 @@ function captureConfigWrite() {
     getWriteOptions: () => capturedOptions,
     getMkdirOptions: () => capturedMkdirOptions,
   };
+}
+
+// Capture chmodSync calls
+function captureChmod() {
+  const calls = [];
+  fs.chmodSync.mockImplementation((filePath, mode) => {
+    calls.push({ filePath, mode });
+  });
+  return { getCalls: () => calls };
 }
 
 describe('Profile management', () => {
@@ -362,6 +372,34 @@ describe('Profile management', () => {
       setActiveProfile('staging');
 
       expect(getMkdirOptions()).toMatchObject({ mode: 0o700 });
+    });
+
+    test('chmods existing config directory to 0o700', () => {
+      const { CONFIG_DIR } = require('../lib/config');
+      mockConfigFile(multiProfileConfig());
+      // Both CONFIG_DIR and CONFIG_FILE exist
+      fs.existsSync.mockImplementation(() => true);
+      captureConfigWrite();
+      const { getCalls } = captureChmod();
+
+      setActiveProfile('staging');
+
+      const dirChmod = getCalls().find(c => c.filePath === CONFIG_DIR);
+      expect(dirChmod).toBeDefined();
+      expect(dirChmod.mode).toBe(0o700);
+    });
+
+    test('chmods config file to 0o600 on every save', () => {
+      mockConfigFile(multiProfileConfig());
+      fs.existsSync.mockImplementation(() => true);
+      captureConfigWrite();
+      const { getCalls } = captureChmod();
+
+      setActiveProfile('staging');
+
+      const fileChmod = getCalls().find(c => c.filePath === CONFIG_FILE);
+      expect(fileChmod).toBeDefined();
+      expect(fileChmod.mode).toBe(0o600);
     });
   });
 });
