@@ -9,6 +9,7 @@ jest.mock('fs', () => {
     readFileSync: jest.fn((...args) => actual.readFileSync(...args)),
     writeFileSync: jest.fn((...args) => actual.writeFileSync(...args)),
     mkdirSync: jest.fn((...args) => actual.mkdirSync(...args)),
+    chmodSync: jest.fn(),
   };
 });
 
@@ -84,13 +85,31 @@ function mockConfigFile(data) {
 // Capture what was written to config file
 function captureConfigWrite() {
   let captured = null;
-  fs.writeFileSync.mockImplementation((filePath, content) => {
+  let capturedOptions = null;
+  let capturedMkdirOptions = null;
+  fs.writeFileSync.mockImplementation((filePath, content, options) => {
     if (filePath === CONFIG_FILE) {
       captured = JSON.parse(content);
+      capturedOptions = options;
     }
   });
-  fs.mkdirSync.mockImplementation(() => {});
-  return () => captured;
+  fs.mkdirSync.mockImplementation((_path, options) => {
+    capturedMkdirOptions = options;
+  });
+  return {
+    getWritten: () => captured,
+    getWriteOptions: () => capturedOptions,
+    getMkdirOptions: () => capturedMkdirOptions,
+  };
+}
+
+// Capture chmodSync calls
+function captureChmod() {
+  const calls = [];
+  fs.chmodSync.mockImplementation((filePath, mode) => {
+    calls.push({ filePath, mode });
+  });
+  return { getCalls: () => calls };
 }
 
 describe('Profile management', () => {
@@ -261,7 +280,7 @@ describe('Profile management', () => {
   describe('setActiveProfile', () => {
     test('switches active profile', () => {
       mockConfigFile(multiProfileConfig());
-      const getWritten = captureConfigWrite();
+      const { getWritten } = captureConfigWrite();
 
       setActiveProfile('staging');
 
@@ -285,7 +304,7 @@ describe('Profile management', () => {
   describe('deleteProfile', () => {
     test('removes named profile', () => {
       mockConfigFile(multiProfileConfig());
-      const getWritten = captureConfigWrite();
+      const { getWritten } = captureConfigWrite();
 
       deleteProfile('staging');
 
@@ -296,7 +315,7 @@ describe('Profile management', () => {
 
     test('switches active profile if deleted profile was active', () => {
       mockConfigFile(multiProfileConfig());
-      const getWritten = captureConfigWrite();
+      const { getWritten } = captureConfigWrite();
 
       deleteProfile('default');
 
@@ -330,6 +349,57 @@ describe('Profile management', () => {
     test('throws error when no config file', () => {
       mockConfigFile(null);
       expect(() => deleteProfile('default')).toThrow('No configuration file found');
+    });
+  });
+
+  describe('file permissions', () => {
+    test('saves config file with 0o600 permissions', () => {
+      mockConfigFile(multiProfileConfig());
+      const { getWriteOptions } = captureConfigWrite();
+
+      setActiveProfile('staging');
+
+      expect(getWriteOptions()).toEqual({ mode: 0o600 });
+    });
+
+    test('creates config directory with 0o700 permissions when it does not exist', () => {
+      const { CONFIG_DIR } = require('../lib/config');
+      mockConfigFile(multiProfileConfig());
+      // CONFIG_FILE exists (to allow reading), but CONFIG_DIR does not exist (to trigger mkdir)
+      fs.existsSync.mockImplementation((filePath) => filePath !== CONFIG_DIR);
+      const { getMkdirOptions } = captureConfigWrite();
+
+      setActiveProfile('staging');
+
+      expect(getMkdirOptions()).toMatchObject({ mode: 0o700 });
+    });
+
+    test('chmods existing config directory to 0o700', () => {
+      const { CONFIG_DIR } = require('../lib/config');
+      mockConfigFile(multiProfileConfig());
+      // Both CONFIG_DIR and CONFIG_FILE exist
+      fs.existsSync.mockImplementation(() => true);
+      captureConfigWrite();
+      const { getCalls } = captureChmod();
+
+      setActiveProfile('staging');
+
+      const dirChmod = getCalls().find(c => c.filePath === CONFIG_DIR);
+      expect(dirChmod).toBeDefined();
+      expect(dirChmod.mode).toBe(0o700);
+    });
+
+    test('chmods config file to 0o600 on every save', () => {
+      mockConfigFile(multiProfileConfig());
+      fs.existsSync.mockImplementation(() => true);
+      captureConfigWrite();
+      const { getCalls } = captureChmod();
+
+      setActiveProfile('staging');
+
+      const fileChmod = getCalls().find(c => c.filePath === CONFIG_FILE);
+      expect(fileChmod).toBeDefined();
+      expect(fileChmod.mode).toBe(0o600);
     });
   });
 });
