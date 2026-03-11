@@ -58,7 +58,7 @@ describe('readOnly mode via environment variables', () => {
 describe('readOnly mode via config file', () => {
   const saved = {};
   const fs = require('fs');
-  const { CONFIG_FILE, CONFIG_DIR } = require('../lib/config');
+  const { CONFIG_FILE } = require('../lib/config');
 
   beforeEach(() => {
     for (const key of ENV_KEYS) {
