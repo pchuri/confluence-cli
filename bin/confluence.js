@@ -13,6 +13,14 @@ function buildPageUrl(config, path) {
   return `${protocol}://${config.domain}${path}`;
 }
 
+function assertWritable(config) {
+  if (config.readOnly) {
+    console.error(chalk.red('Error: This profile is in read-only mode. Write operations are not allowed.'));
+    console.error(chalk.yellow('Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.'));
+    process.exit(1);
+  }
+}
+
 program
   .name('confluence')
   .description('CLI tool for Atlassian Confluence')
@@ -34,6 +42,7 @@ program
   .option('-a, --auth-type <type>', 'Authentication type (basic or bearer)')
   .option('-e, --email <email>', 'Email or username for basic auth')
   .option('-t, --token <token>', 'API token')
+  .option('--read-only', 'Set profile to read-only mode (blocks write operations)')
   .action(async (options) => {
     const profile = getProfileName();
     await initConfig({ ...options, profile });
@@ -208,8 +217,9 @@ program
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
-      
+
       let content = '';
       
       if (options.file) {
@@ -251,8 +261,9 @@ program
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
-      
+
       // Get parent page info to get space key
       const parentInfo = await client.getPageInfo(parentId);
       const spaceKey = parentInfo.space.key;
@@ -305,8 +316,9 @@ program
       }
 
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
-      
+
       let content = null; // Use null to indicate no content change
       
       if (options.file) {
@@ -344,6 +356,7 @@ program
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
       const result = await client.movePage(pageId, newParentId, options.title);
 
@@ -371,6 +384,7 @@ program
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
       const pageInfo = await client.getPageInfo(pageIdOrUrl);
 
@@ -414,6 +428,7 @@ program
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
       const pageData = await client.getPageForEdit(pageId);
       
@@ -613,6 +628,7 @@ program
       const fs = require('fs');
       const path = require('path');
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
 
       const resolvedFiles = files.map((filePath) => ({
@@ -660,6 +676,7 @@ program
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
 
       if (!options.yes) {
@@ -810,6 +827,7 @@ program
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
 
       if (!options.value && !options.file) {
@@ -866,6 +884,7 @@ program
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
 
       if (!options.yes) {
@@ -1067,6 +1086,7 @@ program
     let location = null;
     try {
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
 
       let content = '';
@@ -1181,6 +1201,7 @@ program
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
 
       if (!options.yes) {
@@ -1599,8 +1620,9 @@ program
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
+      assertWritable(config);
       const client = new ConfluenceClient(config);
-      
+
       // Parse numeric flags with safe fallbacks
       const parsedDepth = parseInt(options.maxDepth, 10);
       const maxDepth = Number.isNaN(parsedDepth) ? 10 : parsedDepth;
@@ -1876,7 +1898,8 @@ profileCmd
     console.log(chalk.blue('Configuration profiles:\n'));
     profiles.forEach(p => {
       const marker = p.active ? chalk.green(' (active)') : '';
-      console.log(`  ${p.active ? chalk.green('*') : ' '} ${chalk.cyan(p.name)}${marker} - ${chalk.gray(p.domain)}`);
+      const readOnlyBadge = p.readOnly ? chalk.red(' [read-only]') : '';
+      console.log(`  ${p.active ? chalk.green('*') : ' '} ${chalk.cyan(p.name)}${marker}${readOnlyBadge} - ${chalk.gray(p.domain)}`);
     });
   });
 
@@ -1902,6 +1925,7 @@ profileCmd
   .option('-a, --auth-type <type>', 'Authentication type (basic or bearer)')
   .option('-e, --email <email>', 'Email or username for basic auth')
   .option('-t, --token <token>', 'API token')
+  .option('--read-only', 'Set profile to read-only mode (blocks write operations)')
   .action(async (name, options) => {
     if (!isValidProfileName(name)) {
       console.error(chalk.red('Invalid profile name. Use only letters, numbers, hyphens, and underscores.'));
@@ -1943,6 +1967,7 @@ module.exports = {
     uniquePathFor,
     exportRecursive,
     sanitizeTitle,
+    assertWritable,
   },
 };
 
