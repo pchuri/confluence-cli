@@ -242,7 +242,7 @@ describe('ConfluenceClient', () => {
       
       expect(result).toContain('<ac:structured-macro ac:name="code">');
       expect(result).toContain('<ac:parameter ac:name="language">javascript</ac:parameter>');
-      expect(result).toContain('console.log(&quot;Hello World&quot;);');
+      expect(result).toContain('console.log("Hello World");');
     });
 
     test('should convert lists to native Confluence format', () => {
@@ -272,13 +272,26 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('<td><p>Cell 1</p></td>');
     });
 
-    test('should convert links to Confluence link format', () => {
+    test('should convert links to smart link format on Cloud instances', () => {
       const markdown = '[Example Link](https://example.com)';
       const result = client.markdownToStorage(markdown);
-      
+
+      expect(result).toContain('<a href="https://example.com" data-card-appearance="inline">Example Link</a>');
+      expect(result).not.toContain('<ac:link>');
+    });
+
+    test('should convert links to ac:link format on Server/Data Center instances', () => {
+      const serverClient = new ConfluenceClient({
+        domain: 'confluence.example.com',
+        token: 'test-token'
+      });
+      const markdown = '[Example Link](https://example.com)';
+      const result = serverClient.markdownToStorage(markdown);
+
       expect(result).toContain('<ac:link>');
       expect(result).toContain('ri:value="https://example.com"');
       expect(result).toContain('Example Link');
+      expect(result).not.toContain('data-card-appearance');
     });
   });
 
