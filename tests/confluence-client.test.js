@@ -176,7 +176,7 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
-    test('provides basic auth hints for regular cloud tokens', async () => {
+    test('provides bearer/PAT hints for bearer token auth', async () => {
       const mock = new MockAdapter(client.client);
       mock.onGet(/\/content\/123/).reply(401);
 
