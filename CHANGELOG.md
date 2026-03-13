@@ -1,3 +1,10 @@
+## [1.27.2](https://github.com/pchuri/confluence-cli/compare/v1.27.1...v1.27.2) (2026-03-13)
+
+
+### Bug Fixes
+
+* improve 401 error messages and document required scopes for scoped API tokens ([#77](https://github.com/pchuri/confluence-cli/issues/77)) ([e7e3e52](https://github.com/pchuri/confluence-cli/commit/e7e3e523d25413c1fe4e2a1dfccabfd4436476e5)), closes [#76](https://github.com/pchuri/confluence-cli/issues/76)
+
 ## [1.27.1](https://github.com/pchuri/confluence-cli/compare/v1.27.0...v1.27.1) (2026-03-11)
 
 
