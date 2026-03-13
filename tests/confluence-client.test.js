@@ -159,6 +159,47 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('401 error handling', () => {
+    test('provides scoped token hints when using api.atlassian.com', async () => {
+      const scopedClient = new ConfluenceClient({
+        domain: 'api.atlassian.com',
+        token: 'scoped-token',
+        authType: 'basic',
+        email: 'user@example.com',
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
+      });
+      const mock = new MockAdapter(scopedClient.client);
+      mock.onGet(/\/content\/123/).reply(401);
+
+      await expect(scopedClient.readPage('123')).rejects.toThrow(/scoped API token/);
+      await expect(scopedClient.readPage('123')).rejects.toThrow(/read:confluence-content\.all/);
+      mock.restore();
+    });
+
+    test('provides basic auth hints for regular cloud tokens', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet(/\/content\/123/).reply(401);
+
+      await expect(client.readPage('123')).rejects.toThrow(/Authentication failed/);
+      await expect(client.readPage('123')).rejects.toThrow(/verify your personal access token/);
+      mock.restore();
+    });
+
+    test('provides basic auth hints when using basic auth on cloud', async () => {
+      const basicClient = new ConfluenceClient({
+        domain: 'test.atlassian.net',
+        token: 'api-token',
+        authType: 'basic',
+        email: 'user@example.com'
+      });
+      const mock = new MockAdapter(basicClient.client);
+      mock.onGet(/\/content\/123/).reply(401);
+
+      await expect(basicClient.readPage('123')).rejects.toThrow(/verify your email and API token/);
+      mock.restore();
+    });
+  });
+
   describe('extractPageId', () => {
     test('should return numeric page ID as is', async () => {
       expect(await client.extractPageId('123456789')).toBe('123456789');
@@ -242,7 +283,7 @@ describe('ConfluenceClient', () => {
       
       expect(result).toContain('<ac:structured-macro ac:name="code">');
       expect(result).toContain('<ac:parameter ac:name="language">javascript</ac:parameter>');
-      expect(result).toContain('console.log(&quot;Hello World&quot;);');
+      expect(result).toContain('console.log("Hello World");');
     });
 
     test('should convert lists to native Confluence format', () => {
@@ -272,13 +313,26 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('<td><p>Cell 1</p></td>');
     });
 
-    test('should convert links to Confluence link format', () => {
+    test('should convert links to smart link format on Cloud instances', () => {
       const markdown = '[Example Link](https://example.com)';
       const result = client.markdownToStorage(markdown);
-      
+
+      expect(result).toContain('<a href="https://example.com" data-card-appearance="inline">Example Link</a>');
+      expect(result).not.toContain('<ac:link>');
+    });
+
+    test('should convert links to ac:link format on Server/Data Center instances', () => {
+      const serverClient = new ConfluenceClient({
+        domain: 'confluence.example.com',
+        token: 'test-token'
+      });
+      const markdown = '[Example Link](https://example.com)';
+      const result = serverClient.markdownToStorage(markdown);
+
       expect(result).toContain('<ac:link>');
       expect(result).toContain('ri:value="https://example.com"');
       expect(result).toContain('Example Link');
+      expect(result).not.toContain('data-card-appearance');
     });
   });
 
