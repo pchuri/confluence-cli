@@ -193,6 +193,22 @@ Scoped tokens restrict access to specific Atlassian products and permissions, fo
    - **API path:** `/ex/confluence/<your-cloud-id>/wiki/rest/api`
    - **Auth type:** `basic` (email + scoped token)
 
+**Required scopes for scoped API tokens:**
+
+When creating a scoped token, select the following [classic scopes](https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/) based on your needs:
+
+| Scope | Required for |
+|-------|-------------|
+| `read:confluence-content.all` | Reading pages and blog posts (`read`, `info`) |
+| `read:confluence-space.summary` | Listing spaces (`spaces`) |
+| `search:confluence` | Searching content (`search`) |
+| `readonly:content.attachment:confluence` | Downloading attachments (`attachments --download`) |
+| `write:confluence-content` | Creating and updating pages (`create`, `update`) |
+| `write:confluence-file` | Uploading attachments (`attachments --upload`) |
+| `write:confluence-space` | Managing spaces |
+
+For **read-only** usage, select at minimum: `read:confluence-content.all`, `read:confluence-space.summary`, and `search:confluence`.
+
 **On-premise / Data Center:** Use your Confluence username and password for basic authentication.
 
 ## Usage
