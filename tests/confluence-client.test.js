@@ -198,6 +198,20 @@ describe('ConfluenceClient', () => {
       await expect(basicClient.readPage('123')).rejects.toThrow(/verify your email and API token/);
       mock.restore();
     });
+
+    test('provides server/DC hints when using basic auth on non-cloud', async () => {
+      const dcClient = new ConfluenceClient({
+        domain: 'confluence.mycompany.com',
+        token: 'password',
+        authType: 'basic',
+        email: 'admin'
+      });
+      const mock = new MockAdapter(dcClient.client);
+      mock.onGet(/\/content\/123/).reply(401);
+
+      await expect(dcClient.readPage('123')).rejects.toThrow(/verify your username and password/);
+      mock.restore();
+    });
   });
 
   describe('extractPageId', () => {
