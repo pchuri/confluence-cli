@@ -65,7 +65,7 @@ export CONFLUENCE_API_TOKEN="your-scoped-token"
 ```
 
 Required classic scopes for scoped tokens:
-- Read-only: `read:confluence-content.all`, `read:confluence-space.summary`, `search:confluence`
+- Read-only: `read:confluence-content.all`, `read:confluence-content.summary`, `read:confluence-space.summary`, `search:confluence`
 - Write: add `write:confluence-content`, `write:confluence-file`, `write:confluence-space`
 - Attachments: `readonly:content.attachment:confluence` (download), `write:confluence-file` (upload)
 
