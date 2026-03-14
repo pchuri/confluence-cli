@@ -1,3 +1,10 @@
+## [1.27.3](https://github.com/pchuri/confluence-cli/compare/v1.27.2...v1.27.3) (2026-03-14)
+
+
+### Bug Fixes
+
+* add read:confluence-content.summary to required scopes documentation ([#78](https://github.com/pchuri/confluence-cli/issues/78)) ([9f7b70a](https://github.com/pchuri/confluence-cli/commit/9f7b70a4ba9665f8024103c55516c41df9357b9b)), closes [#76](https://github.com/pchuri/confluence-cli/issues/76) [#76](https://github.com/pchuri/confluence-cli/issues/76)
+
 ## [1.27.2](https://github.com/pchuri/confluence-cli/compare/v1.27.1...v1.27.2) (2026-03-13)
 
 
