@@ -1,3 +1,10 @@
+## [1.27.4](https://github.com/pchuri/confluence-cli/compare/v1.27.3...v1.27.4) (2026-03-19)
+
+
+### Bug Fixes
+
+* preserve line breaks when converting HTML to markdown ([#79](https://github.com/pchuri/confluence-cli/issues/79)) ([c39f388](https://github.com/pchuri/confluence-cli/commit/c39f388d20da82846f06e27b322016688bcd6373))
+
 ## [1.27.3](https://github.com/pchuri/confluence-cli/compare/v1.27.2...v1.27.3) (2026-03-14)
 
 
