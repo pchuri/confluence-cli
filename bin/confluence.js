@@ -8,6 +8,8 @@ const { getConfig, initConfig, listProfiles, setActiveProfile, deleteProfile, is
 const Analytics = require('../lib/analytics');
 const pkg = require('../package.json');
 
+const getWebUrlPrefix = (apiPath) => apiPath && apiPath.startsWith('/wiki/') ? '/wiki' : '';
+
 function buildPageUrl(config, path) {
   const protocol = config.protocol || 'https';
   return `${protocol}://${config.domain}${path}`;
@@ -240,7 +242,7 @@ program
       console.log(`Title: ${chalk.blue(result.title)}`);
       console.log(`ID: ${chalk.blue(result.id)}`);
       console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
-      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `/wiki${result._links.webui}`)}`)}`);
+      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `${getWebUrlPrefix(config.apiPath)}${result._links.webui}`)}`)}`);
       
       analytics.track('create', true);
     } catch (error) {
@@ -289,7 +291,7 @@ program
       console.log(`ID: ${chalk.blue(result.id)}`);
       console.log(`Parent: ${chalk.blue(parentInfo.title)} (${parentId})`);
       console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
-      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `/wiki${result._links.webui}`)}`)}`);
+      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `${getWebUrlPrefix(config.apiPath)}${result._links.webui}`)}`)}`);
       
       analytics.track('create_child', true);
     } catch (error) {
@@ -337,7 +339,7 @@ program
       console.log(`Title: ${chalk.blue(result.title)}`);
       console.log(`ID: ${chalk.blue(result.id)}`);
       console.log(`Version: ${chalk.blue(result.version.number)}`);
-      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `/wiki${result._links.webui}`)}`)}`);
+      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `${getWebUrlPrefix(config.apiPath)}${result._links.webui}`)}`)}`);
       
       analytics.track('update', true);
     } catch (error) {
@@ -365,7 +367,7 @@ program
       console.log(`ID: ${chalk.blue(result.id)}`);
       console.log(`New Parent: ${chalk.blue(newParentId)}`);
       console.log(`Version: ${chalk.blue(result.version.number)}`);
-      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `/wiki${result._links.webui}`)}`)}`);
+      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `${getWebUrlPrefix(config.apiPath)}${result._links.webui}`)}`)}`);
 
       analytics.track('move', true);
     } catch (error) {
@@ -473,7 +475,7 @@ program
       console.log(`Title: ${chalk.green(pageInfo.title)}`);
       console.log(`ID: ${chalk.green(pageInfo.id)}`);
       console.log(`Space: ${chalk.green(pageInfo.space.name)} (${pageInfo.space.key})`);
-      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `/wiki${pageInfo.url}`)}`)}`);
+      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `${getWebUrlPrefix(config.apiPath)}${pageInfo.url}`)}`)}`);
       
       analytics.track('find', true);
     } catch (error) {
@@ -1713,7 +1715,7 @@ program
           console.log(` - ...and ${result.failures.length - 10} more`);
         }
       }
-      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `/wiki${result.rootPage._links.webui}`)}`)}`);
+      console.log(`URL: ${chalk.gray(`${buildPageUrl(config, `${getWebUrlPrefix(config.apiPath)}${result.rootPage._links.webui}`)}`)}`);
       if (options.failOnError && result.failures?.length) {
         analytics.track('copy_tree', false);
         console.error(chalk.red('Completed with failures and --fail-on-error is set.'));
@@ -1775,7 +1777,7 @@ program
             type: page.type,
             status: page.status,
             spaceKey: page.space?.key,
-            url: `${buildPageUrl(config, `/wiki/spaces/${page.space?.key}/pages/${page.id}`)}`,
+            url: `${buildPageUrl(config, `${getWebUrlPrefix(config.apiPath)}/spaces/${page.space?.key}/pages/${page.id}`)}`,
             parentId: page.parentId || resolvedPageId
           }))
         };
@@ -1804,7 +1806,7 @@ program
           }
           
           if (options.showUrl) {
-            const url = `${buildPageUrl(config, `/wiki/spaces/${page.space?.key}/pages/${page.id}`)}`;
+            const url = `${buildPageUrl(config, `${getWebUrlPrefix(config.apiPath)}/spaces/${page.space?.key}/pages/${page.id}`)}`;
             output += `\n   ${chalk.gray(url)}`;
           }
           
@@ -1869,7 +1871,7 @@ function printTree(nodes, config, options, depth = 1) {
     }
     
     if (options.showUrl) {
-      const url = `${buildPageUrl(config, `/wiki/spaces/${node.space?.key}/pages/${node.id}`)}`;
+      const url = `${buildPageUrl(config, `${getWebUrlPrefix(config.apiPath)}/spaces/${node.space?.key}/pages/${node.id}`)}`;
       output += `\n${indent}${isLast ? '    ' : '│   '}${chalk.gray(url)}`;
     }
     

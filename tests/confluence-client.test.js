@@ -126,6 +126,35 @@ describe('ConfluenceClient', () => {
 
       expect(customClient.baseURL).toBe('https://cloud.example/wiki/rest/api');
     });
+
+    test('sets webUrlPrefix to /wiki when apiPath starts with /wiki/', () => {
+      const cloudClient = new ConfluenceClient({
+        domain: 'test.atlassian.net',
+        token: 'cloud-token',
+        apiPath: '/wiki/rest/api'
+      });
+
+      expect(cloudClient.webUrlPrefix).toBe('/wiki');
+    });
+
+    test('sets webUrlPrefix to empty string when apiPath does not start with /wiki/', () => {
+      const serverClient = new ConfluenceClient({
+        domain: 'confluence.example.com',
+        token: 'server-token',
+        apiPath: '/rest/api'
+      });
+
+      expect(serverClient.webUrlPrefix).toBe('');
+    });
+
+    test('sets webUrlPrefix to empty string when apiPath is not provided', () => {
+      const defaultClient = new ConfluenceClient({
+        domain: 'example.com',
+        token: 'default-token'
+      });
+
+      expect(defaultClient.webUrlPrefix).toBe('');
+    });
   });
 
   describe('authentication setup', () => {
