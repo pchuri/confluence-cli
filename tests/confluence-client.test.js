@@ -379,10 +379,57 @@ describe('ConfluenceClient', () => {
     test('should convert Confluence code macro to markdown', () => {
       const storage = '<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">javascript</ac:parameter><ac:plain-text-body><![CDATA[console.log("Hello");]]></ac:plain-text-body></ac:structured-macro>';
       const result = client.storageToMarkdown(storage);
-      
+
       expect(result).toContain('```javascript');
       expect(result).toContain('console.log("Hello");');
       expect(result).toContain('```');
+    });
+
+    test('should separate code block (with language) from surrounding content with blank lines', () => {
+      const storage = '<p>Intro</p><ac:structured-macro ac:name="code"><ac:parameter ac:name="language">python</ac:parameter><ac:plain-text-body><![CDATA[print("hi")]]></ac:plain-text-body></ac:structured-macro><p>Outro</p>';
+      const result = client.storageToMarkdown(storage);
+      expect(result).toMatch(/Intro\n\n/);
+      expect(result).toMatch(/\n\n```python\n/);
+      expect(result).toMatch(/\n```\n\n/);
+      expect(result).toMatch(/\n\nOutro/);
+    });
+
+    test('should separate code block (no language) from surrounding content with blank lines', () => {
+      const storage = '<p>Before</p><ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[raw code]]></ac:plain-text-body></ac:structured-macro><p>After</p>';
+      const result = client.storageToMarkdown(storage);
+      expect(result).toMatch(/Before\n\n/);
+      expect(result).toMatch(/\n\n```\n/);
+      expect(result).toMatch(/\n```\n\n/);
+      expect(result).toMatch(/\n\nAfter/);
+    });
+
+    test('should separate mermaid macro from surrounding content with blank lines', () => {
+      const storage = '<p>Diagram:</p><ac:structured-macro ac:name="mermaid-macro"><ac:plain-text-body><![CDATA[graph TD; A-->B]]></ac:plain-text-body></ac:structured-macro><p>End</p>';
+      const result = client.storageToMarkdown(storage);
+      expect(result).toMatch(/Diagram:\n\n/);
+      expect(result).toMatch(/\n\n```mermaid\n/);
+      expect(result).toMatch(/\n```\n\n/);
+      expect(result).toMatch(/\n\nEnd/);
+    });
+
+    test('complex page: heading, multi-line paragraph, code block, ordered list', () => {
+      const storage = [
+        '<h1>Deployment Guide</h1>',
+        '<p>Deploy using the following steps.\nEnsure prerequisites are met.</p>',
+        '<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">bash</ac:parameter><ac:plain-text-body><![CDATA[git pull origin main\nnpm run build]]></ac:plain-text-body></ac:structured-macro>',
+        '<p>Then verify:</p>',
+        '<ol><li>Check logs</li><li>Run smoke tests</li></ol>',
+        '<p>Deployment complete.</p>'
+      ].join('');
+      const result = client.storageToMarkdown(storage);
+      expect(result).toBe(
+        '# Deployment Guide\n\n' +
+        'Deploy using the following steps.\nEnsure prerequisites are met.\n\n' +
+        '```bash\ngit pull origin main\nnpm run build\n```\n\n' +
+        'Then verify:\n\n' +
+        '1. Check logs\n2. Run smoke tests\n\n' +
+        'Deployment complete.'
+      );
     });
 
     test('should convert Confluence macros to admonitions', () => {
@@ -426,6 +473,64 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('| Header |');
       expect(result).toContain('| --- |');
       expect(result).toContain('| Cell |');
+    });
+
+    test('should preserve content of multi-line paragraphs', () => {
+      // Without the dotAll flag on the <p> regex, content with embedded newlines is silently dropped
+      const html = '<p>First line\nSecond line</p>';
+      const result = client.htmlToMarkdown(html);
+      expect(result).toContain('First line');
+      expect(result).toContain('Second line');
+    });
+
+    test('should separate consecutive paragraphs with a blank line', () => {
+      const html = '<p>Alpha</p><p>Beta</p>';
+      const result = client.htmlToMarkdown(html);
+      expect(result).toMatch(/Alpha\n\nBeta/);
+    });
+
+    test('should separate lists from surrounding content with blank lines', () => {
+      const html = '<p>Intro</p><ul><li>Item A</li><li>Item B</li></ul><p>Outro</p>';
+      const result = client.htmlToMarkdown(html);
+      expect(result).toMatch(/Intro\n\n/);
+      expect(result).toMatch(/\n\n- Item A\n- Item B\n\n/);
+      expect(result).toMatch(/\n\nOutro/);
+    });
+
+    test('should separate ordered lists from surrounding content with blank lines', () => {
+      const html = '<p>Steps:</p><ol><li>First</li><li>Second</li></ol><p>Done</p>';
+      const result = client.htmlToMarkdown(html);
+      expect(result).toMatch(/Steps:\n\n/);
+      expect(result).toMatch(/\n\n1\. First\n2\. Second\n\n/);
+      expect(result).toMatch(/\n\nDone/);
+    });
+
+    test('should separate tables from surrounding content with blank lines', () => {
+      const html = '<p>See table:</p><table><tr><th>Col</th></tr><tr><td>Val</td></tr></table><p>End</p>';
+      const result = client.htmlToMarkdown(html);
+      expect(result).toMatch(/See table:\n\n/);
+      expect(result).toMatch(/\| Col \|/);
+      expect(result).toMatch(/\n\nEnd/);
+    });
+
+    test('complex page: heading, multi-line paragraph, table, list', () => {
+      const html = [
+        '<h2>API Reference</h2>',
+        '<p>The following endpoints are available.\nAll requests require authentication.</p>',
+        '<table><tr><th>Method</th><th>Path</th></tr><tr><td>GET</td><td>/users</td></tr><tr><td>POST</td><td>/users</td></tr></table>',
+        '<p>Authentication options:</p>',
+        '<ul><li>Bearer token</li><li>API key</li></ul>',
+        '<p>See docs for details.</p>'
+      ].join('');
+      const result = client.htmlToMarkdown(html);
+      expect(result).toBe(
+        '## API Reference\n\n' +
+        'The following endpoints are available.\nAll requests require authentication.\n\n' +
+        '| Method | Path |\n| --- | --- |\n| GET | /users |\n| POST | /users |\n\n' +
+        'Authentication options:\n\n' +
+        '- Bearer token\n- API key\n\n' +
+        'See docs for details.'
+      );
     });
 
     test('should convert named characters correctly', () => {
