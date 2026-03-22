@@ -327,6 +327,16 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('<td><p>Cell 1</p></td>');
     });
 
+    test('should escape CDATA terminators in code blocks', () => {
+      const markdown = '```xml\n<![CDATA[some data]]>\n```';
+      const result = client.markdownToStorage(markdown);
+
+      expect(result).toContain('<![CDATA[');
+      expect(result).toContain(']]]]><![CDATA[>');
+      // The literal ]]> from user code should not appear unescaped
+      expect(result).not.toContain('some data]]>');
+    });
+
     test('should convert links to smart link format on Cloud instances', () => {
       const markdown = '[Example Link](https://example.com)';
       const result = client.markdownToStorage(markdown);
