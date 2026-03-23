@@ -1,3 +1,10 @@
+## [1.27.5](https://github.com/pchuri/confluence-cli/compare/v1.27.4...v1.27.5) (2026-03-23)
+
+
+### Bug Fixes
+
+* make wiki path prefix configurable based on apiPath ([#83](https://github.com/pchuri/confluence-cli/issues/83)) ([fb58a37](https://github.com/pchuri/confluence-cli/commit/fb58a37ebb3ec82fe9237017431c5f5fb59f824a)), closes [/github.com/pchuri/confluence-cli/pull/83#issuecomment-4108336611](https://github.com//github.com/pchuri/confluence-cli/pull/83/issues/issuecomment-4108336611)
+
 ## [1.27.4](https://github.com/pchuri/confluence-cli/compare/v1.27.3...v1.27.4) (2026-03-19)
 
 
