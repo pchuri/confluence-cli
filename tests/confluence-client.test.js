@@ -155,6 +155,16 @@ describe('ConfluenceClient', () => {
 
       expect(defaultClient.webUrlPrefix).toBe('');
     });
+
+    test('sets webUrlPrefix to /wiki when apiPath is wiki/rest/api/ (missing leading slash)', () => {
+      const clientWithMissingSlash = new ConfluenceClient({
+        domain: 'confluence.example.com',
+        token: 'test-token',
+        apiPath: 'wiki/rest/api/'
+      });
+
+      expect(clientWithMissingSlash.webUrlPrefix).toBe('/wiki');
+    });
   });
 
   describe('authentication setup', () => {
