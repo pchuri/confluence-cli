@@ -1,3 +1,10 @@
+## [1.27.6](https://github.com/pchuri/confluence-cli/compare/v1.27.5...v1.27.6) (2026-03-26)
+
+
+### Bug Fixes
+
+* **docs:** correct search examples in SKILL.md to use --cql flag ([#84](https://github.com/pchuri/confluence-cli/issues/84)) ([86800b5](https://github.com/pchuri/confluence-cli/commit/86800b5fc064112f881299417d72b2df02b051ae))
+
 ## [1.27.5](https://github.com/pchuri/confluence-cli/compare/v1.27.4...v1.27.5) (2026-03-23)
 
 

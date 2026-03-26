@@ -1,6 +1,6 @@
 {
   "name": "confluence-cli",
-  "version": "1.27.5",
+  "version": "1.27.6",
   "description": "A command-line interface for Atlassian Confluence with page creation and editing capabilities",
   "main": "index.js",
   "bin": {
