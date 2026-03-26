@@ -197,16 +197,17 @@ confluence find "API Reference" --space MYSPACE
 Search pages using a keyword or CQL expression.
 
 ```sh
-confluence search <query> [--limit <number>]
+confluence search <query> [--limit <number>] [--cql]
 ```
 
 | Option | Default | Description |
 |---|---|---|
 | `--limit` | `10` | Maximum number of results |
+| `--cql` | false | Pass query as raw CQL instead of text search |
 
 ```sh
 confluence search "deployment pipeline"
-confluence search "type=page AND space=MYSPACE" --limit 50
+confluence search --cql 'siteSearch ~ "deployment pipeline" and space = "MYSPACE"' --limit 50
 ```
 
 ---
@@ -697,7 +698,7 @@ confluence children 123456789 --recursive --format json | jq '.[].id'
 ### Search and process results
 
 ```sh
-confluence search "release notes" --limit 20
+confluence search --cql 'siteSearch ~ "release notes" and space = "MYSPACE"' --limit 20
 ```
 
 ---
