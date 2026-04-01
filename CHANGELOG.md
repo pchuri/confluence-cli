@@ -1,3 +1,10 @@
+## [1.27.7](https://github.com/pchuri/confluence-cli/compare/v1.27.6...v1.27.7) (2026-04-01)
+
+
+### Bug Fixes
+
+* publish npm-shrinkwrap.json to pin transitive dependencies ([#88](https://github.com/pchuri/confluence-cli/issues/88)) ([d0dffd2](https://github.com/pchuri/confluence-cli/commit/d0dffd2fa0f9def2cb3a4f6a8a711d14daf3c916)), closes [#86](https://github.com/pchuri/confluence-cli/issues/86)
+
 ## [1.27.6](https://github.com/pchuri/confluence-cli/compare/v1.27.5...v1.27.6) (2026-03-26)
 
 
