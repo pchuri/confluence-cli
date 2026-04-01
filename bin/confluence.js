@@ -548,8 +548,9 @@ program
         fs.mkdirSync(destDir, { recursive: true });
 
         const uniquePathFor = (dir, filename) => {
-          const parsed = path.parse(filename);
-          let attempt = path.join(dir, filename);
+          const safeFilename = sanitizeFilename(filename);
+          const parsed = path.parse(safeFilename);
+          let attempt = path.join(dir, safeFilename);
           let counter = 1;
           while (fs.existsSync(attempt)) {
             const suffix = ` (${counter})`;
@@ -1351,9 +1352,21 @@ function isExportDirectory(fs, path, dir) {
   return fs.existsSync(path.join(dir, EXPORT_MARKER));
 }
 
+function sanitizeFilename(filename) {
+  if (!filename || typeof filename !== 'string') {
+    return 'unnamed';
+  }
+  return filename
+    .replace(/\.\./g, '')
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/^\.+/, '')
+    .trim() || 'unnamed';
+}
+
 function uniquePathFor(fs, path, dir, filename) {
-  const parsed = path.parse(filename);
-  let attempt = path.join(dir, filename);
+  const safeFilename = sanitizeFilename(filename);
+  const parsed = path.parse(safeFilename);
+  let attempt = path.join(dir, safeFilename);
   let counter = 1;
   while (fs.existsSync(attempt)) {
     const suffix = ` (${counter})`;
@@ -1553,7 +1566,11 @@ function sanitizeTitle(value) {
   if (!value || typeof value !== 'string') {
     return fallback;
   }
-  const cleaned = value.replace(/[\\/:*?"<>|]/g, ' ').trim();
+  const cleaned = value
+    .replace(/\.\./g, '')
+    .replace(/[\\/:*?"<>|]/g, '_')
+    .replace(/^\.+/, '')
+    .trim();
   return cleaned || fallback;
 }
 
