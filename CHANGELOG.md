@@ -1,3 +1,10 @@
+## [1.27.8](https://github.com/pchuri/confluence-cli/compare/v1.27.7...v1.27.8) (2026-04-02)
+
+
+### Bug Fixes
+
+* include npm-shrinkwrap.json in published package ([#90](https://github.com/pchuri/confluence-cli/issues/90)) ([58ad062](https://github.com/pchuri/confluence-cli/commit/58ad062d3fdac346fd4312faee46ae3ada8cbb92)), closes [#89](https://github.com/pchuri/confluence-cli/issues/89)
+
 ## [1.27.7](https://github.com/pchuri/confluence-cli/compare/v1.27.6...v1.27.7) (2026-04-01)
 
 
