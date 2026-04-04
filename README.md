@@ -18,6 +18,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - 🛠️ **Edit workflow** - Export page content for editing and re-import
 - 🔀 **Profiles** - Manage multiple Confluence instances with named configuration profiles
 - 🔒 **Read-only mode** - Profile-level write protection for safe AI agent usage
+- 🔄 **Format conversion** - Convert between Markdown, HTML, Storage, and text formats locally (no server required)
 - 🔧 **Easy setup** - Simple configuration with environment variables or interactive setup
 
 ## Installation
@@ -555,6 +556,7 @@ confluence stats
 | `profile use <name>` | Set the active configuration profile | |
 | `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol`, `--read-only` |
 | `profile remove <name>` | Remove a configuration profile | |
+| `convert` | Convert between content formats locally (no server required) | `--input-file <path>`, `--output-file <path>`, `--input-format <markdown\|storage\|html>`, `--output-format <markdown\|storage\|html\|text>` |
 | `stats` | View your usage statistics | |
 
 **Global option:** `--profile <name>` — Use a specific profile for any command (overrides `CONFLUENCE_PROFILE` env var and active profile).
@@ -597,6 +599,15 @@ confluence stats
 confluence profile list
 confluence profile use staging
 confluence --profile staging spaces
+
+# Convert markdown to Confluence storage format (no server required)
+confluence convert --input-file doc.md --input-format markdown --output-format storage
+
+# Pipe conversion via stdin/stdout
+echo "# Hello" | confluence convert --input-format markdown --output-format storage
+
+# Convert storage format back to markdown
+confluence convert -i page.xml -o page.md --input-format storage --output-format markdown
 ```
 
 ## Development
