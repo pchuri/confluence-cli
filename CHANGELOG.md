@@ -1,3 +1,10 @@
+# [1.28.0](https://github.com/pchuri/confluence-cli/compare/v1.27.8...v1.28.0) (2026-04-04)
+
+
+### Features
+
+* add local format conversion command ([#92](https://github.com/pchuri/confluence-cli/issues/92)) ([5425e4e](https://github.com/pchuri/confluence-cli/commit/5425e4e53c33e57365dbefd02f404affa53b9e42)), closes [#91](https://github.com/pchuri/confluence-cli/issues/91)
+
 ## [1.27.8](https://github.com/pchuri/confluence-cli/compare/v1.27.7...v1.27.8) (2026-04-02)
 
 
