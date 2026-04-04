@@ -47,20 +47,23 @@ describe('convert command', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
-  test('markdown to storage via stdin/stdout', () => {
-    const output = run(
-      ['convert', '--input-format', 'markdown', '--output-format', 'storage'],
-      '# Hello\n\nWorld\n'
-    );
+  function writeInput(name, content) {
+    const p = path.join(tmpDir, name);
+    fs.writeFileSync(p, content);
+    return p;
+  }
+
+  test('markdown to storage via stdout', () => {
+    const inputFile = writeInput('input.md', '# Hello\n\nWorld\n');
+    const output = run(['convert', '--input-file', inputFile, '--input-format', 'markdown', '--output-format', 'storage']);
     expect(output).toContain('<h1>');
     expect(output).toContain('Hello');
     expect(output).toContain('World');
   });
 
   test('markdown to storage via files', () => {
-    const inputFile = path.join(tmpDir, 'input.md');
+    const inputFile = writeInput('input.md', '# Test\n\nParagraph\n');
     const outputFile = path.join(tmpDir, 'output.xml');
-    fs.writeFileSync(inputFile, '# Test\n\nParagraph\n');
     run(['convert', '--input-file', inputFile, '--output-file', outputFile, '--input-format', 'markdown', '--output-format', 'storage']);
     const output = fs.readFileSync(outputFile, 'utf-8');
     expect(output).toContain('<h1>');
@@ -68,44 +71,42 @@ describe('convert command', () => {
   });
 
   test('storage to markdown', () => {
-    const output = run(
-      ['convert', '--input-format', 'storage', '--output-format', 'markdown'],
-      '<h1>Title</h1><p>Content</p>'
-    );
+    const inputFile = writeInput('input.xml', '<h1>Title</h1><p>Content</p>');
+    const output = run(['convert', '--input-file', inputFile, '--input-format', 'storage', '--output-format', 'markdown']);
     expect(output).toContain('# Title');
     expect(output).toContain('Content');
   });
 
   test('markdown to html', () => {
-    const output = run(
-      ['convert', '--input-format', 'markdown', '--output-format', 'html'],
-      '**bold**'
-    );
+    const inputFile = writeInput('input.md', '**bold**');
+    const output = run(['convert', '--input-file', inputFile, '--input-format', 'markdown', '--output-format', 'html']);
     expect(output).toContain('<strong>bold</strong>');
   });
 
   test('storage to text', () => {
-    const output = run(
-      ['convert', '--input-format', 'storage', '--output-format', 'text'],
-      '<h1>Title</h1><p>Content</p>'
-    );
+    const inputFile = writeInput('input.xml', '<h1>Title</h1><p>Content</p>');
+    const output = run(['convert', '--input-file', inputFile, '--input-format', 'storage', '--output-format', 'text']);
     expect(output.toLowerCase()).toContain('title');
     expect(output).toContain('Content');
   });
 
   test('errors on missing --input-format', () => {
-    expect(() => run(['convert', '--output-format', 'storage'], '')).toThrow();
+    const inputFile = writeInput('input.md', '');
+    expect(() => run(['convert', '--input-file', inputFile, '--output-format', 'storage'])).toThrow();
   });
 
   test('errors on missing --output-format', () => {
-    expect(() => run(['convert', '--input-format', 'markdown'], '')).toThrow();
+    const inputFile = writeInput('input.md', '');
+    expect(() => run(['convert', '--input-file', inputFile, '--input-format', 'markdown'])).toThrow();
   });
 
   test('errors on same input and output format', () => {
-    expect(() => run(['convert', '--input-format', 'markdown', '--output-format', 'markdown'], '')).toThrow();
+    const inputFile = writeInput('input.md', '');
+    expect(() => run(['convert', '--input-file', inputFile, '--input-format', 'markdown', '--output-format', 'markdown'])).toThrow();
   });
 
   test('errors on invalid format', () => {
-    expect(() => run(['convert', '--input-format', 'xml', '--output-format', 'storage'], '')).toThrow();
+    const inputFile = writeInput('input.md', '');
+    expect(() => run(['convert', '--input-file', inputFile, '--input-format', 'xml', '--output-format', 'storage'])).toThrow();
   });
 });

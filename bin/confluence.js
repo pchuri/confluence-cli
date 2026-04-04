@@ -1992,7 +1992,7 @@ program
       if (options.inputFile) {
         input = fs.readFileSync(options.inputFile, 'utf-8');
       } else {
-        input = fs.readFileSync('/dev/stdin', 'utf-8');
+        input = fs.readFileSync(process.stdin.fd, 'utf-8');
       }
 
       const converter = ConfluenceClient.createLocalConverter();
