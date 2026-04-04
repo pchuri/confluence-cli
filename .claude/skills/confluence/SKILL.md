@@ -1,11 +1,11 @@
 ---
 name: confluence
-description: Use confluence-cli to read, search, create, update, move, and delete Confluence pages and attachments from the terminal.
+description: Use confluence-cli to read, search, create, update, move, delete, and convert Confluence pages and attachments from the terminal.
 ---
 
 # confluence-cli Skill
 
-A CLI tool for Atlassian Confluence. Lets you read, search, create, update, move, and delete pages and attachments from the terminal or from an agent.
+A CLI tool for Atlassian Confluence. Lets you read, search, create, update, move, delete, and convert pages and attachments from the terminal or from an agent.
 
 ## Installation
 
@@ -627,6 +627,36 @@ confluence stats
 
 ---
 
+### `convert`
+
+Convert between content formats locally without a Confluence server connection.
+
+```sh
+confluence convert [--input-file <path>] [--output-file <path>] --input-format <format> --output-format <format>
+```
+
+| Option | Default | Description |
+|---|---|---|
+| `--input-file`, `-i` | stdin | Input file path |
+| `--output-file`, `-o` | stdout | Output file path |
+| `--input-format` | — | Input format: `markdown`, `storage`, `html` (required) |
+| `--output-format` | — | Output format: `markdown`, `storage`, `html`, `text` (required) |
+
+Supported conversions: markdown→storage, markdown→html, markdown→text, html→storage, html→text, html→markdown, storage→markdown, storage→html, storage→text.
+
+```sh
+# Markdown to Confluence storage format
+confluence convert -i doc.md -o doc.xml --input-format markdown --output-format storage
+
+# Pipe via stdin/stdout
+echo "# Hello" | confluence convert --input-format markdown --output-format storage
+
+# Storage format back to markdown
+confluence convert -i page.xml --input-format storage --output-format markdown
+```
+
+---
+
 ### `install-skill`
 
 Copy the Claude Code skill documentation into your project's `.claude/skills/` directory so Claude Code can learn confluence-cli automatically.
@@ -680,6 +710,16 @@ confluence copy-tree 123456789 987654321 --dry-run
 
 # Execute the copy
 confluence copy-tree 123456789 987654321 "Backup Copy"
+```
+
+### Offline format conversion
+
+```sh
+# Convert markdown to Confluence storage format (no server needed)
+confluence convert -i doc.md -o doc.xml --input-format markdown --output-format storage
+
+# Convert storage format to markdown for editing
+confluence convert -i page.xml -o page.md --input-format storage --output-format markdown
 ```
 
 ### Export a page for local editing
