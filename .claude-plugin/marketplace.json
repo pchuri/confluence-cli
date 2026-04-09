@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "pchuri-confluence-cli",
+  "owner": {
+    "name": "pchuri"
+  },
+  "metadata": {
+    "description": "Claude Code plugins for Atlassian Confluence CLI.",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "confluence",
+      "description": "Use confluence-cli to read, search, create, update, move, delete, and convert Confluence pages and attachments from the terminal.",
+      "source": "./plugins/confluence"
+    }
+  ]
+}

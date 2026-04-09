@@ -1,0 +1,18 @@
+{
+  "name": "confluence",
+  "description": "Use confluence-cli to read, search, create, update, move, delete, and convert Confluence pages and attachments from the terminal.",
+  "version": "1.28.0",
+  "author": {
+    "name": "pchuri"
+  },
+  "homepage": "https://github.com/pchuri/confluence-cli#readme",
+  "repository": "https://github.com/pchuri/confluence-cli",
+  "license": "MIT",
+  "keywords": [
+    "confluence",
+    "atlassian",
+    "wiki",
+    "documentation",
+    "cli"
+  ]
+}
