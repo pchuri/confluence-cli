@@ -1,3 +1,10 @@
+# [1.29.0](https://github.com/pchuri/confluence-cli/compare/v1.28.0...v1.29.0) (2026-04-09)
+
+
+### Features
+
+* add Claude Code marketplace plugin ([#95](https://github.com/pchuri/confluence-cli/issues/95)) ([026794e](https://github.com/pchuri/confluence-cli/commit/026794e351eee93e988b63c626864c17c88876a0))
+
 # [1.28.0](https://github.com/pchuri/confluence-cli/compare/v1.27.8...v1.28.0) (2026-04-04)
 
 
