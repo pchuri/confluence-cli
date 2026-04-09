@@ -40,17 +40,28 @@ Or run directly with npx:
 npx confluence-cli
 ```
 
-## Claude Code AI Skills
+## Claude Code Integration
 
-If you use [Claude Code](https://claude.ai/code) or any AI agent that reads `.claude/skills/`, install the skill documentation so the agent understands all confluence-cli commands automatically.
+confluence-cli ships as a [Claude Code plugin](https://docs.anthropic.com/en/docs/claude-code/plugins). Once installed, Claude Code understands all confluence-cli commands automatically and receives updates when the skill is improved.
 
-Run this from your project root after installing confluence-cli:
+### Option 1: Install as Plugin (recommended)
+
+Add the marketplace and install the plugin:
+
+```bash
+/plugin marketplace add pchuri/confluence-cli
+/plugin install confluence@pchuri-confluence-cli
+```
+
+### Option 2: Install Skill manually
+
+If you prefer not to use the plugin system, copy the skill documentation into your project:
 
 ```bash
 confluence install-skill
 ```
 
-This creates `.claude/skills/confluence/SKILL.md` in your current directory. Claude Code picks it up automatically and can help you with any confluence-cli command.
+This creates `.claude/skills/confluence/SKILL.md` in your current directory. Claude Code picks it up automatically.
 
 ## Quick Start
 

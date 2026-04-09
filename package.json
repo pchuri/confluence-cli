@@ -58,7 +58,8 @@
   "files": [
     "bin/",
     "lib/",
-    ".claude/skills/",
+    "plugins/",
+    ".claude-plugin/",
     "npm-shrinkwrap.json"
   ]
 }

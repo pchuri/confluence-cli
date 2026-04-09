@@ -167,7 +167,7 @@ program
     const fs = require('fs');
     const path = require('path');
 
-    const skillSrc = path.join(__dirname, '..', '.claude', 'skills', 'confluence', 'SKILL.md');
+    const skillSrc = path.join(__dirname, '..', 'plugins', 'confluence', 'skills', 'confluence', 'SKILL.md');
 
     if (!fs.existsSync(skillSrc)) {
       console.error(chalk.red('Error: skill file not found in package. Try reinstalling confluence-cli.'));

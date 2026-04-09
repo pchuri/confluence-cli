@@ -1,6 +1,8 @@
 ---
 name: confluence
 description: Use confluence-cli to read, search, create, update, move, delete, and convert Confluence pages and attachments from the terminal.
+argument-hint: <pageId, URL, search query, or task description>
+allowed-tools: [Bash, Read, Write, Glob, Grep]
 ---
 
 # confluence-cli Skill
