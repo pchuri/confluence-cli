@@ -59,6 +59,7 @@
     "bin/",
     "lib/",
     "plugins/",
+    ".claude-plugin/",
     "npm-shrinkwrap.json"
   ]
 }
