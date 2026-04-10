@@ -102,7 +102,7 @@ This creates `.claude/skills/confluence/SKILL.md` in your current directory. Cla
 confluence init
 ```
 
-The wizard helps you choose the right API endpoint and authentication method. It recommends `/wiki/rest/api` for Atlassian Cloud domains (e.g., `*.atlassian.net`) and `/rest/api` for self-hosted/Data Center instances, then prompts for Basic (email/username + token/password) or Bearer authentication.
+The wizard helps you choose the right API endpoint and authentication method. It recommends `/wiki/rest/api` for Atlassian Cloud domains (e.g., `*.atlassian.net`) and `/rest/api` for self-hosted/Data Center instances, then prompts for Basic (email/username + token/password), Bearer, or client-certificate (mTLS) authentication.
 
 ### Option 2: Non-interactive Setup (CLI Flags)
 
@@ -138,6 +138,17 @@ confluence --profile staging init \
   --token "your-personal-access-token"
 ```
 
+**mTLS profile** (self-hosted or reverse-proxied Confluence APIs):
+```bash
+confluence --profile corp init \
+  --domain "docs.example.com" \
+  --api-path "/confluence/rest/api" \
+  --auth-type "mtls" \
+  --tls-client-cert "/Users/you/.certs/client.pem" \
+  --tls-client-key "/Users/you/.certs/client.key" \
+  --tls-ca-cert "/Users/you/.certs/ca-chain.pem"
+```
+
 **Hybrid mode** (some fields provided, rest via prompts):
 ```bash
 # Domain and token provided, will prompt for auth method and email
@@ -150,9 +161,12 @@ confluence init --email "user@example.com" --token "your-api-token"
 **Available flags:**
 - `-d, --domain <domain>` - Confluence domain (e.g., `company.atlassian.net`)
 - `-p, --api-path <path>` - REST API path (e.g., `/wiki/rest/api`)
-- `-a, --auth-type <type>` - Authentication type: `basic` or `bearer`
+- `-a, --auth-type <type>` - Authentication type: `basic`, `bearer`, or `mtls`
 - `-e, --email <email>` - Email or username for basic authentication
 - `-t, --token <token>` - API token or password
+- `--tls-client-cert <path>` - Client certificate for mTLS authentication
+- `--tls-client-key <path>` - Client private key for mTLS authentication
+- `--tls-ca-cert <path>` - Optional CA certificate chain for mTLS authentication
 - `--read-only` - Enable read-only mode (blocks all write operations)
 
 ⚠️ **Security note:** While flags work, storing tokens in shell history is risky. Prefer environment variables (Option 3) for production environments.
@@ -169,6 +183,16 @@ export CONFLUENCE_AUTH_TYPE="basic"
 export CONFLUENCE_PROFILE="default"
 ```
 
+**mTLS environment variables**:
+```bash
+export CONFLUENCE_DOMAIN="docs.example.com"
+export CONFLUENCE_API_PATH="/confluence/rest/api"
+export CONFLUENCE_AUTH_TYPE="mtls"
+export CONFLUENCE_TLS_CLIENT_CERT="/Users/you/.certs/client.pem"
+export CONFLUENCE_TLS_CLIENT_KEY="/Users/you/.certs/client.key"
+export CONFLUENCE_TLS_CA_CERT="/Users/you/.certs/ca-chain.pem"  # optional
+```
+
 **Scoped API token** (recommended for agents):
 ```bash
 export CONFLUENCE_DOMAIN="api.atlassian.com"
@@ -178,7 +202,7 @@ export CONFLUENCE_EMAIL="user@example.com"
 export CONFLUENCE_API_TOKEN="your-scoped-token"
 ```
 
-`CONFLUENCE_API_PATH` defaults to `/wiki/rest/api` for Atlassian Cloud domains and `/rest/api` otherwise. Override it when your site lives under a custom reverse proxy or on-premises path. `CONFLUENCE_AUTH_TYPE` defaults to `basic` when an email is present and falls back to `bearer` otherwise.
+`CONFLUENCE_API_PATH` defaults to `/wiki/rest/api` for Atlassian Cloud domains and `/rest/api` otherwise. Override it when your site lives under a custom reverse proxy or on-premises path. `CONFLUENCE_AUTH_TYPE` defaults to `basic` when an email is present and falls back to `bearer` otherwise. For `mtls`, set `CONFLUENCE_TLS_CLIENT_CERT` and `CONFLUENCE_TLS_CLIENT_KEY`; `CONFLUENCE_TLS_CA_CERT` is optional.
 
 **Read-only mode** (recommended for AI agents):
 ```bash
@@ -223,6 +247,8 @@ When creating a scoped token, select the following [classic scopes](https://deve
 For **read-only** usage, select at minimum: `read:confluence-content.all`, `read:confluence-content.summary`, `read:confluence-space.summary`, and `search:confluence`.
 
 **On-premise / Data Center:** Use your Confluence username and password for basic authentication.
+
+**mTLS-protected Confluence APIs:** Some self-hosted or reverse-proxied deployments authenticate at the TLS layer with a client certificate instead of sending an application-level token. In these environments, configure `authType=mtls` and provide certificate paths via CLI flags or environment variables. No `Authorization` header will be sent in mTLS mode.
 
 ## Usage
 

@@ -29,6 +29,7 @@ const ENV_KEYS = [
   'CONFLUENCE_EMAIL', 'CONFLUENCE_USERNAME',
   'CONFLUENCE_AUTH_TYPE', 'CONFLUENCE_API_PATH',
   'CONFLUENCE_PROTOCOL', 'CONFLUENCE_PROFILE',
+  'CONFLUENCE_TLS_CA_CERT', 'CONFLUENCE_TLS_CLIENT_CERT', 'CONFLUENCE_TLS_CLIENT_KEY',
 ];
 
 // Helper to create a multi-profile config
@@ -189,6 +190,43 @@ describe('Profile management', () => {
       expect(config.token).toBe('env-token');
     });
 
+    test('supports mtls-only auth from environment variables', () => {
+      process.env.CONFLUENCE_DOMAIN = 'api.collaborate.akamai.com';
+      process.env.CONFLUENCE_AUTH_TYPE = 'mtls';
+      process.env.CONFLUENCE_API_PATH = '/confluence/rest/api';
+      process.env.CONFLUENCE_TLS_CA_CERT = '/Users/test/.certs/akamai-ca-chain.pem';
+      process.env.CONFLUENCE_TLS_CLIENT_CERT = '/Users/test/.certs/user-client.pem';
+      process.env.CONFLUENCE_TLS_CLIENT_KEY = '/Users/test/.certs/user.key';
+
+      const config = getConfig();
+      expect(config.domain).toBe('api.collaborate.akamai.com');
+      expect(config.authType).toBe('mtls');
+      expect(config.token).toBeUndefined();
+      expect(config.mtls).toEqual({
+        caCert: '/Users/test/.certs/akamai-ca-chain.pem',
+        clientCert: '/Users/test/.certs/user-client.pem',
+        clientKey: '/Users/test/.certs/user.key',
+      });
+    });
+
+    test('exits when mtls env config is missing a client key', () => {
+      process.env.CONFLUENCE_DOMAIN = 'api.collaborate.akamai.com';
+      process.env.CONFLUENCE_AUTH_TYPE = 'mtls';
+      process.env.CONFLUENCE_TLS_CLIENT_CERT = '/Users/test/.certs/user-client.pem';
+
+      const mockExit = jest.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit');
+      });
+      const mockError = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const mockLog = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+      expect(() => getConfig()).toThrow('process.exit');
+
+      mockExit.mockRestore();
+      mockError.mockRestore();
+      mockLog.mockRestore();
+    });
+
     test('CONFLUENCE_PROFILE env var selects profile', () => {
       process.env.CONFLUENCE_PROFILE = 'staging';
       mockConfigFile(multiProfileConfig());
@@ -227,6 +265,30 @@ describe('Profile management', () => {
       expect(config.token).toBe('old-token');
       expect(config.authType).toBe('bearer');
       expect(config.protocol).toBe('https');
+    });
+
+    test('returns mtls config stored in a profile', () => {
+      mockConfigFile({
+        activeProfile: 'default',
+        profiles: {
+          default: {
+            domain: 'api.collaborate.akamai.com',
+            protocol: 'https',
+            apiPath: '/confluence/rest/api',
+            authType: 'mtls',
+            mtls: {
+              caCert: '/Users/test/.certs/akamai-ca-chain.pem',
+              clientCert: '/Users/test/.certs/user-client.pem',
+              clientKey: '/Users/test/.certs/user.key',
+            },
+          },
+        },
+      });
+
+      const config = getConfig();
+      expect(config.authType).toBe('mtls');
+      expect(config.token).toBeUndefined();
+      expect(config.mtls.clientCert).toBe('/Users/test/.certs/user-client.pem');
     });
 
     test('exits with error for empty config file', () => {
