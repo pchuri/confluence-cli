@@ -1,3 +1,10 @@
+## [1.29.1](https://github.com/pchuri/confluence-cli/compare/v1.29.0...v1.29.1) (2026-04-11)
+
+
+### Bug Fixes
+
+* upgrade axios to ^1.15.0 to address security vulnerabilities ([#97](https://github.com/pchuri/confluence-cli/issues/97)) ([98344f4](https://github.com/pchuri/confluence-cli/commit/98344f4131ec3777c161c0aad516c59fb976daff)), closes [#96](https://github.com/pchuri/confluence-cli/issues/96)
+
 # [1.29.0](https://github.com/pchuri/confluence-cli/compare/v1.28.0...v1.29.0) (2026-04-09)
 
 
