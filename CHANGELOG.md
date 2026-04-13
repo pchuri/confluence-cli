@@ -1,3 +1,10 @@
+# [1.30.0](https://github.com/pchuri/confluence-cli/compare/v1.29.1...v1.30.0) (2026-04-13)
+
+
+### Features
+
+* support Confluence tiny links (/wiki/x/<code>) as pageId input ([#101](https://github.com/pchuri/confluence-cli/issues/101)) ([dcccc8e](https://github.com/pchuri/confluence-cli/commit/dcccc8e2420cda0e6b333be430845e1e68e7afaf)), closes [#100](https://github.com/pchuri/confluence-cli/issues/100)
+
 ## [1.29.1](https://github.com/pchuri/confluence-cli/compare/v1.29.0...v1.29.1) (2026-04-11)
 
 
