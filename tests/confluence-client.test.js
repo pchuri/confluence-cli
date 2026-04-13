@@ -318,6 +318,30 @@ describe('ConfluenceClient', () => {
 
       mock.restore();
     });
+
+    test('should resolve tiny links via redirect', async () => {
+      const mock = new MockAdapter(client.client);
+
+      mock.onGet(/\/wiki\/x\//).reply(302, null, {
+        location: 'https://test.atlassian.net/wiki/spaces/TEST/pages/123456789/Page+Title'
+      });
+
+      const tinyUrl = 'https://test.atlassian.net/wiki/x/aBcDeFg';
+      expect(await client.extractPageId(tinyUrl)).toBe('123456789');
+
+      mock.restore();
+    });
+
+    test('should throw error when tiny link cannot be resolved', async () => {
+      const mock = new MockAdapter(client.client);
+
+      mock.onGet(/\/wiki\/x\//).reply(404);
+
+      const tinyUrl = 'https://test.atlassian.net/wiki/x/invalidCode';
+      await expect(client.extractPageId(tinyUrl)).rejects.toThrow(/Could not resolve page ID from tiny link/);
+
+      mock.restore();
+    });
   });
 
   describe('markdownToStorage', () => {
