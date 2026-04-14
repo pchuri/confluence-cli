@@ -144,9 +144,9 @@ confluence --profile corp init \
   --domain "docs.example.com" \
   --api-path "/confluence/rest/api" \
   --auth-type "mtls" \
-  --tls-client-cert "/Users/you/.certs/client.pem" \
-  --tls-client-key "/Users/you/.certs/client.key" \
-  --tls-ca-cert "/Users/you/.certs/ca-chain.pem"
+  --tls-client-cert "~/.certs/client.pem" \
+  --tls-client-key "~/.certs/client.key" \
+  --tls-ca-cert "~/.certs/ca-chain.pem"
 ```
 
 **Hybrid mode** (some fields provided, rest via prompts):
@@ -188,9 +188,9 @@ export CONFLUENCE_PROFILE="default"
 export CONFLUENCE_DOMAIN="docs.example.com"
 export CONFLUENCE_API_PATH="/confluence/rest/api"
 export CONFLUENCE_AUTH_TYPE="mtls"
-export CONFLUENCE_TLS_CLIENT_CERT="/Users/you/.certs/client.pem"
-export CONFLUENCE_TLS_CLIENT_KEY="/Users/you/.certs/client.key"
-export CONFLUENCE_TLS_CA_CERT="/Users/you/.certs/ca-chain.pem"  # optional
+export CONFLUENCE_TLS_CLIENT_CERT="~/.certs/client.pem"
+export CONFLUENCE_TLS_CLIENT_KEY="~/.certs/client.key"
+export CONFLUENCE_TLS_CA_CERT="~/.certs/ca-chain.pem"  # optional
 ```
 
 **Scoped API token** (recommended for agents):
