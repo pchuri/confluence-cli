@@ -198,6 +198,17 @@ describe('Profile management', () => {
       process.env.CONFLUENCE_TLS_CLIENT_CERT = '/Users/test/.certs/user-client.pem';
       process.env.CONFLUENCE_TLS_CLIENT_KEY = '/Users/test/.certs/user.key';
 
+      // Mock existsSync to return true for the cert paths
+      const certPaths = [
+        '/Users/test/.certs/akamai-ca-chain.pem',
+        '/Users/test/.certs/user-client.pem',
+        '/Users/test/.certs/user.key',
+      ];
+      fs.existsSync.mockImplementation((filePath) => {
+        if (certPaths.includes(filePath)) return true;
+        return jest.requireActual('fs').existsSync(filePath);
+      });
+
       const config = getConfig();
       expect(config.domain).toBe('api.collaborate.akamai.com');
       expect(config.authType).toBe('mtls');
@@ -268,6 +279,11 @@ describe('Profile management', () => {
     });
 
     test('returns mtls config stored in a profile', () => {
+      const certPaths = [
+        '/Users/test/.certs/akamai-ca-chain.pem',
+        '/Users/test/.certs/user-client.pem',
+        '/Users/test/.certs/user.key',
+      ];
       mockConfigFile({
         activeProfile: 'default',
         profiles: {
@@ -283,6 +299,12 @@ describe('Profile management', () => {
             },
           },
         },
+      });
+      // Also mock existsSync for cert paths
+      const originalMock = fs.existsSync.getMockImplementation();
+      fs.existsSync.mockImplementation((filePath) => {
+        if (certPaths.includes(filePath)) return true;
+        return originalMock(filePath);
       });
 
       const config = getConfig();

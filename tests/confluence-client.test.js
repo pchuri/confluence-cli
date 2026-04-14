@@ -206,23 +206,25 @@ describe('ConfluenceClient', () => {
       fs.writeFileSync(keyPath, 'client-key');
       fs.writeFileSync(caPath, 'ca-cert');
 
-      const mtlsClient = new ConfluenceClient({
-        domain: 'api.collaborate.akamai.com',
-        authType: 'mtls',
-        apiPath: '/confluence/rest/api',
-        mtls: {
-          caCert: caPath,
-          clientCert: certPath,
-          clientKey: keyPath,
-        }
-      });
+      try {
+        const mtlsClient = new ConfluenceClient({
+          domain: 'api.collaborate.akamai.com',
+          authType: 'mtls',
+          apiPath: '/confluence/rest/api',
+          mtls: {
+            caCert: caPath,
+            clientCert: certPath,
+            clientKey: keyPath,
+          }
+        });
 
-      expect(mtlsClient.client.defaults.headers.Authorization).toBeUndefined();
-      expect(mtlsClient.client.defaults.httpsAgent.options.ca.toString()).toBe('ca-cert');
-      expect(mtlsClient.client.defaults.httpsAgent.options.cert.toString()).toBe('client-cert');
-      expect(mtlsClient.client.defaults.httpsAgent.options.key.toString()).toBe('client-key');
-
-      removeDirRecursive(tmpDir);
+        expect(mtlsClient.client.defaults.headers.Authorization).toBeUndefined();
+        expect(mtlsClient.client.defaults.httpsAgent.options.ca.toString()).toBe('ca-cert');
+        expect(mtlsClient.client.defaults.httpsAgent.options.cert.toString()).toBe('client-cert');
+        expect(mtlsClient.client.defaults.httpsAgent.options.key.toString()).toBe('client-key');
+      } finally {
+        removeDirRecursive(tmpDir);
+      }
     });
   });
 
@@ -287,21 +289,24 @@ describe('ConfluenceClient', () => {
       fs.writeFileSync(certPath, 'client-cert');
       fs.writeFileSync(keyPath, 'client-key');
 
-      const mtlsClient = new ConfluenceClient({
-        domain: 'api.collaborate.akamai.com',
-        authType: 'mtls',
-        apiPath: '/confluence/rest/api',
-        mtls: {
-          clientCert: certPath,
-          clientKey: keyPath,
-        }
-      });
-      const mock = new MockAdapter(mtlsClient.client);
-      mock.onGet(/\/content\/123/).reply(401);
+      try {
+        const mtlsClient = new ConfluenceClient({
+          domain: 'api.collaborate.akamai.com',
+          authType: 'mtls',
+          apiPath: '/confluence/rest/api',
+          mtls: {
+            clientCert: certPath,
+            clientKey: keyPath,
+          }
+        });
+        const mock = new MockAdapter(mtlsClient.client);
+        mock.onGet(/\/content\/123/).reply(401);
 
-      await expect(mtlsClient.readPage('123')).rejects.toThrow(/client certificate/);
-      mock.restore();
-      removeDirRecursive(tmpDir);
+        await expect(mtlsClient.readPage('123')).rejects.toThrow(/client certificate/);
+        mock.restore();
+      } finally {
+        removeDirRecursive(tmpDir);
+      }
     });
   });
 
