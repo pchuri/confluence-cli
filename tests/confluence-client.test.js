@@ -196,6 +196,36 @@ describe('ConfluenceClient', () => {
         authType: 'basic'
       })).toThrow('Basic authentication requires an email address or username.');
     });
+
+    test('supports mtls auth without an Authorization header', () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-mtls-'));
+      const certPath = path.join(tmpDir, 'client.pem');
+      const keyPath = path.join(tmpDir, 'client.key');
+      const caPath = path.join(tmpDir, 'ca.pem');
+      fs.writeFileSync(certPath, 'client-cert');
+      fs.writeFileSync(keyPath, 'client-key');
+      fs.writeFileSync(caPath, 'ca-cert');
+
+      try {
+        const mtlsClient = new ConfluenceClient({
+          domain: 'api.collaborate.akamai.com',
+          authType: 'mtls',
+          apiPath: '/confluence/rest/api',
+          mtls: {
+            caCert: caPath,
+            clientCert: certPath,
+            clientKey: keyPath,
+          }
+        });
+
+        expect(mtlsClient.client.defaults.headers.Authorization).toBeUndefined();
+        expect(mtlsClient.client.defaults.httpsAgent.options.ca.toString()).toBe('ca-cert');
+        expect(mtlsClient.client.defaults.httpsAgent.options.cert.toString()).toBe('client-cert');
+        expect(mtlsClient.client.defaults.httpsAgent.options.key.toString()).toBe('client-key');
+      } finally {
+        removeDirRecursive(tmpDir);
+      }
+    });
   });
 
   describe('401 error handling', () => {
@@ -250,6 +280,33 @@ describe('ConfluenceClient', () => {
 
       await expect(dcClient.readPage('123')).rejects.toThrow(/verify your username and password/);
       mock.restore();
+    });
+
+    test('provides certificate hints for mtls auth', async () => {
+      const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-mtls-'));
+      const certPath = path.join(tmpDir, 'client.pem');
+      const keyPath = path.join(tmpDir, 'client.key');
+      fs.writeFileSync(certPath, 'client-cert');
+      fs.writeFileSync(keyPath, 'client-key');
+
+      try {
+        const mtlsClient = new ConfluenceClient({
+          domain: 'api.collaborate.akamai.com',
+          authType: 'mtls',
+          apiPath: '/confluence/rest/api',
+          mtls: {
+            clientCert: certPath,
+            clientKey: keyPath,
+          }
+        });
+        const mock = new MockAdapter(mtlsClient.client);
+        mock.onGet(/\/content\/123/).reply(401);
+
+        await expect(mtlsClient.readPage('123')).rejects.toThrow(/client certificate/);
+        mock.restore();
+      } finally {
+        removeDirRecursive(tmpDir);
+      }
     });
   });
 

@@ -34,9 +34,12 @@ program
   .option('-d, --domain <domain>', 'Confluence domain')
   .option('--protocol <protocol>', 'Protocol (http or https)')
   .option('-p, --api-path <path>', 'REST API path')
-  .option('-a, --auth-type <type>', 'Authentication type (basic or bearer)')
+  .option('-a, --auth-type <type>', 'Authentication type (basic, bearer, or mtls)')
   .option('-e, --email <email>', 'Email or username for basic auth')
   .option('-t, --token <token>', 'API token')
+  .option('--tls-ca-cert <path>', 'CA certificate for mTLS connections')
+  .option('--tls-client-cert <path>', 'Client certificate for mTLS connections')
+  .option('--tls-client-key <path>', 'Client private key for mTLS connections')
   .option('--read-only', 'Set profile to read-only mode (blocks write operations)')
   .action(async (options) => {
     const profile = getProfileName();
@@ -1917,9 +1920,12 @@ profileCmd
   .option('-d, --domain <domain>', 'Confluence domain')
   .option('--protocol <protocol>', 'Protocol (http or https)')
   .option('-p, --api-path <path>', 'REST API path')
-  .option('-a, --auth-type <type>', 'Authentication type (basic or bearer)')
+  .option('-a, --auth-type <type>', 'Authentication type (basic, bearer, or mtls)')
   .option('-e, --email <email>', 'Email or username for basic auth')
   .option('-t, --token <token>', 'API token')
+  .option('--tls-ca-cert <path>', 'CA certificate for mTLS connections')
+  .option('--tls-client-cert <path>', 'Client certificate for mTLS connections')
+  .option('--tls-client-key <path>', 'Client private key for mTLS connections')
   .option('--read-only', 'Set profile to read-only mode (blocks write operations)')
   .action(async (name, options) => {
     if (!isValidProfileName(name)) {
