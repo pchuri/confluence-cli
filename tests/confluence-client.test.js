@@ -573,8 +573,32 @@ describe('ConfluenceClient', () => {
     test('should convert Confluence links to markdown', () => {
       const storage = '<ac:link><ri:url ri:value="https://example.com" /><ac:plain-text-link-body><![CDATA[Example]]></ac:plain-text-link-body></ac:link>';
       const result = client.storageToMarkdown(storage);
-      
+
       expect(result).toContain('[Example](https://example.com)');
+    });
+
+    test('should convert internal page links to markdown', () => {
+      const storage = '<ac:link><ri:page ri:space-key="DEV" ri:content-title="Page Title" /></ac:link>';
+      const result = client.storageToMarkdown(storage);
+      expect(result).toContain('[Page Title]');
+    });
+
+    test('should preserve display text from internal page links with ac:link-body', () => {
+      const storage = '<ac:link><ri:page ri:content-title="Some Long Page Title" ri:version-at-save="28" /><ac:link-body>Short Name</ac:link-body></ac:link>';
+      const result = client.storageToMarkdown(storage);
+      expect(result).toContain('Short Name');
+    });
+
+    test('should remove ac:link tags with attributes', () => {
+      const storage = '<p>Before</p><ac:link ac:anchor="section"><ri:page ri:content-title="Page" /></ac:link><p>After</p>';
+      const result = client.storageToMarkdown(storage);
+      expect(result).not.toContain('ac:link');
+    });
+
+    test('should preserve internal link text in table cells', () => {
+      const storage = '<table><tr><th><p>Name</p></th></tr><tr><td><p><ac:link><ri:page ri:content-title="Long Title" /><ac:link-body>Display</ac:link-body></ac:link></p></td></tr></table>';
+      const result = client.storageToMarkdown(storage);
+      expect(result).toContain('Display');
     });
   });
 
