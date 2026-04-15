@@ -478,6 +478,55 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('Example Link');
       expect(result).not.toContain('data-card-appearance');
     });
+
+    test('should convert links to smart link format when forceCloud is set on a custom domain', () => {
+      const customDomainClient = new ConfluenceClient({
+        domain: 'wiki.example.org',
+        token: 'test-token',
+        forceCloud: true
+      });
+      const markdown = '[Example Link](https://example.com)';
+      const result = customDomainClient.markdownToStorage(markdown);
+
+      expect(result).toContain('<a href="https://example.com" data-card-appearance="inline">Example Link</a>');
+      expect(result).not.toContain('<ac:link>');
+    });
+  });
+
+  describe('forceCloud', () => {
+    test('isCloud returns false for custom domains without forceCloud', () => {
+      const customClient = new ConfluenceClient({
+        domain: 'wiki.example.org',
+        token: 'test-token'
+      });
+      expect(customClient.isCloud()).toBe(false);
+    });
+
+    test('isCloud returns true for custom domains with forceCloud', () => {
+      const customClient = new ConfluenceClient({
+        domain: 'wiki.example.org',
+        token: 'test-token',
+        forceCloud: true
+      });
+      expect(customClient.isCloud()).toBe(true);
+    });
+
+    test('isCloud returns true for atlassian.net domains without forceCloud', () => {
+      const cloudClient = new ConfluenceClient({
+        domain: 'company.atlassian.net',
+        token: 'test-token'
+      });
+      expect(cloudClient.isCloud()).toBe(true);
+    });
+
+    test('forceCloud defaults to false when not specified', () => {
+      const defaultClient = new ConfluenceClient({
+        domain: 'example.com',
+        token: 'test-token'
+      });
+      expect(defaultClient.forceCloud).toBe(false);
+      expect(defaultClient.isCloud()).toBe(false);
+    });
   });
 
   describe('markdownToNativeStorage', () => {

@@ -29,6 +29,7 @@ confluence --version   # verify install
 | `CONFLUENCE_API_TOKEN` | API token or personal access token | `ATATT3x...` |
 | `CONFLUENCE_PROFILE` | Named profile to use (optional) | `staging` |
 | `CONFLUENCE_READ_ONLY` | Block all write operations when `true` | `true` |
+| `CONFLUENCE_FORCE_CLOUD` | Force Cloud link format for custom domains | `true` |
 
 **Global `--profile` flag (use a named profile for any command):**
 
@@ -53,6 +54,7 @@ confluence init \
 
 **Cloud vs Server/DC:**
 - Atlassian Cloud (`*.atlassian.net`): use `--api-path "/wiki/rest/api"`, auth type `basic` with email + API token
+- Atlassian Cloud (custom domain): if your Cloud instance uses a custom domain (e.g., `wiki.example.org`), set `CONFLUENCE_FORCE_CLOUD=true` or add `"forceCloud": true` to your profile in `~/.confluence-cli/config.json`. Without this, links will render incorrectly.
 - Atlassian Cloud (scoped token): use `--domain "api.atlassian.com"`, `--api-path "/ex/confluence/<your-cloud-id>/wiki/rest/api"`, auth type `basic` with email + scoped token. Get your Cloud ID from `https://<your-site>.atlassian.net/_edge/tenant_info`. Recommended for agents (least privilege).
 - Self-hosted / Data Center: use `--api-path "/rest/api"`, auth type `bearer` with a personal access token (no email needed)
 

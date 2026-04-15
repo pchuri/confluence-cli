@@ -6,7 +6,7 @@ const ENV_KEYS = [
   'CONFLUENCE_API_TOKEN', 'CONFLUENCE_PASSWORD',
   'CONFLUENCE_EMAIL', 'CONFLUENCE_USERNAME',
   'CONFLUENCE_AUTH_TYPE', 'CONFLUENCE_API_PATH',
-  'CONFLUENCE_PROTOCOL'
+  'CONFLUENCE_PROTOCOL', 'CONFLUENCE_FORCE_CLOUD'
 ];
 
 describe('getConfig env var aliases', () => {
@@ -102,5 +102,22 @@ describe('getConfig env var aliases', () => {
 
     const config = getConfig();
     expect(config.protocol).toBe('https');
+  });
+
+  test('CONFLUENCE_FORCE_CLOUD=true sets forceCloud in config', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_FORCE_CLOUD = 'true';
+
+    const config = getConfig();
+    expect(config.forceCloud).toBe(true);
+  });
+
+  test('forceCloud defaults to false when CONFLUENCE_FORCE_CLOUD is not set', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+
+    const config = getConfig();
+    expect(config.forceCloud).toBe(false);
   });
 });
