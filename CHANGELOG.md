@@ -1,3 +1,10 @@
+## [1.30.1](https://github.com/pchuri/confluence-cli/compare/v1.30.0...v1.30.1) (2026-04-15)
+
+
+### Bug Fixes
+
+* preserve internal page links with custom display text in markdown conversion ([#105](https://github.com/pchuri/confluence-cli/issues/105)) ([06382f3](https://github.com/pchuri/confluence-cli/commit/06382f3317c84c252adb03e0b956c3ca1a5fb66a)), closes [#104](https://github.com/pchuri/confluence-cli/issues/104)
+
 # [1.30.0](https://github.com/pchuri/confluence-cli/compare/v1.29.1...v1.30.0) (2026-04-13)
 
 
