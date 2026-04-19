@@ -1,3 +1,10 @@
+## [1.30.2](https://github.com/pchuri/confluence-cli/compare/v1.30.1...v1.30.2) (2026-04-19)
+
+
+### Bug Fixes
+
+* escape regex metacharacters in userkey before replacement ([#109](https://github.com/pchuri/confluence-cli/issues/109)) ([394b72c](https://github.com/pchuri/confluence-cli/commit/394b72cf99a11614e394a3bedff52011f563843d))
+
 ## [1.30.1](https://github.com/pchuri/confluence-cli/compare/v1.30.0...v1.30.1) (2026-04-15)
 
 
