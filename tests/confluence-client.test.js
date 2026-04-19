@@ -809,6 +809,53 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('resolveUserKeysInHtml', () => {
+    test('should replace ri:user link with @displayName', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/user').reply(200, { displayName: 'Jane Doe', username: 'jdoe' });
+
+      const html = '<p>cc <ac:link><ri:user ri:userkey="abc123" /></ac:link></p>';
+      const { html: resolved, userMap } = await client.resolveUserKeysInHtml(html);
+
+      expect(resolved).toBe('<p>cc @Jane Doe</p>');
+      expect(userMap.get('abc123')).toBe('Jane Doe');
+
+      mock.restore();
+    });
+
+    test('should handle userkey containing regex metacharacters', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/user').reply(200, { displayName: 'Jane Doe', username: 'jdoe' });
+
+      const html = '<p><ac:link><ri:user ri:userkey="a.b+c*d" /></ac:link></p>';
+      const { html: resolved } = await client.resolveUserKeysInHtml(html);
+
+      expect(resolved).toBe('<p>@Jane Doe</p>');
+
+      mock.restore();
+    });
+
+    test('should not interpret $ in displayName as replacement pattern', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/user').reply(200, { displayName: '$1 money $$', username: 'user' });
+
+      const html = '<p><ac:link><ri:user ri:userkey="xyz" /></ac:link></p>';
+      const { html: resolved } = await client.resolveUserKeysInHtml(html);
+
+      expect(resolved).toBe('<p>@$1 money $$</p>');
+
+      mock.restore();
+    });
+
+    test('should return html unchanged when no userkeys present', async () => {
+      const html = '<p>plain content</p>';
+      const { html: resolved, userMap } = await client.resolveUserKeysInHtml(html);
+
+      expect(resolved).toBe(html);
+      expect(userMap.size).toBe(0);
+    });
+  });
+
   describe('page creation and updates', () => {
     test('should have required methods for page management', () => {
       expect(typeof client.createPage).toBe('function');
