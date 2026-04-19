@@ -22,6 +22,12 @@ function assertNonEmpty(value, label) {
   }
 }
 
+function handleCommandError(analytics, commandName, error) {
+  analytics.track(commandName, false);
+  console.error(chalk.red('Error:'), error.message);
+  process.exit(1);
+}
+
 program
   .name('confluence')
   .description('CLI tool for Atlassian Confluence')
@@ -65,9 +71,7 @@ program
       console.log(content);
       analytics.track('read', true);
     } catch (error) {
-      analytics.track('read', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'read', error);
     }
   });
 
@@ -90,9 +94,7 @@ program
       }
       analytics.track('info', true);
     } catch (error) {
-      analytics.track('info', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'info', error);
     }
   });
 
@@ -123,9 +125,7 @@ program
       });
       analytics.track('search', true);
     } catch (error) {
-      analytics.track('search', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'search', error);
     }
   });
 
@@ -146,9 +146,7 @@ program
       });
       analytics.track('spaces', true);
     } catch (error) {
-      analytics.track('spaces', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'spaces', error);
     }
   });
 
@@ -251,9 +249,7 @@ program
 
       analytics.track('create', true);
     } catch (error) {
-      analytics.track('create', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'create', error);
     }
   });
 
@@ -303,9 +299,7 @@ program
 
       analytics.track('create_child', true);
     } catch (error) {
-      analytics.track('create_child', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'create_child', error);
     }
   });
 
@@ -355,9 +349,7 @@ program
 
       analytics.track('update', true);
     } catch (error) {
-      analytics.track('update', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'update', error);
     }
   });
 
@@ -383,9 +375,7 @@ program
 
       analytics.track('move', true);
     } catch (error) {
-      analytics.track('move', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'move', error);
     }
   });
 
@@ -427,9 +417,7 @@ program
       console.log(`ID: ${chalk.blue(result.id)}`);
       analytics.track('delete', true);
     } catch (error) {
-      analytics.track('delete', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'delete', error);
     }
   });
 
@@ -465,9 +453,7 @@ program
       
       analytics.track('edit', true);
     } catch (error) {
-      analytics.track('edit', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'edit', error);
     }
   });
 
@@ -491,9 +477,7 @@ program
 
       analytics.track('find', true);
     } catch (error) {
-      analytics.track('find', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'find', error);
     }
   });
 
@@ -613,9 +597,7 @@ program
 
       analytics.track('attachments', true);
     } catch (error) {
-      analytics.track('attachments', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'attachments', error);
     }
   });
 
@@ -675,9 +657,7 @@ program
       console.log(chalk.green(`Uploaded ${uploaded} attachment${uploaded === 1 ? '' : 's'} to page ${pageId}`));
       analytics.track('attachment_upload', true);
     } catch (error) {
-      analytics.track('attachment_upload', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'attachment_upload', error);
     }
   });
 
@@ -717,9 +697,7 @@ program
       console.log(`Page ID: ${chalk.blue(result.pageId)}`);
       analytics.track('attachment_delete', true);
     } catch (error) {
-      analytics.track('attachment_delete', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'attachment_delete', error);
     }
   });
 
@@ -790,9 +768,7 @@ program
       }
       analytics.track('property_list', true);
     } catch (error) {
-      analytics.track('property_list', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'property_list', error);
     }
   });
 
@@ -824,9 +800,7 @@ program
       }
       analytics.track('property_get', true);
     } catch (error) {
-      analytics.track('property_get', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'property_get', error);
     }
   });
 
@@ -883,9 +857,7 @@ program
       }
       analytics.track('property_set', true);
     } catch (error) {
-      analytics.track('property_set', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'property_set', error);
     }
   });
 
@@ -925,9 +897,7 @@ program
       console.log(`${chalk.green('Page ID:')} ${chalk.blue(result.pageId)}`);
       analytics.track('property_delete', true);
     } catch (error) {
-      analytics.track('property_delete', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'property_delete', error);
     }
   });
 
@@ -1076,9 +1046,7 @@ program
 
       analytics.track('comments', true);
     } catch (error) {
-      analytics.track('comments', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'comments', error);
     }
   });
 
@@ -1241,9 +1209,7 @@ program
       console.log(`ID: ${chalk.blue(result.id)}`);
       analytics.track('comment_delete', true);
     } catch (error) {
-      analytics.track('comment_delete', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'comment_delete', error);
     }
   });
 
@@ -1348,9 +1314,7 @@ program
 
       analytics.track('export', true);
     } catch (error) {
-      analytics.track('export', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'export', error);
     }
   });
 
@@ -1736,9 +1700,7 @@ program
       
       analytics.track('copy_tree', true);
     } catch (error) {
-      analytics.track('copy_tree', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'copy_tree', error);
     }
   });
 
@@ -1835,9 +1797,7 @@ program
       
       analytics.track('children', true);
     } catch (error) {
-      analytics.track('children', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'children', error);
     }
   });
 
@@ -2055,9 +2015,7 @@ program
       }
       analytics.track('convert', true);
     } catch (error) {
-      analytics.track('convert', false);
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
+      handleCommandError(analytics, 'convert', error);
     }
   });
 
@@ -2073,6 +2031,7 @@ module.exports = {
     sanitizeTitle,
     assertWritable,
     assertNonEmpty,
+    handleCommandError,
   },
 };
 
