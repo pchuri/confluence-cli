@@ -16,6 +16,12 @@ function assertWritable(config) {
   }
 }
 
+function assertNonEmpty(value, label) {
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`${label} is required and cannot be empty.`);
+  }
+}
+
 program
   .name('confluence')
   .description('CLI tool for Atlassian Confluence')
@@ -214,12 +220,15 @@ program
   .action(async (title, spaceKey, options) => {
     const analytics = new Analytics();
     try {
+      assertNonEmpty(title, 'title');
+      assertNonEmpty(spaceKey, 'spaceKey');
+
       const config = getConfig(getProfileName());
       assertWritable(config);
       const client = new ConfluenceClient(config);
 
       let content = '';
-      
+
       if (options.file) {
         const fs = require('fs');
         if (!fs.existsSync(options.file)) {
@@ -231,7 +240,7 @@ program
       } else {
         throw new Error('Either --file or --content option is required');
       }
-      
+
       const result = await client.createPage(title, spaceKey, content, options.format);
       
       console.log(chalk.green('✅ Page created successfully!'));
@@ -258,6 +267,9 @@ program
   .action(async (title, parentId, options) => {
     const analytics = new Analytics();
     try {
+      assertNonEmpty(title, 'title');
+      assertNonEmpty(parentId, 'parentId');
+
       const config = getConfig(getProfileName());
       assertWritable(config);
       const client = new ConfluenceClient(config);
@@ -311,6 +323,10 @@ program
       // Check if at least one option is provided
       if (!options.title && !options.file && !options.content) {
         throw new Error('At least one of --title, --file, or --content must be provided.');
+      }
+
+      if (options.title !== undefined) {
+        assertNonEmpty(options.title, '--title');
       }
 
       const config = getConfig(getProfileName());
@@ -2056,6 +2072,7 @@ module.exports = {
     exportRecursive,
     sanitizeTitle,
     assertWritable,
+    assertNonEmpty,
   },
 };
 
