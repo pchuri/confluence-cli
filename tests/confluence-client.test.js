@@ -165,6 +165,39 @@ describe('ConfluenceClient', () => {
 
       expect(clientWithMissingSlash.webUrlPrefix).toBe('/wiki');
     });
+
+    test('toAbsoluteUrl prepends /wiki context path on Atlassian Cloud', () => {
+      const cloudClient = new ConfluenceClient({
+        domain: 'test.atlassian.net',
+        token: 'cloud-token',
+        apiPath: '/wiki/rest/api'
+      });
+
+      expect(cloudClient.toAbsoluteUrl('/download/attachments/123/file.png?version=1&modificationDate=1700000000000&cacheVersion=1&api=v2'))
+        .toBe('https://test.atlassian.net/wiki/download/attachments/123/file.png?version=1&modificationDate=1700000000000&cacheVersion=1&api=v2');
+    });
+
+    test('toAbsoluteUrl does not double-prepend /wiki when path already starts with it', () => {
+      const cloudClient = new ConfluenceClient({
+        domain: 'test.atlassian.net',
+        token: 'cloud-token',
+        apiPath: '/wiki/rest/api'
+      });
+
+      expect(cloudClient.toAbsoluteUrl('/wiki/download/attachments/123/file.png'))
+        .toBe('https://test.atlassian.net/wiki/download/attachments/123/file.png');
+    });
+
+    test('toAbsoluteUrl leaves Server/DC paths untouched when webUrlPrefix is empty', () => {
+      const serverClient = new ConfluenceClient({
+        domain: 'confluence.example.com',
+        token: 'server-token',
+        apiPath: '/rest/api'
+      });
+
+      expect(serverClient.toAbsoluteUrl('/download/attachments/123/file.png'))
+        .toBe('https://confluence.example.com/download/attachments/123/file.png');
+    });
   });
 
   describe('authentication setup', () => {
