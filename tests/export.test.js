@@ -8,6 +8,8 @@ const {
     isExportDirectory,
     uniquePathFor,
     exportRecursive,
+    sanitizeTitle,
+    sanitizeFilename,
   },
 } = require('../bin/confluence.js');
 
@@ -114,6 +116,104 @@ describe('uniquePathFor', () => {
     const fs = createMockFs({ [path.join('/dir', 'file.png')]: 'data' });
     const result = uniquePathFor(fs, path, '/dir', 'file.png');
     expect(result).toBe(path.join('/dir', 'file (1).png'));
+  });
+
+  test('strips directory traversal from filename before joining', () => {
+    const fs = createMockFs();
+    const result = uniquePathFor(fs, path, '/dir', '../../etc/passwd');
+    expect(result).toBe(path.join('/dir', 'passwd'));
+  });
+
+  test('strips windows-style directory traversal', () => {
+    const fs = createMockFs();
+    const result = uniquePathFor(fs, path, '/dir', '..\\..\\windows\\system.ini');
+    expect(result).toBe(path.join('/dir', 'system.ini'));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sanitizeFilename
+// ---------------------------------------------------------------------------
+describe('sanitizeFilename', () => {
+  test('returns unnamed for null/undefined/non-string input', () => {
+    expect(sanitizeFilename(null)).toBe('unnamed');
+    expect(sanitizeFilename(undefined)).toBe('unnamed');
+    expect(sanitizeFilename(42)).toBe('unnamed');
+    expect(sanitizeFilename('')).toBe('unnamed');
+  });
+
+  test('preserves ordinary filenames', () => {
+    expect(sanitizeFilename('report.pdf')).toBe('report.pdf');
+    expect(sanitizeFilename('design notes.md')).toBe('design notes.md');
+  });
+
+  test('strips path components (posix)', () => {
+    expect(sanitizeFilename('../../etc/passwd')).toBe('passwd');
+    expect(sanitizeFilename('/abs/path/file.txt')).toBe('file.txt');
+  });
+
+  test('strips path components (windows-style)', () => {
+    expect(sanitizeFilename('..\\..\\system.ini')).toBe('system.ini');
+    expect(sanitizeFilename('C:\\Users\\x\\doc.txt')).toBe('doc.txt');
+  });
+
+  test('defeats single-pass regex bypass like ".a."', () => {
+    expect(sanitizeFilename('.a.')).toBe('a.');
+    expect(sanitizeFilename('....')).toBe('unnamed');
+    expect(sanitizeFilename('.../foo')).toBe('foo');
+  });
+
+  test('replaces reserved filesystem characters', () => {
+    expect(sanitizeFilename('a:b?c*d"e<f>g|h.txt')).toBe('a_b_c_d_e_f_g_h.txt');
+  });
+
+  test('strips leading dots so hidden files cannot be created', () => {
+    expect(sanitizeFilename('.bashrc')).toBe('bashrc');
+  });
+
+  test('falls back when sanitization leaves empty string', () => {
+    expect(sanitizeFilename('..')).toBe('unnamed');
+    expect(sanitizeFilename('   ')).toBe('unnamed');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sanitizeTitle
+// ---------------------------------------------------------------------------
+describe('sanitizeTitle', () => {
+  test('returns "page" fallback for invalid input', () => {
+    expect(sanitizeTitle(null)).toBe('page');
+    expect(sanitizeTitle('')).toBe('page');
+    expect(sanitizeTitle(0)).toBe('page');
+  });
+
+  test('preserves ordinary titles unchanged', () => {
+    expect(sanitizeTitle('Architecture Decisions')).toBe('Architecture Decisions');
+  });
+
+  test('replaces reserved chars with space (backward compatible)', () => {
+    expect(sanitizeTitle('Foo/Bar:Baz')).toBe('Foo Bar Baz');
+    expect(sanitizeTitle('a<b>c|d"e')).toBe('a b c d e');
+  });
+
+  test('removes path separators so traversal is impossible after path.join', () => {
+    const out = sanitizeTitle('../../etc/passwd');
+    expect(out).not.toMatch(/[\\/]/);
+    expect(path.join('/safe', out).startsWith('/safe/')).toBe(true);
+  });
+
+  test('handles windows-style separators too', () => {
+    const out = sanitizeTitle('..\\..\\etc\\passwd');
+    expect(out).not.toMatch(/[\\/]/);
+  });
+
+  test('strips leading dots so hidden export dirs cannot be created', () => {
+    expect(sanitizeTitle('.hidden')).toBe('hidden');
+    expect(sanitizeTitle('..')).toBe('page');
+  });
+
+  test('strips control characters', () => {
+    expect(sanitizeTitle('foo\x00bar')).toBe('foo bar');
   });
 });
 

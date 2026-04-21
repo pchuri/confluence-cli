@@ -1356,11 +1356,14 @@ function sanitizeFilename(filename) {
   if (!filename || typeof filename !== 'string') {
     return 'unnamed';
   }
-  return filename
-    .replace(/\.\./g, '')
-    .replace(/[\\/:*?"<>|]/g, '_')
+  const path = require('path');
+  const stripped = path.basename(filename.replace(/\\/g, '/'));
+  const cleaned = stripped
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '_')
     .replace(/^\.+/, '')
-    .trim() || 'unnamed';
+    .trim();
+  return cleaned || 'unnamed';
 }
 
 function uniquePathFor(fs, path, dir, filename) {
@@ -1567,8 +1570,8 @@ function sanitizeTitle(value) {
     return fallback;
   }
   const cleaned = value
-    .replace(/\.\./g, '')
-    .replace(/[\\/:*?"<>|]/g, '_')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, ' ')
     .replace(/^\.+/, '')
     .trim();
   return cleaned || fallback;
@@ -1979,6 +1982,7 @@ module.exports = {
     uniquePathFor,
     exportRecursive,
     sanitizeTitle,
+    sanitizeFilename,
     assertWritable,
   },
 };

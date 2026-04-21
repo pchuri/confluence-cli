@@ -653,6 +653,94 @@ describe('ConfluenceClient', () => {
 
       mock.restore();
     });
+
+    test('should escape backslashes before double quotes', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/search').reply((config) => {
+        expect(config.params.cql).toBe('text ~ "back\\\\slash \\"mix\\""');
+        return [200, { results: [] }];
+      });
+
+      await client.search('back\\slash "mix"');
+      mock.restore();
+    });
+
+    test('should preserve wildcards in text search (not over-escape)', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/search').reply((config) => {
+        expect(config.params.cql).toBe('text ~ "foo* ba?"');
+        return [200, { results: [] }];
+      });
+
+      await client.search('foo* ba?');
+      mock.restore();
+    });
+
+    test('should neutralize CQL injection attempting to break out of the literal', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/search').reply((config) => {
+        // The closing quote and injected OR clause must be escaped so the
+        // attacker's payload stays inside the text literal.
+        expect(config.params.cql).toBe('text ~ "x\\" OR title = \\"admin"');
+        return [200, { results: [] }];
+      });
+
+      await client.search('x" OR title = "admin');
+      mock.restore();
+    });
+  });
+
+  describe('escapeCql', () => {
+    test('escapes backslash and double quote', () => {
+      expect(client.escapeCql('a"b')).toBe('a\\"b');
+      expect(client.escapeCql('a\\b')).toBe('a\\\\b');
+    });
+
+    test('escapes backslashes before quotes so a quote cannot smuggle in', () => {
+      expect(client.escapeCql('\\"')).toBe('\\\\\\"');
+    });
+
+    test('leaves wildcard and fuzzy operators alone', () => {
+      expect(client.escapeCql('foo*bar?baz~')).toBe('foo*bar?baz~');
+    });
+
+    test('returns empty string for non-string input', () => {
+      expect(client.escapeCql(null)).toBe('');
+      expect(client.escapeCql(undefined)).toBe('');
+      expect(client.escapeCql(42)).toBe('');
+    });
+  });
+
+  describe('findPageByTitle', () => {
+    test('escapes the title inside the CQL literal', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/search').reply((config) => {
+        expect(config.params.cql).toBe('title = "it\\\\\\"s"');
+        return [200, {
+          results: [{
+            content: { id: '1', title: 'it\\"s', type: 'page', space: { key: 'X', name: 'X' } }
+          }]
+        }];
+      });
+
+      await client.findPageByTitle('it\\"s');
+      mock.restore();
+    });
+
+    test('escapes spaceKey when provided', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/search').reply((config) => {
+        expect(config.params.cql).toBe('title = "Home" AND space = "A\\"B"');
+        return [200, {
+          results: [{
+            content: { id: '1', title: 'Home', type: 'page', space: { key: 'A"B', name: 'X' } }
+          }]
+        }];
+      });
+
+      await client.findPageByTitle('Home', 'A"B');
+      mock.restore();
+    });
   });
 
   describe('page creation and updates', () => {
