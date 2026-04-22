@@ -1,3 +1,10 @@
+## [1.31.1](https://github.com/pchuri/confluence-cli/compare/v1.31.0...v1.31.1) (2026-04-22)
+
+
+### Performance Improvements
+
+* parallelize getAllDescendantPages sibling fetches ([#113](https://github.com/pchuri/confluence-cli/issues/113)) ([bdee5de](https://github.com/pchuri/confluence-cli/commit/bdee5deb4b28300ec644cafad99f6935d2dfc459))
+
 # [1.31.0](https://github.com/pchuri/confluence-cli/compare/v1.30.2...v1.31.0) (2026-04-22)
 
 
