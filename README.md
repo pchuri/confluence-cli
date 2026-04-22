@@ -149,6 +149,21 @@ confluence --profile corp init \
   --tls-ca-cert "~/.certs/ca-chain.pem"
 ```
 
+**Cookie authentication profile** (Enterprise SSO):
+```bash
+confluence --profile sso init \
+  --domain "confluence.company.com" \
+  --api-path "/rest/api" \
+  --auth-type "cookie" \
+  --cookie "JSESSIONID=abc123xyz..."
+
+# Multiple cookies are also supported:
+confluence --profile sso init \
+  --domain "confluence.company.com" \
+  --auth-type "cookie" \
+  --cookie "JSESSIONID=abc123; XSRF-TOKEN=xyz789"
+```
+
 **Hybrid mode** (some fields provided, rest via prompts):
 ```bash
 # Domain and token provided, will prompt for auth method and email
@@ -161,9 +176,10 @@ confluence init --email "user@example.com" --token "your-api-token"
 **Available flags:**
 - `-d, --domain <domain>` - Confluence domain (e.g., `company.atlassian.net`)
 - `-p, --api-path <path>` - REST API path (e.g., `/wiki/rest/api`)
-- `-a, --auth-type <type>` - Authentication type: `basic`, `bearer`, or `mtls`
+- `-a, --auth-type <type>` - Authentication type: `basic`, `bearer`, `mtls`, or `cookie`
 - `-e, --email <email>` - Email or username for basic authentication
 - `-t, --token <token>` - API token or password
+- `-c, --cookie <cookie>` - Cookie for Enterprise SSO authentication (e.g., `"JSESSIONID=..."`)
 - `--tls-client-cert <path>` - Client certificate for mTLS authentication
 - `--tls-client-key <path>` - Client private key for mTLS authentication
 - `--tls-ca-cert <path>` - Optional CA certificate chain for mTLS authentication
@@ -191,6 +207,14 @@ export CONFLUENCE_AUTH_TYPE="mtls"
 export CONFLUENCE_TLS_CLIENT_CERT="~/.certs/client.pem"
 export CONFLUENCE_TLS_CLIENT_KEY="~/.certs/client.key"
 export CONFLUENCE_TLS_CA_CERT="~/.certs/ca-chain.pem"  # optional
+```
+
+**Cookie environment variables** (Enterprise SSO):
+```bash
+export CONFLUENCE_DOMAIN="confluence.company.com"
+export CONFLUENCE_API_PATH="/rest/api"
+export CONFLUENCE_AUTH_TYPE="cookie"
+export CONFLUENCE_COOKIE="JSESSIONID=abc123xyz..."
 ```
 
 **Scoped API token** (recommended for agents):
@@ -270,6 +294,8 @@ For **read-only** usage, select at minimum: `read:confluence-content.all`, `read
 **On-premise / Data Center:** Use your Confluence username and password for basic authentication.
 
 **mTLS-protected Confluence APIs:** Some self-hosted or reverse-proxied deployments authenticate at the TLS layer with a client certificate instead of sending an application-level token. In these environments, configure `authType=mtls` and provide certificate paths via CLI flags or environment variables. No `Authorization` header will be sent in mTLS mode.
+
+**Enterprise SSO with Cookie Authentication:** For Confluence instances behind Enterprise SSO (SAML, OAuth, Okta, etc.) where API tokens or Basic/Bearer auth are not available, you can authenticate using session cookies. After logging in through your browser, extract the session cookie (typically `JSESSIONID` or similar) from your browser's dev tools and configure it via the `--cookie` flag or `CONFLUENCE_COOKIE` environment variable. The cookie is sent in the `Cookie` header instead of an `Authorization` header. Note that session cookies typically expire, so you'll need to refresh them periodically. For security, prefer `CONFLUENCE_COOKIE` env var or interactive prompt over `--cookie` flag since command-line arguments may be visible in shell history and process listings.
 
 ## Usage
 
