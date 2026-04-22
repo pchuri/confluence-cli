@@ -551,8 +551,9 @@ program
         fs.mkdirSync(destDir, { recursive: true });
 
         const uniquePathFor = (dir, filename) => {
-          const parsed = path.parse(filename);
-          let attempt = path.join(dir, filename);
+          const safeFilename = sanitizeFilename(filename);
+          const parsed = path.parse(safeFilename);
+          let attempt = path.join(dir, safeFilename);
           let counter = 1;
           while (fs.existsSync(attempt)) {
             const suffix = ` (${counter})`;
@@ -1334,9 +1335,24 @@ function isExportDirectory(fs, path, dir) {
   return fs.existsSync(path.join(dir, EXPORT_MARKER));
 }
 
+function sanitizeFilename(filename) {
+  if (!filename || typeof filename !== 'string') {
+    return 'unnamed';
+  }
+  const path = require('path');
+  const stripped = path.basename(filename.replace(/\\/g, '/'));
+  const cleaned = stripped
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '_')
+    .replace(/^\.+/, '')
+    .trim();
+  return cleaned || 'unnamed';
+}
+
 function uniquePathFor(fs, path, dir, filename) {
-  const parsed = path.parse(filename);
-  let attempt = path.join(dir, filename);
+  const safeFilename = sanitizeFilename(filename);
+  const parsed = path.parse(safeFilename);
+  let attempt = path.join(dir, safeFilename);
   let counter = 1;
   while (fs.existsSync(attempt)) {
     const suffix = ` (${counter})`;
@@ -1536,7 +1552,11 @@ function sanitizeTitle(value) {
   if (!value || typeof value !== 'string') {
     return fallback;
   }
-  const cleaned = value.replace(/[\\/:*?"<>|]/g, ' ').trim();
+  const cleaned = value
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\\/:*?"<>|\x00-\x1f]/g, ' ')
+    .replace(/^\.+/, '')
+    .trim();
   return cleaned || fallback;
 }
 
@@ -2029,6 +2049,7 @@ module.exports = {
     uniquePathFor,
     exportRecursive,
     sanitizeTitle,
+    sanitizeFilename,
     assertWritable,
     assertNonEmpty,
     handleCommandError,
