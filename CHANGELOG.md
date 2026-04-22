@@ -1,3 +1,10 @@
+# [1.31.0](https://github.com/pchuri/confluence-cli/compare/v1.30.2...v1.31.0) (2026-04-22)
+
+
+### Features
+
+* add cookie authentication for Enterprise SSO ([#111](https://github.com/pchuri/confluence-cli/issues/111)) ([9fe55f3](https://github.com/pchuri/confluence-cli/commit/9fe55f38e4fdad97905cb824062f1af4723c45a5)), closes [#106](https://github.com/pchuri/confluence-cli/issues/106)
+
 ## [1.30.2](https://github.com/pchuri/confluence-cli/compare/v1.30.1...v1.30.2) (2026-04-19)
 
 
