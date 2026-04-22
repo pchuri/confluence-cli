@@ -180,4 +180,37 @@ describe('getConfig env var aliases', () => {
       logSpy.mockRestore();
     }
   });
+
+  test('CONFLUENCE_AUTH_TYPE=COOKIE (uppercase) enters env path and validates', () => {
+    process.env.CONFLUENCE_DOMAIN = 'confluence.company.com';
+    process.env.CONFLUENCE_AUTH_TYPE = 'COOKIE';
+    // No CONFLUENCE_COOKIE set — should surface the cookie validation error,
+    // NOT fall through to "No configuration found!".
+
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      expect(() => getConfig()).toThrow('process.exit called');
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringMatching(/Cookie authentication requires a cookie value/));
+      expect(errorSpy).not.toHaveBeenCalledWith(expect.stringMatching(/No configuration found/));
+    } finally {
+      exitSpy.mockRestore();
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
+  });
+
+  test('CONFLUENCE_AUTH_TYPE=COOKIE (uppercase) with cookie resolves normally', () => {
+    process.env.CONFLUENCE_DOMAIN = 'confluence.company.com';
+    process.env.CONFLUENCE_AUTH_TYPE = 'COOKIE';
+    process.env.CONFLUENCE_COOKIE = 'JSESSIONID=abc123';
+
+    const config = getConfig();
+    expect(config.authType).toBe('cookie');
+    expect(config.cookie).toBe('JSESSIONID=abc123');
+  });
 });
