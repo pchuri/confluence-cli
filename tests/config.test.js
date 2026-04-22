@@ -7,7 +7,8 @@ const ENV_KEYS = [
   'CONFLUENCE_EMAIL', 'CONFLUENCE_USERNAME',
   'CONFLUENCE_AUTH_TYPE', 'CONFLUENCE_API_PATH',
   'CONFLUENCE_PROTOCOL', 'CONFLUENCE_FORCE_CLOUD',
-  'CONFLUENCE_COOKIE'
+  'CONFLUENCE_COOKIE',
+  'CONFLUENCE_TLS_CA_CERT', 'CONFLUENCE_TLS_CLIENT_CERT', 'CONFLUENCE_TLS_CLIENT_KEY'
 ];
 
 describe('getConfig env var aliases', () => {
@@ -212,5 +213,28 @@ describe('getConfig env var aliases', () => {
     const config = getConfig();
     expect(config.authType).toBe('cookie');
     expect(config.cookie).toBe('JSESSIONID=abc123');
+  });
+
+  test('CONFLUENCE_AUTH_TYPE=MTLS (uppercase) enters env path with mTLS error', () => {
+    process.env.CONFLUENCE_DOMAIN = 'confluence.company.com';
+    process.env.CONFLUENCE_AUTH_TYPE = 'MTLS';
+    // No CONFLUENCE_TLS_* set — should surface the mTLS validation error,
+    // NOT fall through to "No configuration found!".
+
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      expect(() => getConfig()).toThrow('process.exit called');
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringMatching(/client certificate and client key/));
+      expect(errorSpy).not.toHaveBeenCalledWith(expect.stringMatching(/No configuration found/));
+    } finally {
+      exitSpy.mockRestore();
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
   });
 });
