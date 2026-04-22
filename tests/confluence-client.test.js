@@ -1233,6 +1233,36 @@ describe('ConfluenceClient', () => {
       expect(typeof client.shouldExcludePage).toBe('function');
     });
 
+    test('getAllDescendantPages caps concurrent getChildPages across the whole traversal', async () => {
+      let inFlight = 0;
+      let maxInFlight = 0;
+
+      const branchingFactor = 15;
+      const rootChildren = Array.from({ length: branchingFactor }, (_, i) => ({ id: `c${i}`, title: `child${i}` }));
+      const grandChildrenFor = (parentId) =>
+        Array.from({ length: branchingFactor }, (_, i) => ({ id: `${parentId}g${i}`, title: `${parentId}-gc${i}` }));
+
+      client.getChildPages = jest.fn(async (id) => {
+        inFlight += 1;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise(resolve => setImmediate(resolve));
+        try {
+          if (id === 'root') return rootChildren;
+          if (/^c\d+$/.test(id)) return grandChildrenFor(id);
+          return [];
+        } finally {
+          inFlight -= 1;
+        }
+      });
+
+      const descendants = await client.getAllDescendantPages('root');
+
+      expect(maxInFlight).toBeLessThanOrEqual(10);
+      expect(descendants).toHaveLength(branchingFactor + branchingFactor * branchingFactor);
+      expect(descendants.slice(0, branchingFactor).map(d => d.id)).toEqual(rootChildren.map(c => c.id));
+      expect(descendants.slice(0, branchingFactor).every(d => d.parentId === 'root')).toBe(true);
+    });
+
     test('should correctly exclude pages based on patterns', () => {
       const patterns = ['temp*', 'test*', '*draft*'];
 
