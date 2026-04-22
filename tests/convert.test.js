@@ -3,6 +3,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const ConfluenceClient = require('../lib/confluence-client');
+const MacroConverter = require('../lib/macro-converter');
 
 const CLI = path.resolve(__dirname, '../bin/index.js');
 
@@ -17,7 +18,7 @@ function run(args, input) {
 describe('createLocalConverter', () => {
   test('creates instance without server config', () => {
     const converter = ConfluenceClient.createLocalConverter();
-    expect(converter).toBeInstanceOf(ConfluenceClient);
+    expect(converter).toBeInstanceOf(MacroConverter);
     expect(converter.markdown).toBeDefined();
   });
 
