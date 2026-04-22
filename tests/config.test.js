@@ -6,7 +6,8 @@ const ENV_KEYS = [
   'CONFLUENCE_API_TOKEN', 'CONFLUENCE_PASSWORD',
   'CONFLUENCE_EMAIL', 'CONFLUENCE_USERNAME',
   'CONFLUENCE_AUTH_TYPE', 'CONFLUENCE_API_PATH',
-  'CONFLUENCE_PROTOCOL', 'CONFLUENCE_FORCE_CLOUD'
+  'CONFLUENCE_PROTOCOL', 'CONFLUENCE_FORCE_CLOUD',
+  'CONFLUENCE_COOKIE'
 ];
 
 describe('getConfig env var aliases', () => {
@@ -119,5 +120,64 @@ describe('getConfig env var aliases', () => {
 
     const config = getConfig();
     expect(config.forceCloud).toBe(false);
+  });
+
+  test('CONFLUENCE_COOKIE with AUTH_TYPE=cookie sets cookie auth', () => {
+    process.env.CONFLUENCE_DOMAIN = 'confluence.company.com';
+    process.env.CONFLUENCE_AUTH_TYPE = 'cookie';
+    process.env.CONFLUENCE_COOKIE = 'JSESSIONID=abc123xyz';
+
+    const config = getConfig();
+    expect(config.authType).toBe('cookie');
+    expect(config.cookie).toBe('JSESSIONID=abc123xyz');
+    expect(config.token).toBeUndefined();
+  });
+
+  test('CONFLUENCE_COOKIE alone (without token or AUTH_TYPE) infers cookie auth', () => {
+    process.env.CONFLUENCE_DOMAIN = 'confluence.company.com';
+    process.env.CONFLUENCE_COOKIE = 'JSESSIONID=abc123xyz';
+
+    const config = getConfig();
+    expect(config.authType).toBe('cookie');
+    expect(config.cookie).toBe('JSESSIONID=abc123xyz');
+  });
+
+  test('CONFLUENCE_COOKIE is trimmed', () => {
+    process.env.CONFLUENCE_DOMAIN = 'confluence.company.com';
+    process.env.CONFLUENCE_AUTH_TYPE = 'cookie';
+    process.env.CONFLUENCE_COOKIE = '  JSESSIONID=abc123  ';
+
+    const config = getConfig();
+    expect(config.cookie).toBe('JSESSIONID=abc123');
+  });
+
+  test('cookie auth with multiple cookies preserved', () => {
+    process.env.CONFLUENCE_DOMAIN = 'confluence.company.com';
+    process.env.CONFLUENCE_AUTH_TYPE = 'cookie';
+    process.env.CONFLUENCE_COOKIE = 'JSESSIONID=abc; XSRF-TOKEN=xyz';
+
+    const config = getConfig();
+    expect(config.cookie).toBe('JSESSIONID=abc; XSRF-TOKEN=xyz');
+  });
+
+  test('AUTH_TYPE=cookie without CONFLUENCE_COOKIE exits with error', () => {
+    process.env.CONFLUENCE_DOMAIN = 'confluence.company.com';
+    process.env.CONFLUENCE_AUTH_TYPE = 'cookie';
+    // No CONFLUENCE_COOKIE set
+
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      expect(() => getConfig()).toThrow('process.exit called');
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringMatching(/Cookie authentication requires a cookie value/));
+    } finally {
+      exitSpy.mockRestore();
+      errorSpy.mockRestore();
+      logSpy.mockRestore();
+    }
   });
 });

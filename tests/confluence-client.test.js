@@ -259,6 +259,66 @@ describe('ConfluenceClient', () => {
         removeDirRecursive(tmpDir);
       }
     });
+
+    test('sends Cookie header and no Authorization header when authType is cookie', () => {
+      const cookieClient = new ConfluenceClient({
+        domain: 'confluence.company.com',
+        authType: 'cookie',
+        cookie: 'JSESSIONID=abc123xyz',
+        apiPath: '/rest/api'
+      });
+
+      expect(cookieClient.authType).toBe('cookie');
+      expect(cookieClient.client.defaults.headers.Authorization).toBeUndefined();
+      expect(cookieClient.client.defaults.headers.Cookie).toBe('JSESSIONID=abc123xyz');
+    });
+
+    test('buildAuthHeader returns null for cookie auth', () => {
+      const cookieClient = new ConfluenceClient({
+        domain: 'confluence.company.com',
+        authType: 'cookie',
+        cookie: 'JSESSIONID=abc123xyz'
+      });
+
+      expect(cookieClient.buildAuthHeader()).toBeNull();
+    });
+
+    test('buildAuthHeaders returns only Cookie for cookie auth', () => {
+      const cookieClient = new ConfluenceClient({
+        domain: 'confluence.company.com',
+        authType: 'cookie',
+        cookie: 'a=1; b=2'
+      });
+
+      expect(cookieClient.buildAuthHeaders()).toEqual({ Cookie: 'a=1; b=2' });
+    });
+
+    test('supports multiple cookies in Cookie header', () => {
+      const cookieClient = new ConfluenceClient({
+        domain: 'confluence.company.com',
+        authType: 'cookie',
+        cookie: 'JSESSIONID=abc; XSRF-TOKEN=xyz'
+      });
+
+      expect(cookieClient.client.defaults.headers.Cookie).toBe('JSESSIONID=abc; XSRF-TOKEN=xyz');
+    });
+  });
+
+  describe('401 error handling (cookie auth)', () => {
+    test('provides cookie-specific hints for cookie auth', async () => {
+      const cookieClient = new ConfluenceClient({
+        domain: 'confluence.company.com',
+        authType: 'cookie',
+        cookie: 'JSESSIONID=expired',
+        apiPath: '/rest/api'
+      });
+      const mock = new MockAdapter(cookieClient.client);
+      mock.onGet(/\/content\/123/).reply(401);
+
+      await expect(cookieClient.readPage('123')).rejects.toThrow(/cookie is valid and not expired/);
+      await expect(cookieClient.readPage('123')).rejects.toThrow(/Enterprise SSO/);
+      mock.restore();
+    });
   });
 
   describe('401 error handling', () => {
