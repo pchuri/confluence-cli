@@ -34,6 +34,18 @@ describe('createLocalConverter', () => {
     expect(result).toContain('# Hello');
     expect(result).toContain('World');
   });
+
+  test('preserves htmlToMarkdown surface', () => {
+    const converter = ConfluenceClient.createLocalConverter();
+    expect(typeof converter.htmlToMarkdown).toBe('function');
+    const result = converter.htmlToMarkdown('<p><strong>bold</strong></p>');
+    expect(result).toContain('**bold**');
+  });
+
+  test('preserves NAMED_ENTITIES export', () => {
+    expect(ConfluenceClient.NAMED_ENTITIES).toBeDefined();
+    expect(ConfluenceClient.NAMED_ENTITIES.aring).toBe('å');
+  });
 });
 
 describe('convert command', () => {
