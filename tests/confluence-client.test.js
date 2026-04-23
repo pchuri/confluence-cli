@@ -166,6 +166,16 @@ describe('ConfluenceClient', () => {
       expect(clientWithMissingSlash.webUrlPrefix).toBe('/wiki');
     });
 
+    test('sets webUrlPrefix to /wiki for scoped token api paths that include /wiki/rest/api', () => {
+      const scopedClient = new ConfluenceClient({
+        domain: 'api.atlassian.com',
+        token: 'scoped-token',
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
+      });
+
+      expect(scopedClient.webUrlPrefix).toBe('/wiki');
+    });
+
     test('toAbsoluteUrl prepends /wiki context path on Atlassian Cloud', () => {
       const cloudClient = new ConfluenceClient({
         domain: 'test.atlassian.net',
@@ -197,6 +207,17 @@ describe('ConfluenceClient', () => {
 
       expect(serverClient.toAbsoluteUrl('/download/attachments/123/file.png'))
         .toBe('https://confluence.example.com/download/attachments/123/file.png');
+    });
+
+    test('toAbsoluteUrl prefers the API-provided base URL when available', () => {
+      const scopedClient = new ConfluenceClient({
+        domain: 'api.atlassian.com',
+        token: 'scoped-token',
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
+      });
+
+      expect(scopedClient.toAbsoluteUrl('/spaces/ENG/pages/123/Architecture+Overview', 'https://tenant.atlassian.net/wiki'))
+        .toBe('https://tenant.atlassian.net/wiki/spaces/ENG/pages/123/Architecture+Overview');
     });
   });
 
@@ -400,6 +421,155 @@ describe('ConfluenceClient', () => {
       } finally {
         removeDirRecursive(tmpDir);
       }
+    });
+  });
+
+  describe('page metadata and storage reads', () => {
+    test('readPage should return storage content when format is storage', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        body: {
+          storage: {
+            value: '<p>Storage body</p>'
+          }
+        }
+      });
+
+      await expect(client.readPage('123', 'storage')).resolves.toBe('<p>Storage body</p>');
+
+      mock.restore();
+    });
+
+    test('getPageInfo should normalize machine-readable metadata', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(config => {
+        expect(config.params.expand).toContain('space');
+        expect(config.params.expand).toContain('history');
+        expect(config.params.expand).toContain('version');
+        expect(config.params.expand).toContain('ancestors');
+        return [200, {
+          id: '123',
+          title: 'Architecture Overview',
+          type: 'page',
+          status: 'current',
+          space: { key: 'ENG', name: 'Engineering' },
+          history: {
+            createdBy: { displayName: 'Ada Lovelace', accountId: 'acct-1' },
+            createdDate: '2025-01-01T10:00:00.000Z'
+          },
+          version: {
+            number: 7,
+            when: '2025-01-02T12:00:00.000Z',
+            by: { displayName: 'Grace Hopper', accountId: 'acct-2' }
+          },
+          ancestors: [
+            { id: '100', type: 'page', title: 'Parent Page' }
+          ],
+          _links: {
+            webui: '/spaces/ENG/pages/123/Architecture+Overview'
+          }
+        }];
+      });
+
+      const info = await client.getPageInfo('123');
+      expect(info).toMatchObject({
+        id: '123',
+        title: 'Architecture Overview',
+        type: 'page',
+        status: 'current',
+        spaceKey: 'ENG',
+        parentId: '100',
+        version: 7,
+        url: 'https://test.atlassian.net/spaces/ENG/pages/123/Architecture+Overview',
+        createdAt: '2025-01-01T10:00:00.000Z',
+        updatedAt: '2025-01-02T12:00:00.000Z',
+        ancestors: [{ id: '100', type: 'page', title: 'Parent Page' }],
+        author: { displayName: 'Ada Lovelace', accountId: 'acct-1' },
+        lastUpdatedBy: { displayName: 'Grace Hopper', accountId: 'acct-2' }
+      });
+      expect(info.space).toEqual({ key: 'ENG', name: 'Engineering' });
+
+      mock.restore();
+    });
+
+    test('normalizePage should prefer _links.base for scoped token browser URLs', () => {
+      const scopedClient = new ConfluenceClient({
+        domain: 'api.atlassian.com',
+        email: 'user@example.com',
+        token: 'scoped-token',
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
+      });
+
+      const info = scopedClient.normalizePage({
+        id: '123',
+        title: 'Architecture Overview',
+        type: 'page',
+        status: 'current',
+        space: { key: 'ENG', name: 'Engineering' },
+        _links: {
+          base: 'https://tenant.atlassian.net/wiki',
+          webui: '/spaces/ENG/pages/123/Architecture+Overview'
+        }
+      });
+
+      expect(info.url).toBe('https://tenant.atlassian.net/wiki/spaces/ENG/pages/123/Architecture+Overview');
+    });
+
+    test('getPageInfo should handle missing parent cleanly', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/555').reply(200, {
+        id: '555',
+        title: 'Root Page',
+        type: 'page',
+        status: 'current',
+        space: { key: 'ROOT', name: 'Root Space' },
+        version: { number: 1 },
+        ancestors: [],
+        _links: {}
+      });
+
+      const info = await client.getPageInfo('555');
+      expect(info.parentId).toBeNull();
+      expect(info.ancestors).toEqual([]);
+      expect(info.url).toBe('https://test.atlassian.net/spaces/ROOT/pages/555');
+
+      mock.restore();
+    });
+
+    test('getChildPages should include structured metadata for JSON output', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/child/page').reply(config => {
+        expect(config.params.expand).toContain('ancestors');
+        return [200, {
+          results: [
+            {
+              id: '200',
+              title: 'Child Page',
+              type: 'page',
+              status: 'current',
+              space: { key: 'ENG', name: 'Engineering' },
+              version: { number: 4 },
+              ancestors: [{ id: '123', type: 'page', title: 'Parent Page' }],
+              _links: { webui: '/spaces/ENG/pages/200/Child+Page' }
+            }
+          ]
+        }];
+      });
+
+      const pages = await client.getChildPages('123');
+      expect(pages).toEqual([expect.objectContaining({
+        id: '200',
+        title: 'Child Page',
+        type: 'page',
+        status: 'current',
+        spaceKey: 'ENG',
+        parentId: '123',
+        version: 4,
+        url: 'https://test.atlassian.net/spaces/ENG/pages/200/Child+Page',
+        ancestors: [{ id: '123', type: 'page', title: 'Parent Page' }]
+      })]);
+
+      mock.restore();
     });
   });
 

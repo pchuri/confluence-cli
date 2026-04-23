@@ -304,6 +304,9 @@ For **read-only** usage, select at minimum: `read:confluence-content.all`, `read
 # Read by page ID
 confluence read 123456789
 
+# Read native Confluence storage content
+confluence read 123456789 --format storage
+
 # Read in markdown format
 confluence read 123456789 --format markdown
 
@@ -311,9 +314,28 @@ confluence read 123456789 --format markdown
 confluence read "https://your-domain.atlassian.net/wiki/viewpage.action?pageId=123456789"
 ```
 
+Use `--format storage` when you need Confluence's native storage representation, especially for macros and other Confluence-specific markup.
+
 ### Get Page Information
 ```bash
 confluence info 123456789
+
+# Emit machine-readable metadata
+confluence info 123456789 --format json
+```
+
+Example JSON shape:
+```json
+{
+  "id": "123456789",
+  "title": "Architecture Overview",
+  "type": "page",
+  "status": "current",
+  "spaceKey": "ENG",
+  "parentId": "100200300",
+  "version": 7,
+  "url": "https://your-domain.atlassian.net/wiki/spaces/ENG/pages/123456789/Architecture+Overview"
+}
 ```
 
 ### Search Pages
@@ -442,6 +464,36 @@ confluence children 123456789 --recursive --max-depth 3
 
 # Output as JSON for scripting
 confluence children 123456789 --recursive --format json > children.json
+```
+
+`children --format json` returns structured metadata for each page, including `id`, `title`, `type`, `status`, `spaceKey`, `parentId`, `version`, and `url`. Recursive output also includes `depth`, and when available, `ancestors`.
+
+Example recursive JSON item:
+```json
+{
+  "pageId": "123456789",
+  "childCount": 2,
+  "children": [
+    {
+      "id": "200300400",
+      "title": "Child Page",
+      "type": "page",
+      "status": "current",
+      "spaceKey": "ENG",
+      "parentId": "123456789",
+      "version": 4,
+      "url": "https://your-domain.atlassian.net/wiki/spaces/ENG/pages/200300400/Child+Page",
+      "depth": 1,
+      "ancestors": [
+        {
+          "id": "123456789",
+          "type": "page",
+          "title": "Architecture Overview"
+        }
+      ]
+    }
+  ]
+}
 ```
 
 ### Find a Page by Title
@@ -612,8 +664,8 @@ confluence stats
 | Command | Description | Options |
 |---|---|---|
 | `init` | Initialize CLI configuration | `--read-only` |
-| `read <pageId_or_url>` | Read page content | `--format <html\|text\|markdown>` |
-| `info <pageId_or_url>` | Get page information | |
+| `read <pageId_or_url>` | Read page content | `--format <html\|text\|storage\|markdown>` |
+| `info <pageId_or_url>` | Get page information | `--format <text\|json>` |
 | `search <query>` | Search for pages | `--limit <number>` |
 | `spaces` | List all available spaces | |
 | `find <title>` | Find a page by its title | `--space <spaceKey>` |
