@@ -3,7 +3,6 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const ConfluenceClient = require('../lib/confluence-client');
-const MacroConverter = require('../lib/macro-converter');
 
 const CLI = path.resolve(__dirname, '../bin/index.js');
 
@@ -18,7 +17,7 @@ function run(args, input) {
 describe('createLocalConverter', () => {
   test('creates instance without server config', () => {
     const converter = ConfluenceClient.createLocalConverter();
-    expect(converter).toBeInstanceOf(MacroConverter);
+    expect(converter).toBeInstanceOf(ConfluenceClient);
     expect(converter.markdown).toBeDefined();
   });
 
@@ -34,6 +33,18 @@ describe('createLocalConverter', () => {
     const result = converter.storageToMarkdown('<h1>Hello</h1><p>World</p>');
     expect(result).toContain('# Hello');
     expect(result).toContain('World');
+  });
+
+  test('preserves htmlToMarkdown surface', () => {
+    const converter = ConfluenceClient.createLocalConverter();
+    expect(typeof converter.htmlToMarkdown).toBe('function');
+    const result = converter.htmlToMarkdown('<p><strong>bold</strong></p>');
+    expect(result).toContain('**bold**');
+  });
+
+  test('preserves NAMED_ENTITIES export', () => {
+    expect(ConfluenceClient.NAMED_ENTITIES).toBeDefined();
+    expect(ConfluenceClient.NAMED_ENTITIES.aring).toBe('å');
   });
 });
 

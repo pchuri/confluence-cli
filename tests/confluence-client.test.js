@@ -3,7 +3,6 @@ const os = require('os');
 const path = require('path');
 const FormData = require('form-data');
 const ConfluenceClient = require('../lib/confluence-client');
-const { htmlToMarkdown, NAMED_ENTITIES } = require('../lib/html-to-markdown');
 const MockAdapter = require('axios-mock-adapter');
 
 const removeDirRecursive = (dir) => {
@@ -748,7 +747,7 @@ describe('ConfluenceClient', () => {
   describe('htmlToMarkdown', () => {
     test('should convert basic HTML to markdown', () => {
       const html = '<h2>Title</h2><p>Some <strong>bold</strong> and <em>italic</em> text.</p>';
-      const result = htmlToMarkdown(html);
+      const result = client.htmlToMarkdown(html);
       
       expect(result).toContain('## Title');
       expect(result).toContain('**bold**');
@@ -757,7 +756,7 @@ describe('ConfluenceClient', () => {
 
     test('should convert HTML lists to markdown', () => {
       const html = '<ul><li><p>Item 1</p></li><li><p>Item 2</p></li></ul>';
-      const result = htmlToMarkdown(html);
+      const result = client.htmlToMarkdown(html);
       
       expect(result).toContain('- Item 1');
       expect(result).toContain('- Item 2');
@@ -765,7 +764,7 @@ describe('ConfluenceClient', () => {
 
     test('should convert HTML tables to markdown', () => {
       const html = '<table><tr><th><p>Header</p></th></tr><tr><td><p>Cell</p></td></tr></table>';
-      const result = htmlToMarkdown(html);
+      const result = client.htmlToMarkdown(html);
       
       expect(result).toContain('| Header |');
       expect(result).toContain('| --- |');
@@ -775,20 +774,20 @@ describe('ConfluenceClient', () => {
     test('should preserve content of multi-line paragraphs', () => {
       // Without the dotAll flag on the <p> regex, content with embedded newlines is silently dropped
       const html = '<p>First line\nSecond line</p>';
-      const result = htmlToMarkdown(html);
+      const result = client.htmlToMarkdown(html);
       expect(result).toContain('First line');
       expect(result).toContain('Second line');
     });
 
     test('should separate consecutive paragraphs with a blank line', () => {
       const html = '<p>Alpha</p><p>Beta</p>';
-      const result = htmlToMarkdown(html);
+      const result = client.htmlToMarkdown(html);
       expect(result).toMatch(/Alpha\n\nBeta/);
     });
 
     test('should separate lists from surrounding content with blank lines', () => {
       const html = '<p>Intro</p><ul><li>Item A</li><li>Item B</li></ul><p>Outro</p>';
-      const result = htmlToMarkdown(html);
+      const result = client.htmlToMarkdown(html);
       expect(result).toMatch(/Intro\n\n/);
       expect(result).toMatch(/\n\n- Item A\n- Item B\n\n/);
       expect(result).toMatch(/\n\nOutro/);
@@ -796,7 +795,7 @@ describe('ConfluenceClient', () => {
 
     test('should separate ordered lists from surrounding content with blank lines', () => {
       const html = '<p>Steps:</p><ol><li>First</li><li>Second</li></ol><p>Done</p>';
-      const result = htmlToMarkdown(html);
+      const result = client.htmlToMarkdown(html);
       expect(result).toMatch(/Steps:\n\n/);
       expect(result).toMatch(/\n\n1\. First\n2\. Second\n\n/);
       expect(result).toMatch(/\n\nDone/);
@@ -804,7 +803,7 @@ describe('ConfluenceClient', () => {
 
     test('should separate tables from surrounding content with blank lines', () => {
       const html = '<p>See table:</p><table><tr><th>Col</th></tr><tr><td>Val</td></tr></table><p>End</p>';
-      const result = htmlToMarkdown(html);
+      const result = client.htmlToMarkdown(html);
       expect(result).toMatch(/See table:\n\n/);
       expect(result).toMatch(/\| Col \|/);
       expect(result).toMatch(/\n\nEnd/);
@@ -819,7 +818,7 @@ describe('ConfluenceClient', () => {
         '<ul><li>Bearer token</li><li>API key</li></ul>',
         '<p>See docs for details.</p>'
       ].join('');
-      const result = htmlToMarkdown(html);
+      const result = client.htmlToMarkdown(html);
       expect(result).toBe(
         '## API Reference\n\n' +
         'The following endpoints are available.\nAll requests require authentication.\n\n' +
@@ -831,9 +830,11 @@ describe('ConfluenceClient', () => {
     });
 
     test('should convert named characters correctly', () => {
+      const NAMED_ENTITIES = ConfluenceClient.NAMED_ENTITIES;
+
       for (const [entity, char] of Object.entries(NAMED_ENTITIES)) {
         const html = `<p>Character: &${entity};</p>`;
-        const result = htmlToMarkdown(html);
+        const result = client.htmlToMarkdown(html);
         expect(result).toContain(`Character: ${char}`);
       }
     });
