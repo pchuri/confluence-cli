@@ -1,3 +1,10 @@
+## [1.32.1](https://github.com/pchuri/confluence-cli/compare/v1.32.0...v1.32.1) (2026-04-24)
+
+
+### Bug Fixes
+
+* publish prod-only npm-shrinkwrap to avoid devDependency leakage ([#116](https://github.com/pchuri/confluence-cli/issues/116)) ([d2a7241](https://github.com/pchuri/confluence-cli/commit/d2a72419c1de92f8059521de29f576de2e58b72f)), closes [#110](https://github.com/pchuri/confluence-cli/issues/110)
+
 # [1.32.0](https://github.com/pchuri/confluence-cli/compare/v1.31.1...v1.32.0) (2026-04-24)
 
 
