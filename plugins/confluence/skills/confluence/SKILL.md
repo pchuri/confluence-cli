@@ -149,15 +149,16 @@ confluence --profile staging init --domain "staging.example.com" --auth-type bea
 Read page content. Outputs to stdout.
 
 ```sh
-confluence read <pageId> [--format html|text|markdown]
+confluence read <pageId> [--format html|text|storage|markdown]
 ```
 
 | Option | Default | Description |
 |---|---|---|
-| `--format` | `text` | Output format: `html`, `text`, or `markdown` |
+| `--format` | `text` | Output format: `html`, `text`, `storage`, or `markdown` |
 
 ```sh
 confluence read 123456789
+confluence read 123456789 --format storage
 confluence read 123456789 --format markdown
 ```
 
@@ -165,14 +166,15 @@ confluence read 123456789 --format markdown
 
 ### `info <pageId>`
 
-Get page metadata (title, ID, type, status, space).
+Get page metadata. Use `--format json` for machine-readable output.
 
 ```sh
-confluence info <pageId>
+confluence info <pageId> [--format text|json]
 ```
 
 ```sh
 confluence info 123456789
+confluence info 123456789 --format json
 ```
 
 ---

@@ -63,7 +63,7 @@ program
 program
   .command('read <pageId>')
   .description('Read a Confluence page by ID or URL')
-  .option('-f, --format <format>', 'Output format (html, text, markdown)', 'text')
+  .option('-f, --format <format>', 'Output format (html, text, storage, markdown)', 'text')
   .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
@@ -80,18 +80,24 @@ program
 program
   .command('info <pageId>')
   .description('Get information about a Confluence page')
-  .action(async (pageId) => {
+  .option('-f, --format <format>', 'Output format (text, json)', 'text')
+  .action(async (pageId, options) => {
     const analytics = new Analytics();
     try {
       const client = new ConfluenceClient(getConfig(getProfileName()));
       const info = await client.getPageInfo(pageId);
-      console.log(chalk.blue('Page Information:'));
-      console.log(`Title: ${chalk.green(info.title)}`);
-      console.log(`ID: ${chalk.green(info.id)}`);
-      console.log(`Type: ${chalk.green(info.type)}`);
-      console.log(`Status: ${chalk.green(info.status)}`);
-      if (info.space) {
-        console.log(`Space: ${chalk.green(info.space.name)} (${info.space.key})`);
+
+      if ((options.format || 'text').toLowerCase() === 'json') {
+        console.log(JSON.stringify(info, null, 2));
+      } else {
+        console.log(chalk.blue('Page Information:'));
+        console.log(`Title: ${chalk.green(info.title)}`);
+        console.log(`ID: ${chalk.green(info.id)}`);
+        console.log(`Type: ${chalk.green(info.type)}`);
+        console.log(`Status: ${chalk.green(info.status)}`);
+        if (info.space) {
+          console.log(`Space: ${chalk.green(info.space.name)} (${info.space.key})`);
+        }
       }
       analytics.track('info', true);
     } catch (error) {
@@ -1739,6 +1745,7 @@ program
     try {
       const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
+      const format = (options.format || 'list').toLowerCase();
       
       // Extract page ID from URL if needed
       const resolvedPageId = await client.extractPageId(pageId);
@@ -1747,34 +1754,56 @@ program
       let children;
       if (options.recursive) {
         const maxDepth = parseInt(options.maxDepth) || 10;
-        children = await client.getAllDescendantPages(resolvedPageId, maxDepth);
+        children = await client.getAllDescendantPages(
+          resolvedPageId,
+          maxDepth,
+          { includeAncestors: format === 'json' }
+        );
       } else {
         children = await client.getChildPages(resolvedPageId);
       }
       
       if (children.length === 0) {
-        console.log(chalk.yellow('No child pages found.'));
+        if (format === 'json') {
+          console.log(JSON.stringify({
+            pageId: String(resolvedPageId),
+            childCount: 0,
+            children: []
+          }, null, 2));
+        } else {
+          console.log(chalk.yellow('No child pages found.'));
+        }
         analytics.track('children', true);
         return;
       }
       
-      // Format output
-      const format = options.format.toLowerCase();
-      
       if (format === 'json') {
         // JSON output
         const output = {
-          pageId: resolvedPageId,
+          pageId: String(resolvedPageId),
           childCount: children.length,
-          children: children.map(page => ({
-            id: page.id,
-            title: page.title,
-            type: page.type,
-            status: page.status,
-            spaceKey: page.space?.key,
-            url: `${client.buildUrl(`${client.webUrlPrefix}/spaces/${page.space?.key}/pages/${page.id}`)}`,
-            parentId: page.parentId || resolvedPageId
-          }))
+          children: children.map(page => {
+            const record = {
+              id: page.id,
+              title: page.title,
+              type: page.type,
+              status: page.status,
+              spaceKey: page.spaceKey || page.space?.key || null,
+              parentId: page.parentId || String(resolvedPageId),
+              version: page.version ?? null,
+              url: page.url || null
+            };
+
+            if (options.recursive && page.depth !== undefined) {
+              record.depth = page.depth;
+            }
+
+            if (options.recursive && Array.isArray(page.ancestors) && page.ancestors.length > 0) {
+              record.ancestors = page.ancestors;
+            }
+
+            return record;
+          })
         };
         console.log(JSON.stringify(output, null, 2));
       } else if (format === 'tree' && options.recursive) {
