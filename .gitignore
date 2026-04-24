@@ -3,6 +3,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Generated at publish time with prod-only dependencies; repo uses package-lock.json for dev
+npm-shrinkwrap.json
+
 # Runtime data
 pids
 *.pid
