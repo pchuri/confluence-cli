@@ -803,6 +803,20 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('<a href="https://example.com" data-card-appearance="inline">Example Link</a>');
       expect(result).not.toContain('<ac:link>');
     });
+
+    test('explicit linkStyle on the client flows through to storage output', () => {
+      // Converter-level semantics are covered in tests/macro-converter.test.js.
+      // This just confirms the ConfluenceClient constructor plumbs linkStyle through.
+      const client = new ConfluenceClient({
+        domain: 'wiki.example.org',
+        token: 'test-token',
+        forceCloud: true,
+        linkStyle: 'plain'
+      });
+      const result = client.markdownToStorage('[Link](https://example.com)');
+      expect(result).toContain('<a href="https://example.com">Link</a>');
+      expect(result).not.toContain('data-card-appearance');
+    });
   });
 
   describe('forceCloud', () => {
