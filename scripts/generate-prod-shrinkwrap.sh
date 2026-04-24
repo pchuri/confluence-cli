@@ -2,25 +2,34 @@
 set -euo pipefail
 
 # Generate an npm-shrinkwrap.json that locks only production dependencies.
-# `npm prune --omit=dev` does not remove dev entries from package-lock.json,
-# so we resolve a fresh lockfile from a package.json with devDependencies
-# stripped. This keeps the published shrinkwrap free of devDependency
-# metadata, which npm would otherwise install under the consumer's
-# node_modules/<pkg>/node_modules as extraneous packages.
+# We derive it by filtering the checked-in package-lock.json (removing
+# entries with "dev": true and clearing root.devDependencies) instead of
+# re-resolving from the registry. Re-resolving would let runtime packages
+# drift to newer semver-compatible versions than what CI verified, which
+# defeats the supply-chain hardening the shrinkwrap is meant to provide.
 
-tmpdir=$(mktemp -d)
-trap 'rm -rf "$tmpdir"' EXIT
+node -e '
+const fs = require("fs");
 
-node -e "
-const fs = require('fs');
-const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
-delete pkg.devDependencies;
-fs.writeFileSync(process.argv[1] + '/package.json', JSON.stringify(pkg, null, 2));
-" "$tmpdir"
+const lock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
 
-(cd "$tmpdir" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund >/dev/null)
+if (lock.lockfileVersion !== 3) {
+  console.error("Expected lockfileVersion 3, got " + lock.lockfileVersion);
+  process.exit(1);
+}
 
-rm -f npm-shrinkwrap.json
-mv "$tmpdir/package-lock.json" ./npm-shrinkwrap.json
+const packages = {};
+for (const [key, value] of Object.entries(lock.packages)) {
+  if (value.dev) continue;
+  if (key === "") {
+    const { devDependencies, ...rest } = value;
+    packages[key] = rest;
+  } else {
+    packages[key] = value;
+  }
+}
 
-echo "Generated npm-shrinkwrap.json with $(node -e "console.log(Object.keys(require('./npm-shrinkwrap.json').packages).length)") prod packages"
+const out = { ...lock, packages };
+fs.writeFileSync("npm-shrinkwrap.json", JSON.stringify(out, null, 2) + "\n");
+console.log("Generated npm-shrinkwrap.json with " + (Object.keys(packages).length - 1) + " prod packages");
+'
