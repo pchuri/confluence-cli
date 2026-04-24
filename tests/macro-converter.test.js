@@ -66,3 +66,68 @@ describe('MacroConverter', () => {
     });
   });
 });
+
+describe('MacroConverter markdownToStorage marker conventions', () => {
+  // isCloud: true so link output matches the smart-link branch in mixed tests.
+  const converter = new MacroConverter({ isCloud: true });
+
+  describe('TOC', () => {
+    test('**TOC** becomes Table of Contents macro', () => {
+      const result = converter.markdownToStorage('**TOC**');
+      expect(result).toContain('<ac:structured-macro ac:name="toc" />');
+      expect(result).not.toContain('**TOC**');
+    });
+  });
+
+  describe('ANCHOR', () => {
+    test('**ANCHOR: id** becomes anchor macro with given id', () => {
+      const result = converter.markdownToStorage('**ANCHOR: my-section**');
+      expect(result).toContain('<ac:structured-macro ac:name="anchor">');
+      expect(result).toContain('<ac:parameter ac:name="">my-section</ac:parameter>');
+      expect(result).not.toContain('**ANCHOR');
+    });
+  });
+
+  describe('same-page anchor links', () => {
+    test('[text](#id) becomes ac:link with ac:anchor', () => {
+      const result = converter.markdownToStorage('[Jump](#my-section)');
+      expect(result).toContain('<ac:link ac:anchor="my-section">');
+      expect(result).toContain('<![CDATA[Jump]]>');
+    });
+
+    test('anchor-link conversion runs before general link conversion on Cloud', () => {
+      const result = converter.markdownToStorage(
+        '[Jump](#my-section) and [External](https://example.com)'
+      );
+      expect(result).toContain('ac:anchor="my-section"');
+      expect(result).toContain('data-card-appearance="inline"');
+    });
+
+    test('anchor-link conversion runs before general link conversion on Server/DC', () => {
+      const serverConverter = new MacroConverter({ isCloud: false });
+      const result = serverConverter.markdownToStorage(
+        '[Jump](#my-section) and [External](https://example.com)'
+      );
+      expect(result).toContain('ac:anchor="my-section"');
+      // External link should get the ac:link + ri:url storage format, not be
+      // double-wrapped by the anchor replacement.
+      expect(result).toContain('ri:value="https://example.com"');
+      expect(result).not.toContain('ac:anchor="https');
+    });
+  });
+
+  describe('QUOTE', () => {
+    test('> **QUOTE** preserves blockquote instead of info macro', () => {
+      const result = converter.markdownToStorage('> **QUOTE**\n> Famous words.');
+      expect(result).toContain('<blockquote>');
+      expect(result).toContain('Famous words.');
+      expect(result).not.toContain('ac:name="info"');
+    });
+
+    test('unmarked blockquote still defaults to info macro', () => {
+      const result = converter.markdownToStorage('> Just a quote');
+      expect(result).toContain('<ac:structured-macro ac:name="info">');
+      expect(result).toContain('Just a quote');
+    });
+  });
+});
