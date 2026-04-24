@@ -1,3 +1,10 @@
+# [1.33.0](https://github.com/pchuri/confluence-cli/compare/v1.32.1...v1.33.0) (2026-04-24)
+
+
+### Features
+
+* add configurable linkStyle for storage-format link output ([#117](https://github.com/pchuri/confluence-cli/issues/117)) ([18aa60c](https://github.com/pchuri/confluence-cli/commit/18aa60c19dcce02028257902d07a50613860d5df))
+
 ## [1.32.1](https://github.com/pchuri/confluence-cli/compare/v1.32.0...v1.32.1) (2026-04-24)
 
 
