@@ -7,6 +7,7 @@ const ENV_KEYS = [
   'CONFLUENCE_EMAIL', 'CONFLUENCE_USERNAME',
   'CONFLUENCE_AUTH_TYPE', 'CONFLUENCE_API_PATH',
   'CONFLUENCE_PROTOCOL', 'CONFLUENCE_FORCE_CLOUD',
+  'CONFLUENCE_LINK_STYLE',
   'CONFLUENCE_COOKIE',
   'CONFLUENCE_TLS_CA_CERT', 'CONFLUENCE_TLS_CLIENT_CERT', 'CONFLUENCE_TLS_CLIENT_KEY'
 ];
@@ -121,6 +122,49 @@ describe('getConfig env var aliases', () => {
 
     const config = getConfig();
     expect(config.forceCloud).toBe(false);
+  });
+
+  test('CONFLUENCE_LINK_STYLE sets linkStyle in config', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_LINK_STYLE = 'plain';
+
+    const config = getConfig();
+    expect(config.linkStyle).toBe('plain');
+  });
+
+  test('linkStyle is undefined when CONFLUENCE_LINK_STYLE is not set', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+
+    const config = getConfig();
+    expect(config.linkStyle).toBeUndefined();
+  });
+
+  test('invalid CONFLUENCE_LINK_STYLE warns and falls back to undefined', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_LINK_STYLE = 'smrt';
+
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const config = getConfig();
+      expect(config.linkStyle).toBeUndefined();
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/Invalid linkStyle.*smrt/)
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test('CONFLUENCE_LINK_STYLE is case-insensitive and trimmed', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_LINK_STYLE = '  PLAIN  ';
+
+    const config = getConfig();
+    expect(config.linkStyle).toBe('plain');
   });
 
   test('CONFLUENCE_COOKIE with AUTH_TYPE=cookie sets cookie auth', () => {

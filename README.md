@@ -249,6 +249,30 @@ Or add `"forceCloud": true` to your profile in `~/.confluence-cli/config.json`:
 }
 ```
 
+**Link rendering on Cloud (`linkStyle`):**
+
+Some Cloud instances — particularly custom-domain Cloud setups — fail to render smart links (`<a data-card-appearance="inline">`) and show "Cannot handle: DefaultLink" errors instead. If you hit this, set `linkStyle` to `plain` to emit simple `<a href>` tags, which render reliably everywhere:
+
+```bash
+export CONFLUENCE_LINK_STYLE=plain
+```
+
+Or per-profile:
+
+```json
+{
+  "profiles": {
+    "default": {
+      "domain": "wiki.example.org",
+      "forceCloud": true,
+      "linkStyle": "plain"
+    }
+  }
+}
+```
+
+Valid values: `smart` (Cloud smart links), `plain` (simple `<a href>`), `wiki` (Server/DC `ac:link`). When unset, the CLI picks `smart` for Cloud and `wiki` for Server/DC — existing behavior is unchanged.
+
 **Read-only mode** (recommended for AI agents):
 ```bash
 export CONFLUENCE_READ_ONLY=true
