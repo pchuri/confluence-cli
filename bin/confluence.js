@@ -1754,7 +1754,11 @@ program
       let children;
       if (options.recursive) {
         const maxDepth = parseInt(options.maxDepth) || 10;
-        children = await client.getAllDescendantPages(resolvedPageId, maxDepth);
+        children = await client.getAllDescendantPages(
+          resolvedPageId,
+          maxDepth,
+          { includeAncestors: format === 'json' }
+        );
       } else {
         children = await client.getChildPages(resolvedPageId);
       }

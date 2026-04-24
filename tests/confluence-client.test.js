@@ -492,6 +492,30 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('getPageInfo should normalize space to a stable shape', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/321').reply(200, {
+        id: '321',
+        title: 'Runbook',
+        type: 'page',
+        status: 'current',
+        space: {
+          key: 'OPS',
+          name: 'Operations',
+          id: 42,
+          type: 'global',
+          metadata: { labels: ['internal'] }
+        },
+        version: { number: 1 },
+        ancestors: []
+      });
+
+      const info = await client.getPageInfo('321');
+      expect(info.space).toEqual({ key: 'OPS', name: 'Operations' });
+
+      mock.restore();
+    });
+
     test('normalizePage should prefer _links.base for scoped token browser URLs', () => {
       const scopedClient = new ConfluenceClient({
         domain: 'api.atlassian.com',
@@ -539,7 +563,7 @@ describe('ConfluenceClient', () => {
     test('getChildPages should include structured metadata for JSON output', async () => {
       const mock = new MockAdapter(client.client);
       mock.onGet('/content/123/child/page').reply(config => {
-        expect(config.params.expand).toContain('ancestors');
+        expect(config.params.expand).toBe('space,version');
         return [200, {
           results: [
             {
@@ -565,9 +589,34 @@ describe('ConfluenceClient', () => {
         spaceKey: 'ENG',
         parentId: '123',
         version: 4,
-        url: 'https://test.atlassian.net/spaces/ENG/pages/200/Child+Page',
-        ancestors: [{ id: '123', type: 'page', title: 'Parent Page' }]
+        url: 'https://test.atlassian.net/spaces/ENG/pages/200/Child+Page'
       })]);
+
+      mock.restore();
+    });
+
+    test('getChildPages should fetch ancestors only when requested', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/child/page').reply(config => {
+        expect(config.params.expand).toBe('space,version,ancestors');
+        return [200, {
+          results: [
+            {
+              id: '200',
+              title: 'Child Page',
+              type: 'page',
+              status: 'current',
+              space: { key: 'ENG', name: 'Engineering' },
+              version: { number: 4 },
+              ancestors: [{ id: '123', type: 'page', title: 'Parent Page' }],
+              _links: { webui: '/spaces/ENG/pages/200/Child+Page' }
+            }
+          ]
+        }];
+      });
+
+      const pages = await client.getChildPages('123', 500, { includeAncestors: true });
+      expect(pages[0].ancestors).toEqual([{ id: '123', type: 'page', title: 'Parent Page' }]);
 
       mock.restore();
     });

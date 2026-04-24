@@ -86,6 +86,7 @@ describe('CLI metadata and storage output', () => {
         title: 'Architecture Overview',
         type: 'page',
         status: 'current',
+        space: { key: 'ENG', name: 'Engineering' },
         spaceKey: 'ENG',
         parentId: '100',
         version: 7,
@@ -107,6 +108,7 @@ describe('CLI metadata and storage output', () => {
       title: 'Architecture Overview',
       type: 'page',
       status: 'current',
+      space: { key: 'ENG', name: 'Engineering' },
       spaceKey: 'ENG',
       parentId: '100',
       version: 7,
@@ -210,36 +212,37 @@ describe('CLI metadata and storage output', () => {
   });
 
   test('children --recursive --format json includes depth and ancestors', async () => {
+    const getAllDescendantPages = jest.fn(async () => ([
+      {
+        id: '200',
+        title: 'Child Page',
+        type: 'page',
+        status: 'current',
+        spaceKey: 'ENG',
+        parentId: '123',
+        version: 4,
+        depth: 1,
+        url: 'https://test.atlassian.net/wiki/spaces/ENG/pages/200/Child+Page',
+        ancestors: [{ id: '123', type: 'page', title: 'Parent' }]
+      },
+      {
+        id: '300',
+        title: 'Nested Page',
+        type: 'page',
+        status: 'current',
+        spaceKey: 'ENG',
+        parentId: '200',
+        version: 2,
+        depth: 2,
+        url: 'https://test.atlassian.net/wiki/spaces/ENG/pages/300/Nested+Page',
+        ancestors: [
+          { id: '123', type: 'page', title: 'Parent' },
+          { id: '200', type: 'page', title: 'Child Page' }
+        ]
+      }
+    ]));
     const { program } = await loadCli({
-      getAllDescendantPages: jest.fn(async () => ([
-        {
-          id: '200',
-          title: 'Child Page',
-          type: 'page',
-          status: 'current',
-          spaceKey: 'ENG',
-          parentId: '123',
-          version: 4,
-          depth: 1,
-          url: 'https://test.atlassian.net/wiki/spaces/ENG/pages/200/Child+Page',
-          ancestors: [{ id: '123', type: 'page', title: 'Parent' }]
-        },
-        {
-          id: '300',
-          title: 'Nested Page',
-          type: 'page',
-          status: 'current',
-          spaceKey: 'ENG',
-          parentId: '200',
-          version: 2,
-          depth: 2,
-          url: 'https://test.atlassian.net/wiki/spaces/ENG/pages/300/Nested+Page',
-          ancestors: [
-            { id: '123', type: 'page', title: 'Parent' },
-            { id: '200', type: 'page', title: 'Child Page' }
-          ]
-        }
-      ]))
+      getAllDescendantPages
     });
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
 
@@ -264,5 +267,6 @@ describe('CLI metadata and storage output', () => {
         { id: '200', type: 'page', title: 'Child Page' }
       ]
     });
+    expect(getAllDescendantPages).toHaveBeenCalledWith('123', 10, { includeAncestors: true });
   });
 });
