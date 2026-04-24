@@ -1,3 +1,10 @@
+# [1.32.0](https://github.com/pchuri/confluence-cli/compare/v1.31.1...v1.32.0) (2026-04-24)
+
+
+### Features
+
+* add json metadata and storage read support ([#115](https://github.com/pchuri/confluence-cli/issues/115)) ([179fe4f](https://github.com/pchuri/confluence-cli/commit/179fe4fed4c77bf89589855d69abe8353a0dffe2))
+
 ## [1.31.1](https://github.com/pchuri/confluence-cli/compare/v1.31.0...v1.31.1) (2026-04-22)
 
 
