@@ -1,3 +1,10 @@
+## [1.33.1](https://github.com/pchuri/confluence-cli/compare/v1.33.0...v1.33.1) (2026-04-26)
+
+
+### Bug Fixes
+
+* **security:** refuse cross-host attachment downloads ([#121](https://github.com/pchuri/confluence-cli/issues/121)) ([64b87c4](https://github.com/pchuri/confluence-cli/commit/64b87c4160b86c164b47862582fd47ce67d1f342))
+
 # [1.33.0](https://github.com/pchuri/confluence-cli/compare/v1.32.1...v1.33.0) (2026-04-24)
 
 
