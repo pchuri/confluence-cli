@@ -1774,6 +1774,49 @@ describe('ConfluenceClient', () => {
 
       mock.restore();
     });
+
+    describe('downloadAttachment SSRF guard', () => {
+      test('isSameHostAsConfigured returns true for the configured host', () => {
+        expect(client.isSameHostAsConfigured('https://test.atlassian.net/wiki/x')).toBe(true);
+      });
+
+      test('isSameHostAsConfigured returns false for a different host', () => {
+        expect(client.isSameHostAsConfigured('https://evil.com/wiki/x')).toBe(false);
+      });
+
+      test('isSameHostAsConfigured returns false for malformed input', () => {
+        expect(client.isSameHostAsConfigured('not a url')).toBe(false);
+        expect(client.isSameHostAsConfigured('')).toBe(false);
+        expect(client.isSameHostAsConfigured(null)).toBe(false);
+      });
+
+      test('assertSameHost throws a clear error including both hosts on mismatch', () => {
+        expect(() => client.assertSameHost('https://evil.com/file.pdf'))
+          .toThrow(/evil\.com.*test\.atlassian\.net/s);
+      });
+
+      test('downloadAttachment refuses when the attachment object\'s downloadLink points elsewhere', async () => {
+        await expect(
+          client.downloadAttachment('123', { downloadLink: 'https://evil.example/exfil.bin' })
+        ).rejects.toThrow(/Refusing to send credentials to "evil\.example"/);
+      });
+
+      test('downloadAttachment refuses when the API returns a foreign-host _links.download', async () => {
+        const mock = new MockAdapter(client.client);
+        mock.onGet('/content/123/child/attachment').reply(200, {
+          results: [{
+            id: '777',
+            title: 'pwn.bin',
+            _links: { download: 'https://evil.example/exfil.bin' }
+          }]
+        });
+
+        await expect(client.downloadAttachment('123', '777'))
+          .rejects.toThrow(/Refusing to send credentials to "evil\.example"/);
+
+        mock.restore();
+      });
+    });
   });
 
   describe('content properties', () => {
