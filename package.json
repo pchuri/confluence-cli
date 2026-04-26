@@ -29,8 +29,7 @@
     "form-data": "^4.0.5",
     "html-to-text": "^9.0.5",
     "inquirer": "^8.2.6",
-    "markdown-it": "^14.1.0",
-    "ora": "^5.4.1"
+    "markdown-it": "^14.1.0"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -45,7 +44,7 @@
     }
   },
   "engines": {
-    "node": ">=14.0.0"
+    "node": ">=18.0.0"
   },
   "repository": {
     "type": "git",

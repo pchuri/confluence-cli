@@ -12,7 +12,7 @@
 
 // Make sure we're using a supported Node.js version
 const nodeVersion = process.version;
-const requiredVersion = '14.0.0';
+const requiredVersion = '18.0.0';
 
 if (!nodeVersion.startsWith('v') || 
     parseInt(nodeVersion.slice(1).split('.')[0]) < parseInt(requiredVersion.split('.')[0])) {
