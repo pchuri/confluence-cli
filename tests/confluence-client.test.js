@@ -1776,32 +1776,63 @@ describe('ConfluenceClient', () => {
     });
 
     describe('downloadAttachment SSRF guard', () => {
-      test('isSameHostAsConfigured returns true for the configured host', () => {
-        expect(client.isSameHostAsConfigured('https://test.atlassian.net/wiki/x')).toBe(true);
+      test('isSameOriginAsConfigured returns true for the configured origin', () => {
+        expect(client.isSameOriginAsConfigured('https://test.atlassian.net/wiki/x')).toBe(true);
       });
 
-      test('isSameHostAsConfigured returns false for a different host', () => {
-        expect(client.isSameHostAsConfigured('https://evil.com/wiki/x')).toBe(false);
+      test('isSameOriginAsConfigured returns false for a different host', () => {
+        expect(client.isSameOriginAsConfigured('https://evil.com/wiki/x')).toBe(false);
       });
 
-      test('isSameHostAsConfigured returns false for malformed input', () => {
-        expect(client.isSameHostAsConfigured('not a url')).toBe(false);
-        expect(client.isSameHostAsConfigured('')).toBe(false);
-        expect(client.isSameHostAsConfigured(null)).toBe(false);
+      test('isSameOriginAsConfigured returns false for an http:// downgrade against an https-configured client', () => {
+        expect(client.isSameOriginAsConfigured('http://test.atlassian.net/wiki/x')).toBe(false);
       });
 
-      test('assertSameHost throws a clear error including both hosts on mismatch', () => {
-        expect(() => client.assertSameHost('https://evil.com/file.pdf'))
-          .toThrow(/evil\.com.*test\.atlassian\.net/s);
+      test('isSameOriginAsConfigured normalizes default ports in both directions', () => {
+        // bare configured domain matches an explicit default-port URL
+        expect(client.isSameOriginAsConfigured('https://test.atlassian.net:443/wiki/x')).toBe(true);
+
+        // configured domain with explicit :443 matches a bare URL on the same host
+        const explicitPortClient = new ConfluenceClient({
+          domain: 'test.atlassian.net:443',
+          token: 'test-token'
+        });
+        expect(explicitPortClient.isSameOriginAsConfigured('https://test.atlassian.net/wiki/x')).toBe(true);
       });
 
-      test('downloadAttachment refuses when the attachment object\'s downloadLink points elsewhere', async () => {
+      test('isSameOriginAsConfigured rejects a non-default port even on the same host', () => {
+        expect(client.isSameOriginAsConfigured('https://test.atlassian.net:8443/wiki/x')).toBe(false);
+      });
+
+      test('isSameOriginAsConfigured returns false for malformed input', () => {
+        expect(client.isSameOriginAsConfigured('not a url')).toBe(false);
+        expect(client.isSameOriginAsConfigured('')).toBe(false);
+        expect(client.isSameOriginAsConfigured(null)).toBe(false);
+      });
+
+      test('assertSameOrigin throws a clear error naming both origins on mismatch', () => {
+        expect(() => client.assertSameOrigin('https://evil.com/file.pdf'))
+          .toThrow(/https:\/\/evil\.com.*https:\/\/test\.atlassian\.net/s);
+      });
+
+      test('assertSameOrigin throws on http:// downgrade and includes the protocol in the error', () => {
+        expect(() => client.assertSameOrigin('http://test.atlassian.net/file.pdf'))
+          .toThrow(/http:\/\/test\.atlassian\.net.*https:\/\/test\.atlassian\.net/s);
+      });
+
+      test('downloadAttachment refuses when the attachment object\'s downloadLink points to a foreign origin', async () => {
         await expect(
           client.downloadAttachment('123', { downloadLink: 'https://evil.example/exfil.bin' })
-        ).rejects.toThrow(/Refusing to send credentials to "evil\.example"/);
+        ).rejects.toThrow(/Refusing to send credentials to "https:\/\/evil\.example"/);
       });
 
-      test('downloadAttachment refuses when the API returns a foreign-host _links.download', async () => {
+      test('downloadAttachment refuses an http:// downgrade against an https-configured client', async () => {
+        await expect(
+          client.downloadAttachment('123', { downloadLink: 'http://test.atlassian.net/exfil.bin' })
+        ).rejects.toThrow(/Refusing to send credentials to "http:\/\/test\.atlassian\.net"/);
+      });
+
+      test('downloadAttachment refuses when the API returns a foreign-origin _links.download', async () => {
         const mock = new MockAdapter(client.client);
         mock.onGet('/content/123/child/attachment').reply(200, {
           results: [{
@@ -1812,7 +1843,7 @@ describe('ConfluenceClient', () => {
         });
 
         await expect(client.downloadAttachment('123', '777'))
-          .rejects.toThrow(/Refusing to send credentials to "evil\.example"/);
+          .rejects.toThrow(/Refusing to send credentials to "https:\/\/evil\.example"/);
 
         mock.restore();
       });
