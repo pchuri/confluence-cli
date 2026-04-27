@@ -21,6 +21,37 @@ describe('htmlToMarkdown', () => {
     });
   });
 
+  describe('anchor links', () => {
+    test('converts plain <a href> to markdown link', () => {
+      expect(htmlToMarkdown('<p><a href="https://example.com">Example</a></p>'))
+        .toBe('[Example](https://example.com)');
+    });
+
+    test('preserves URL on smart-link / inline-card anchors (data-card-appearance)', () => {
+      const html = '<p><a href="https://example.atlassian.net/wiki/spaces/X/pages/123" data-card-appearance="inline">Linked Page</a></p>';
+      expect(htmlToMarkdown(html))
+        .toBe('[Linked Page](https://example.atlassian.net/wiki/spaces/X/pages/123)');
+    });
+
+    test('preserves URL on anchors carrying smart-link metadata attributes', () => {
+      const html = '<p><a data-linked-resource-id="123" href="https://example.com/page" data-linked-resource-type="page">Title</a></p>';
+      expect(htmlToMarkdown(html))
+        .toBe('[Title](https://example.com/page)');
+    });
+
+    test('preserves anchor links inside table cells', () => {
+      const html = '<table><tr><th>Doc</th></tr><tr><td><a href="https://example.com/a" data-card-appearance="inline">A</a></td></tr></table>';
+      expect(htmlToMarkdown(html))
+        .toContain('[A](https://example.com/a)');
+    });
+
+    test('preserves anchor links inside list items', () => {
+      const html = '<ul><li><a href="https://example.com/x" data-card-appearance="inline">X</a></li></ul>';
+      expect(htmlToMarkdown(html))
+        .toBe('- [X](https://example.com/x)');
+    });
+  });
+
   describe('headings', () => {
     test.each([1, 2, 3, 4, 5, 6])('converts <h%i> to # heading', (level) => {
       const html = `<h${level}>Title</h${level}>`;
