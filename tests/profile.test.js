@@ -486,4 +486,37 @@ describe('Profile management', () => {
       expect(fileChmod.mode).toBe(0o600);
     });
   });
+
+  describe('readConfigFile error reporting', () => {
+    test('logs a warning when the config file contains invalid JSON', () => {
+      fs.existsSync.mockImplementation((filePath) => {
+        if (filePath === CONFIG_FILE) return true;
+        return jest.requireActual('fs').existsSync(filePath);
+      });
+      fs.readFileSync.mockImplementation((filePath, encoding) => {
+        if (filePath === CONFIG_FILE) return '{ not valid json';
+        return jest.requireActual('fs').readFileSync(filePath, encoding);
+      });
+
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+      const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+        throw new Error('process.exit called');
+      });
+
+      try {
+        expect(() => getConfig()).toThrow('process.exit called');
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringMatching(/Failed to parse config file/)
+        );
+        expect(errorSpy).toHaveBeenCalledWith(
+          expect.stringMatching(/Run "confluence init" to recreate it/)
+        );
+      } finally {
+        errorSpy.mockRestore();
+        logSpy.mockRestore();
+        exitSpy.mockRestore();
+      }
+    });
+  });
 });
