@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/pchuri/confluence-cli/compare/v2.0.1...v2.0.2) (2026-04-27)
+
+
+### Bug Fixes
+
+* **client:** isolate per-userkey failures in resolveUserKeysInHtml ([#129](https://github.com/pchuri/confluence-cli/issues/129)) ([4185b4a](https://github.com/pchuri/confluence-cli/commit/4185b4a46313ea681a85e25c694ff2ce1fa3fa5f))
+
 ## [2.0.1](https://github.com/pchuri/confluence-cli/compare/v2.0.0...v2.0.1) (2026-04-27)
 
 
