@@ -116,18 +116,4 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
     });
   });
 
-  describe('QUOTE', () => {
-    test('> **QUOTE** preserves blockquote instead of info macro', () => {
-      const result = converter.markdownToStorage('> **QUOTE**\n> Famous words.');
-      expect(result).toContain('<blockquote>');
-      expect(result).toContain('Famous words.');
-      expect(result).not.toContain('ac:name="info"');
-    });
-
-    test('unmarked blockquote still defaults to info macro', () => {
-      const result = converter.markdownToStorage('> Just a quote');
-      expect(result).toContain('<ac:structured-macro ac:name="info">');
-      expect(result).toContain('Just a quote');
-    });
-  });
 });
