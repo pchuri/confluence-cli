@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/pchuri/confluence-cli/compare/v2.0.0...v2.0.1) (2026-04-27)
+
+
+### Bug Fixes
+
+* **config:** type-guard remaining CLI option validation against non-strings ([#128](https://github.com/pchuri/confluence-cli/issues/128)) ([c7c1a31](https://github.com/pchuri/confluence-cli/commit/c7c1a312820f25b62ac530bfad1d8f4156214534)), closes [#124](https://github.com/pchuri/confluence-cli/issues/124)
+
 # [2.0.0](https://github.com/pchuri/confluence-cli/compare/v1.35.0...v2.0.0) (2026-04-27)
 
 
