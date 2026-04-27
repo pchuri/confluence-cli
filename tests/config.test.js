@@ -1,4 +1,4 @@
-const { getConfig } = require('../lib/config');
+const { getConfig, initConfig } = require('../lib/config');
 
 // Save and restore all relevant env vars around each test
 const ENV_KEYS = [
@@ -280,5 +280,73 @@ describe('getConfig env var aliases', () => {
       errorSpy.mockRestore();
       logSpy.mockRestore();
     }
+  });
+});
+
+describe('initConfig CLI option validation', () => {
+  let exitSpy;
+  let errorSpy;
+  let logSpy;
+
+  beforeEach(() => {
+    exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    exitSpy.mockRestore();
+    errorSpy.mockRestore();
+    logSpy.mockRestore();
+  });
+
+  test('null --token surfaces a validation error instead of crashing', async () => {
+    await expect(initConfig({
+      domain: 'example.com',
+      token: null,
+      authType: 'bearer',
+    })).rejects.toThrow('process.exit called');
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/--token cannot be empty/)
+    );
+  });
+
+  test('non-string --token surfaces a validation error instead of crashing', async () => {
+    await expect(initConfig({
+      domain: 'example.com',
+      token: 12345,
+      authType: 'bearer',
+    })).rejects.toThrow('process.exit called');
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/--token cannot be empty/)
+    );
+  });
+
+  test('null --cookie with cookie auth surfaces a validation error instead of crashing', async () => {
+    await expect(initConfig({
+      domain: 'example.com',
+      authType: 'cookie',
+      cookie: null,
+    })).rejects.toThrow('process.exit called');
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/--cookie cannot be empty/)
+    );
+  });
+
+  test('whitespace-only --token still flagged as empty (regression guard)', async () => {
+    await expect(initConfig({
+      domain: 'example.com',
+      token: '   ',
+      authType: 'bearer',
+    })).rejects.toThrow('process.exit called');
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/--token cannot be empty/)
+    );
   });
 });
