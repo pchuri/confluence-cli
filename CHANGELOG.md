@@ -1,3 +1,10 @@
+# [1.35.0](https://github.com/pchuri/confluence-cli/compare/v1.34.0...v1.35.0) (2026-04-27)
+
+
+### Features
+
+* **converter:** round-trip anchor macros and same-page anchor links ([#126](https://github.com/pchuri/confluence-cli/issues/126)) ([3dfb276](https://github.com/pchuri/confluence-cli/commit/3dfb2765911c88630a0c73a63719fc52e1111db6)), closes [#118](https://github.com/pchuri/confluence-cli/issues/118)
+
 # [1.34.0](https://github.com/pchuri/confluence-cli/compare/v1.33.3...v1.34.0) (2026-04-27)
 
 
