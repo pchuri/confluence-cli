@@ -349,4 +349,54 @@ describe('initConfig CLI option validation', () => {
       expect.stringMatching(/--token cannot be empty/)
     );
   });
+
+  test('non-string --domain surfaces a validation error instead of crashing', async () => {
+    await expect(initConfig({
+      domain: 12345,
+      token: 'valid-token',
+      authType: 'bearer',
+    })).rejects.toThrow('process.exit called');
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/--domain cannot be empty/)
+    );
+  });
+
+  test('non-string --api-path surfaces a validation error instead of crashing', async () => {
+    await expect(initConfig({
+      domain: 'example.com',
+      apiPath: 12345,
+      token: 'valid-token',
+      authType: 'bearer',
+    })).rejects.toThrow('process.exit called');
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/--api-path must start with/)
+    );
+  });
+
+  test('non-string --protocol surfaces a validation error instead of crashing', async () => {
+    await expect(initConfig({
+      domain: 'example.com',
+      protocol: 12345,
+      token: 'valid-token',
+      authType: 'bearer',
+    })).rejects.toThrow('process.exit called');
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/--protocol must be/)
+    );
+  });
+
+  test('non-string --auth-type surfaces a validation error instead of crashing', async () => {
+    await expect(initConfig({
+      domain: 'example.com',
+      token: 'valid-token',
+      authType: 12345,
+    })).rejects.toThrow('process.exit called');
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringMatching(/--auth-type must be/)
+    );
+  });
 });
