@@ -116,6 +116,41 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
     });
   });
 
+  describe('blockquote default', () => {
+    test('unmarked blockquote becomes a plain <blockquote> (not an info macro)', () => {
+      const result = converter.markdownToStorage('> Just a quote');
+      expect(result).toContain('<blockquote>');
+      expect(result).toContain('Just a quote');
+      expect(result).not.toContain('ac:name="info"');
+    });
+
+    test('multi-line unmarked blockquote stays plain', () => {
+      const result = converter.markdownToStorage('> first line\n> second line');
+      expect(result).toContain('<blockquote>');
+      expect(result).toContain('first line');
+      expect(result).toContain('second line');
+      expect(result).not.toContain('ac:structured-macro');
+    });
+
+    test('> **INFO** marker still produces an info macro', () => {
+      const result = converter.markdownToStorage('> **INFO**\n> Heads up.');
+      expect(result).toContain('<ac:structured-macro ac:name="info">');
+      expect(result).toContain('Heads up.');
+    });
+
+    test('> **WARNING** marker still produces a warning macro', () => {
+      const result = converter.markdownToStorage('> **WARNING**\n> Be careful.');
+      expect(result).toContain('<ac:structured-macro ac:name="warning">');
+      expect(result).toContain('Be careful.');
+    });
+
+    test('> **NOTE** marker still produces a note macro', () => {
+      const result = converter.markdownToStorage('> **NOTE**\n> Side note.');
+      expect(result).toContain('<ac:structured-macro ac:name="note">');
+      expect(result).toContain('Side note.');
+    });
+  });
+
 });
 
 describe('MacroConverter storageToMarkdown anchor round-trip', () => {
