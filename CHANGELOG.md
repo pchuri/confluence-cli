@@ -1,3 +1,10 @@
+# [1.34.0](https://github.com/pchuri/confluence-cli/compare/v1.33.3...v1.34.0) (2026-04-27)
+
+
+### Features
+
+* add TOC, ANCHOR, and same-page anchor link conversions ([#118](https://github.com/pchuri/confluence-cli/issues/118)) ([213b910](https://github.com/pchuri/confluence-cli/commit/213b9102dcdf470a94ce8ee32616e37017f4c3b0)), closes [#125](https://github.com/pchuri/confluence-cli/issues/125)
+
 ## [1.33.3](https://github.com/pchuri/confluence-cli/compare/v1.33.2...v1.33.3) (2026-04-27)
 
 
