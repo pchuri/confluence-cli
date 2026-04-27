@@ -1,3 +1,13 @@
+# [2.0.0](https://github.com/pchuri/confluence-cli/compare/v1.35.0...v2.0.0) (2026-04-27)
+
+
+* feat!: change blockquote default from info macro to plain <blockquote> (#127) ([c162d68](https://github.com/pchuri/confluence-cli/commit/c162d68c4660ce2fddf7effd9b9ce5efdb7358f1)), closes [#127](https://github.com/pchuri/confluence-cli/issues/127) [#125](https://github.com/pchuri/confluence-cli/issues/125)
+
+
+### BREAKING CHANGES
+
+* Unmarked markdown blockquotes are no longer auto-wrapped in a Confluence info macro. To preserve the old behavior, prefix the blockquote with `> **INFO**`. Existing pages already containing info macros are unaffected — `storageToMarkdown` still emits `[!info]` for them, which `markdownToStorage` re-expands.
+
 # [1.35.0](https://github.com/pchuri/confluence-cli/compare/v1.34.0...v1.35.0) (2026-04-27)
 
 
