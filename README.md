@@ -770,6 +770,55 @@ echo "# Hello" | confluence convert --input-format markdown --output-format stor
 confluence convert -i page.xml -o page.md --input-format storage --output-format markdown
 ```
 
+## Markdown Marker Conventions
+
+When converting markdown to Confluence storage format (via `confluence convert`, `create`, or `update`), the following paragraph-level markers produce native Confluence macros. Each marker round-trips back to its markdown form when going storage → markdown.
+
+### Callout macros — `INFO`, `WARNING`, `NOTE`
+
+A blockquote whose first line is `**INFO**`, `**WARNING**`, or `**NOTE**` becomes the corresponding Confluence macro:
+
+```markdown
+> **INFO**
+> Heads up — this is an info box.
+
+> **WARNING**
+> Watch out for this.
+
+> **NOTE**
+> Side note for the reader.
+```
+
+The reverse direction emits the equivalent shorthand (`[!info]` / `[!warning]` / `[!note]` followed by the body), which markdown→storage then re-expands.
+
+A blockquote without one of these markers stays a **plain blockquote** (`<blockquote>…</blockquote>`) — `> …` is treated as a quotation, not an alert. Use the markers above when you want a callout.
+
+### `**TOC**` — Table of Contents
+
+A paragraph containing only `**TOC**` becomes a Confluence Table of Contents macro using the macro's default heading levels:
+
+```markdown
+**TOC**
+```
+
+### `**ANCHOR: id**` — anchor
+
+A paragraph containing only `**ANCHOR: my-section**` becomes a Confluence anchor macro with the given id:
+
+```markdown
+**ANCHOR: my-section**
+```
+
+### `[text](#id)` — same-page anchor link
+
+A standard markdown link whose href starts with `#` becomes an `ac:link` with `ac:anchor`, rendering as an in-page jump in Confluence:
+
+```markdown
+See [the anchor](#my-section) above.
+```
+
+This works under all three `linkStyle` modes (`smart`, `wiki`, `plain`) — the anchor-link conversion runs before the general `<a href>` handling.
+
 ## Development
 
 ```bash
