@@ -1268,6 +1268,26 @@ describe('ConfluenceClient', () => {
       expect(resolved).toBe(html);
       expect(userMap.size).toBe(0);
     });
+
+    test('should isolate per-key failures: one rejection does not drop other resolutions', async () => {
+      const spy = jest.spyOn(client, 'getUserByKey').mockImplementation(async (key) => {
+        if (key === 'good') {
+          return { key, displayName: 'Good User', username: 'good' };
+        }
+        throw new Error('synthetic failure');
+      });
+
+      const html =
+        '<p><ac:link><ri:user ri:userkey="good" /></ac:link> and ' +
+        '<ac:link><ri:user ri:userkey="bad" /></ac:link></p>';
+      const { html: resolved, userMap } = await client.resolveUserKeysInHtml(html);
+
+      expect(resolved).toBe('<p>@Good User and @bad</p>');
+      expect(userMap.get('good')).toBe('Good User');
+      expect(userMap.get('bad')).toBe('bad');
+
+      spy.mockRestore();
+    });
   });
 
   describe('page creation and updates', () => {
