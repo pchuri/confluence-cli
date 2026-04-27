@@ -117,3 +117,40 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
   });
 
 });
+
+describe('MacroConverter storageToMarkdown anchor round-trip', () => {
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('anchor macro converts back to **ANCHOR: id** marker', () => {
+    const storage = '<ac:structured-macro ac:name="anchor"><ac:parameter ac:name="">my-section</ac:parameter></ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('**ANCHOR: my-section**');
+  });
+
+  test('anchor macro with extra attributes (e.g. ac:macro-id) still converts', () => {
+    const storage = '<ac:structured-macro ac:name="anchor" ac:macro-id="abc-123"><ac:parameter ac:name="">section-2</ac:parameter></ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('**ANCHOR: section-2**');
+  });
+
+  test('ac:link with ac:anchor converts back to [text](#id)', () => {
+    const storage = '<ac:link ac:anchor="my-section"><ac:plain-text-link-body><![CDATA[Jump]]></ac:plain-text-link-body></ac:link>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('[Jump](#my-section)');
+  });
+
+  test('anchor link is not consumed by the generic <ac:link> catch-all', () => {
+    const storage = '<p><ac:link ac:anchor="x"><ac:plain-text-link-body><![CDATA[A]]></ac:plain-text-link-body></ac:link> and <ac:link><ri:url ri:value="https://example.com" /><ac:plain-text-link-body><![CDATA[Ext]]></ac:plain-text-link-body></ac:link></p>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('[A](#x)');
+    expect(result).toContain('[Ext](https://example.com)');
+  });
+
+  test('full round-trip: markdown → storage → markdown preserves anchor and link', () => {
+    const original = '**ANCHOR: section-a**\n\nSee [details](#section-a) below.';
+    const storage = converter.markdownToStorage(original);
+    const back = converter.storageToMarkdown(storage);
+    expect(back).toContain('**ANCHOR: section-a**');
+    expect(back).toContain('[details](#section-a)');
+  });
+});
