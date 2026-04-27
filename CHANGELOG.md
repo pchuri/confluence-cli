@@ -1,3 +1,10 @@
+## [1.33.3](https://github.com/pchuri/confluence-cli/compare/v1.33.2...v1.33.3) (2026-04-27)
+
+
+### Bug Fixes
+
+* preserve href on <a> tags during markdown conversion ([#123](https://github.com/pchuri/confluence-cli/issues/123)) ([1b2036d](https://github.com/pchuri/confluence-cli/commit/1b2036d8d8b418ba90e5fbb1ead1bbfdeabd0ff8)), closes [#122](https://github.com/pchuri/confluence-cli/issues/122)
+
 ## [1.33.2](https://github.com/pchuri/confluence-cli/compare/v1.33.1...v1.33.2) (2026-04-27)
 
 
