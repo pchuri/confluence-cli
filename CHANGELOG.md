@@ -1,3 +1,10 @@
+## [1.33.2](https://github.com/pchuri/confluence-cli/compare/v1.33.1...v1.33.2) (2026-04-27)
+
+
+### Bug Fixes
+
+* **config:** harden CLI option and config-file parsing against bad input ([#124](https://github.com/pchuri/confluence-cli/issues/124)) ([1ee18ef](https://github.com/pchuri/confluence-cli/commit/1ee18ef33c3550a40155bec68f396959d857b52c))
+
 ## [1.33.1](https://github.com/pchuri/confluence-cli/compare/v1.33.0...v1.33.1) (2026-04-26)
 
 
