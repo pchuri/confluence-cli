@@ -1,3 +1,10 @@
+## [2.1.2](https://github.com/pchuri/confluence-cli/compare/v2.1.1...v2.1.2) (2026-04-28)
+
+
+### Bug Fixes
+
+* scope `[!info]` admonition rewrite to block context ([#134](https://github.com/pchuri/confluence-cli/issues/134)) ([ab28d23](https://github.com/pchuri/confluence-cli/commit/ab28d231161b23c929254d578bba84d5470ef7a4))
+
 ## [2.1.1](https://github.com/pchuri/confluence-cli/compare/v2.1.0...v2.1.1) (2026-04-28)
 
 
