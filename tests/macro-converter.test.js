@@ -294,6 +294,25 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
       expect(result).toContain('third');
       expect(result).not.toContain('undefined');
     });
+
+    test('[!info] inside a tilde-fenced code block is left intact', () => {
+      const result = converter.markdownToStorage('~~~\n[!info]\nbody\n~~~');
+      expect(result).toContain('ac:name="code"');
+      expect(result).toContain('[!info]');
+      expect(result).not.toContain('ac:name="info"');
+    });
+
+    test('[!warning] at line start becomes a warning macro', () => {
+      const result = converter.markdownToStorage('[!warning]\nheads up');
+      expect(result).toContain('ac:name="warning"');
+      expect(result).toContain('heads up');
+    });
+
+    test('[!note] at line start becomes a note macro', () => {
+      const result = converter.markdownToStorage('[!note]\nside note');
+      expect(result).toContain('ac:name="note"');
+      expect(result).toContain('side note');
+    });
   });
 
   describe('marker text is stripped from macro body', () => {
