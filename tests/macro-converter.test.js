@@ -214,6 +214,107 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
     });
   });
 
+  describe('admonition preprocessor respects markdown context', () => {
+    // The previous raw-text preprocessor would transform any `[!info]`
+    // anywhere in the source — including inside fenced code blocks, inline
+    // code, and heading text — and break the surrounding markdown. Inline
+    // code and fenced code are now stashed before rewriting, and the
+    // admonition pattern is anchored to a line start so it cannot match
+    // mid-paragraph or after a `>` blockquote prefix.
+    test('[!info] inside inline code is left intact', () => {
+      const result = converter.markdownToStorage('use the `[!info]` marker for callouts');
+      expect(result).toContain('<code>[!info]</code>');
+      expect(result).not.toContain('ac:name="info"');
+    });
+
+    test('[!info] inside a heading\'s inline code is left intact', () => {
+      const result = converter.markdownToStorage('## 5. `[!info]` round-trip marker');
+      expect(result).toContain('<h2>');
+      expect(result).toContain('<code>[!info]</code>');
+      expect(result).not.toContain('ac:name="info"');
+    });
+
+    test('[!info] inside a fenced code block is left intact', () => {
+      const result = converter.markdownToStorage('```\n[!info]\nbody\n```');
+      expect(result).toContain('ac:name="code"');
+      expect(result).toContain('[!info]');
+      expect(result).not.toContain('ac:name="info"');
+    });
+
+    test('[!info] mentioned in heading text stays a heading', () => {
+      const result = converter.markdownToStorage('## [!info] is a section title');
+      expect(result).toContain('<h2>');
+      expect(result).toContain('[!info]');
+      expect(result).not.toContain('ac:name="info"');
+    });
+
+    test('[!info] mid-paragraph stays inline text', () => {
+      const result = converter.markdownToStorage('This text mentions [!info] in passing.');
+      expect(result).toContain('<p>');
+      expect(result).toContain('[!info]');
+      expect(result).not.toContain('ac:name="info"');
+    });
+
+    test('GitHub-style `> [!info]` defers to plain blockquote', () => {
+      // Recognizing `> [!info]` here would emit nested blockquote tokens
+      // that the storage handler's lazy regex can't balance — producing
+      // malformed XML that Confluence rejects with 400. Until the storage
+      // handler supports balanced blockquote parsing, this form must fall
+      // through to a plain `<blockquote>` containing literal `[!info]`.
+      const result = converter.markdownToStorage('> [!info]\n> body');
+      expect(result).toContain('<blockquote>');
+      expect(result).toContain('[!info]');
+      expect(result).not.toContain('ac:name="info"');
+    });
+
+    // Guard against the placeholder/restore step accidentally swallowing
+    // user-authored numbers. The stash uses Unicode private-use delimiters
+    // so the restore regex only matches the placeholder shape, never bare
+    // digits in prose, headings, or list markers.
+    test('plain digits in prose are preserved', () => {
+      const result = converter.markdownToStorage('Version 5 released. 1.0 milestone in 2026.');
+      expect(result).toContain('Version 5 released');
+      expect(result).toContain('1.0 milestone');
+      expect(result).toContain('2026');
+      expect(result).not.toContain('undefined');
+    });
+
+    test('digits in a heading next to inline code are preserved', () => {
+      const result = converter.markdownToStorage('## 5. `[!info]` round-trip marker');
+      expect(result).toContain('<h2>5.');
+      expect(result).toContain('<code>[!info]</code>');
+      expect(result).not.toContain('undefined');
+    });
+
+    test('ordered list markers and inline code coexist', () => {
+      const result = converter.markdownToStorage('1. first\n2. `code` item\n3. third');
+      expect(result).toContain('<ol>');
+      expect(result).toContain('first');
+      expect(result).toContain('<code>code</code> item');
+      expect(result).toContain('third');
+      expect(result).not.toContain('undefined');
+    });
+
+    test('[!info] inside a tilde-fenced code block is left intact', () => {
+      const result = converter.markdownToStorage('~~~\n[!info]\nbody\n~~~');
+      expect(result).toContain('ac:name="code"');
+      expect(result).toContain('[!info]');
+      expect(result).not.toContain('ac:name="info"');
+    });
+
+    test('[!warning] at line start becomes a warning macro', () => {
+      const result = converter.markdownToStorage('[!warning]\nheads up');
+      expect(result).toContain('ac:name="warning"');
+      expect(result).toContain('heads up');
+    });
+
+    test('[!note] at line start becomes a note macro', () => {
+      const result = converter.markdownToStorage('[!note]\nside note');
+      expect(result).toContain('ac:name="note"');
+      expect(result).toContain('side note');
+    });
+  });
+
   describe('marker text is stripped from macro body', () => {
     // README's recommended form: `> **INFO**\n> body` (no blank `>` line).
     // markdown-it parses this as a single paragraph, which the original
