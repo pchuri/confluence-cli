@@ -88,6 +88,69 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
     });
   });
 
+  describe('EXPAND', () => {
+    test('**EXPAND: title** / **EXPAND_END** wraps content in an expand macro', () => {
+      const markdown = '**EXPAND: Show details**\n\nHidden content here.\n\n**EXPAND_END**';
+      const result = converter.markdownToStorage(markdown);
+      expect(result).toContain('<ac:structured-macro ac:name="expand">');
+      expect(result).toContain('<ac:parameter ac:name="title">Show details</ac:parameter>');
+      expect(result).toContain('<ac:rich-text-body>');
+      expect(result).toContain('Hidden content here.');
+      expect(result).not.toContain('**EXPAND');
+    });
+
+    test('inline italic in title is stripped (would otherwise be silently truncated by Confluence)', () => {
+      const result = converter.markdownToStorage('**EXPAND: foo *bar* baz**\n\nbody\n\n**EXPAND_END**');
+      expect(result).toContain('<ac:parameter ac:name="title">foo bar baz</ac:parameter>');
+      expect(result).not.toContain('<em>');
+    });
+
+    test('inline code span in title is stripped', () => {
+      const result = converter.markdownToStorage('**EXPAND: use `getUser()` here**\n\nbody\n\n**EXPAND_END**');
+      expect(result).toContain('<ac:parameter ac:name="title">use getUser() here</ac:parameter>');
+      expect(result).not.toContain('<code>');
+    });
+
+    test('inline link in title is stripped (URL is dropped — macro titles cannot hold links)', () => {
+      const result = converter.markdownToStorage('**EXPAND: see [docs](https://example.com)**\n\nbody\n\n**EXPAND_END**');
+      expect(result).toContain('<ac:parameter ac:name="title">see docs</ac:parameter>');
+      expect(result).not.toContain('<a ');
+      expect(result).not.toContain('data-card-appearance');
+    });
+
+    test('inline strikethrough in title is stripped (would otherwise cause Confluence to reject the page with HTTP 500)', () => {
+      const result = converter.markdownToStorage('**EXPAND: ~~old~~ new**\n\nbody\n\n**EXPAND_END**');
+      expect(result).toContain('<ac:parameter ac:name="title">old new</ac:parameter>');
+      expect(result).not.toContain('<s>');
+    });
+
+    test('XML entities in title are preserved (the fix only strips literal tags)', () => {
+      const result = converter.markdownToStorage('**EXPAND: A & B**\n\nbody\n\n**EXPAND_END**');
+      expect(result).toContain('<ac:parameter ac:name="title">A &amp; B</ac:parameter>');
+    });
+
+    test('multiple EXPAND blocks in one document each get their own macro', () => {
+      const markdown = [
+        '**EXPAND: First**',
+        '',
+        'one',
+        '',
+        '**EXPAND_END**',
+        '',
+        '**EXPAND: Second**',
+        '',
+        'two',
+        '',
+        '**EXPAND_END**'
+      ].join('\n');
+      const result = converter.markdownToStorage(markdown);
+      const matches = result.match(/<ac:structured-macro ac:name="expand">/g) || [];
+      expect(matches).toHaveLength(2);
+      expect(result).toContain('<ac:parameter ac:name="title">First</ac:parameter>');
+      expect(result).toContain('<ac:parameter ac:name="title">Second</ac:parameter>');
+    });
+  });
+
   describe('same-page anchor links', () => {
     test('[text](#id) becomes ac:link with ac:anchor', () => {
       const result = converter.markdownToStorage('[Jump](#my-section)');
@@ -233,6 +296,136 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
     });
   });
 
+  describe('marker text is stripped from macro body', () => {
+    // README's recommended form: `> **INFO**\n> body` (no blank `>` line).
+    // markdown-it parses this as a single paragraph, which the original
+    // cleanup regex did not handle — leaking `<strong>INFO</strong>` into
+    // the rendered macro body. These tests guard the README-documented form.
+    test('INFO marker is stripped (single-paragraph form)', () => {
+      const result = converter.markdownToStorage('> **INFO**\n> body line');
+      expect(result).toContain('ac:name="info"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>INFO</strong>');
+    });
+
+    test('INFO marker is stripped (paragraph-separated form)', () => {
+      const result = converter.markdownToStorage('> **INFO**\n>\n> body line');
+      expect(result).toContain('ac:name="info"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>INFO</strong>');
+    });
+
+    test('WARNING marker is stripped (single-paragraph form)', () => {
+      const result = converter.markdownToStorage('> **WARNING**\n> body line');
+      expect(result).toContain('ac:name="warning"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>WARNING</strong>');
+    });
+
+    test('WARNING marker is stripped (paragraph-separated form)', () => {
+      const result = converter.markdownToStorage('> **WARNING**\n>\n> body line');
+      expect(result).toContain('ac:name="warning"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>WARNING</strong>');
+    });
+
+    test('NOTE marker is stripped (single-paragraph form)', () => {
+      const result = converter.markdownToStorage('> **NOTE**\n> body line');
+      expect(result).toContain('ac:name="note"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>NOTE</strong>');
+    });
+
+    test('NOTE marker is stripped (paragraph-separated form)', () => {
+      const result = converter.markdownToStorage('> **NOTE**\n>\n> body line');
+      expect(result).toContain('ac:name="note"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>NOTE</strong>');
+    });
+
+    // The pre-processor expands `[!info]\nbody` → `> **INFO**\n> body`
+    // (single-paragraph form), so the round-trip path hits the same bug as
+    // the README form. Guard that round-trip here.
+    test('[!info] round-trip strips the marker', () => {
+      const result = converter.markdownToStorage('[!info]\nbody line');
+      expect(result).toContain('ac:name="info"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>INFO</strong>');
+    });
+
+    test('[!warning] round-trip strips the marker', () => {
+      const result = converter.markdownToStorage('[!warning]\nbody line');
+      expect(result).toContain('ac:name="warning"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>WARNING</strong>');
+    });
+
+    test('[!note] round-trip strips the marker', () => {
+      const result = converter.markdownToStorage('[!note]\nbody line');
+      expect(result).toContain('ac:name="note"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>NOTE</strong>');
+    });
+
+    // Negative cases: a quotation that merely *mentions* `**INFO**` (or any
+    // marker keyword) as part of prose must stay a plain blockquote — the
+    // marker is only honored when it sits at the very start of the first
+    // paragraph, immediately followed by `</p>` or `\n`. Both detection and
+    // stripping use this same anchor, so prose `**INFO**` survives untouched.
+    test('mid-sentence **INFO** stays a plain blockquote (no false-positive macro)', () => {
+      const result = converter.markdownToStorage('> Use **INFO** at the start of a callout.');
+      expect(result).toContain('<blockquote>');
+      expect(result).not.toContain('ac:name="info"');
+      expect(result).toContain('<strong>INFO</strong>');
+    });
+
+    test('**INFO** followed by trailing same-line text stays a plain blockquote', () => {
+      const result = converter.markdownToStorage('> **INFO** is an acronym\n> for Information.');
+      expect(result).toContain('<blockquote>');
+      expect(result).not.toContain('ac:name="info"');
+      expect(result).toContain('<strong>INFO</strong>');
+      expect(result).toContain('is an acronym');
+    });
+
+    test('**INFO** as the second word stays a plain blockquote', () => {
+      const result = converter.markdownToStorage('> Some **INFO** text here\n> next line.');
+      expect(result).toContain('<blockquote>');
+      expect(result).not.toContain('ac:name="info"');
+      expect(result).toContain('<strong>INFO</strong>');
+    });
+  });
+
+});
+
+describe('MacroConverter storageToMarkdown EXPAND round-trip', () => {
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('titled expand macro converts back to **EXPAND: title** / **EXPAND_END** markers', () => {
+    const storage = '<ac:structured-macro ac:name="expand" ac:schema-version="1" ac:macro-id="abc-123"><ac:parameter ac:name="title">My title</ac:parameter><ac:rich-text-body><p>body content</p></ac:rich-text-body></ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('**EXPAND: My title**');
+    expect(result).toContain('body content');
+    expect(result).toContain('**EXPAND_END**');
+    expect(result).not.toContain('<details>');
+  });
+
+  test('title-less expand macro still falls back to <details>/<summary> (preserves existing UI-created behavior)', () => {
+    const storage = '<ac:structured-macro ac:name="expand" ac:schema-version="1"><ac:rich-text-body><p>untitled body</p></ac:rich-text-body></ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('<details>');
+    expect(result).toContain('<summary>');
+    expect(result).toContain('untitled body');
+    expect(result).not.toContain('**EXPAND:');
+  });
+
+  test('full round-trip: markdown → storage → markdown preserves title and body', () => {
+    const original = '**EXPAND: Show details**\n\nHidden content here.\n\n**EXPAND_END**';
+    const storage = converter.markdownToStorage(original);
+    const back = converter.storageToMarkdown(storage);
+    expect(back).toContain('**EXPAND: Show details**');
+    expect(back).toContain('Hidden content here.');
+    expect(back).toContain('**EXPAND_END**');
+  });
 });
 
 describe('MacroConverter storageToMarkdown anchor round-trip', () => {

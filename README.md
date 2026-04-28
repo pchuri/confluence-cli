@@ -809,6 +809,24 @@ A paragraph containing only `**ANCHOR: my-section**` becomes a Confluence anchor
 **ANCHOR: my-section**
 ```
 
+### `**EXPAND: title** … **EXPAND_END**` — collapsible expand macro
+
+Wrap a block of content between `**EXPAND: title**` and `**EXPAND_END**` markers (each on its own paragraph) to render it as a Confluence expand macro with a collapsible body:
+
+````markdown
+**EXPAND: Show generated code**
+
+```js
+const x = 1;
+```
+
+**EXPAND_END**
+````
+
+The body may contain any content that is converted earlier in the pipeline (code blocks, tables, callout blockquotes). The reverse direction emits the same `**EXPAND: title**` / `**EXPAND_END**` markers so the conversion round-trips.
+
+Inline markdown inside the title (`*em*`, backtick code, links, `~~strike~~`) is stripped at capture time — Confluence's storage normalizer treats macro titles as plain text and will silently truncate or reject HTML in a `<ac:parameter>`. Title-less expand macros created in the Confluence UI still convert to `<details>/<summary>` blocks.
+
 ### `[text](#id)` — same-page anchor link
 
 A standard markdown link whose href starts with `#` becomes an `ac:link` with `ac:anchor`, rendering as an in-page jump in Confluence:
