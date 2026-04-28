@@ -214,6 +214,105 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
     });
   });
 
+  describe('marker text is stripped from macro body', () => {
+    // README's recommended form: `> **INFO**\n> body` (no blank `>` line).
+    // markdown-it parses this as a single paragraph, which the original
+    // cleanup regex did not handle — leaking `<strong>INFO</strong>` into
+    // the rendered macro body. These tests guard the README-documented form.
+    test('INFO marker is stripped (single-paragraph form)', () => {
+      const result = converter.markdownToStorage('> **INFO**\n> body line');
+      expect(result).toContain('ac:name="info"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>INFO</strong>');
+    });
+
+    test('INFO marker is stripped (paragraph-separated form)', () => {
+      const result = converter.markdownToStorage('> **INFO**\n>\n> body line');
+      expect(result).toContain('ac:name="info"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>INFO</strong>');
+    });
+
+    test('WARNING marker is stripped (single-paragraph form)', () => {
+      const result = converter.markdownToStorage('> **WARNING**\n> body line');
+      expect(result).toContain('ac:name="warning"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>WARNING</strong>');
+    });
+
+    test('WARNING marker is stripped (paragraph-separated form)', () => {
+      const result = converter.markdownToStorage('> **WARNING**\n>\n> body line');
+      expect(result).toContain('ac:name="warning"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>WARNING</strong>');
+    });
+
+    test('NOTE marker is stripped (single-paragraph form)', () => {
+      const result = converter.markdownToStorage('> **NOTE**\n> body line');
+      expect(result).toContain('ac:name="note"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>NOTE</strong>');
+    });
+
+    test('NOTE marker is stripped (paragraph-separated form)', () => {
+      const result = converter.markdownToStorage('> **NOTE**\n>\n> body line');
+      expect(result).toContain('ac:name="note"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>NOTE</strong>');
+    });
+
+    // The pre-processor expands `[!info]\nbody` → `> **INFO**\n> body`
+    // (single-paragraph form), so the round-trip path hits the same bug as
+    // the README form. Guard that round-trip here.
+    test('[!info] round-trip strips the marker', () => {
+      const result = converter.markdownToStorage('[!info]\nbody line');
+      expect(result).toContain('ac:name="info"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>INFO</strong>');
+    });
+
+    test('[!warning] round-trip strips the marker', () => {
+      const result = converter.markdownToStorage('[!warning]\nbody line');
+      expect(result).toContain('ac:name="warning"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>WARNING</strong>');
+    });
+
+    test('[!note] round-trip strips the marker', () => {
+      const result = converter.markdownToStorage('[!note]\nbody line');
+      expect(result).toContain('ac:name="note"');
+      expect(result).toContain('body line');
+      expect(result).not.toContain('<strong>NOTE</strong>');
+    });
+
+    // Negative cases: a quotation that merely *mentions* `**INFO**` (or any
+    // marker keyword) as part of prose must stay a plain blockquote — the
+    // marker is only honored when it sits at the very start of the first
+    // paragraph, immediately followed by `</p>` or `\n`. Both detection and
+    // stripping use this same anchor, so prose `**INFO**` survives untouched.
+    test('mid-sentence **INFO** stays a plain blockquote (no false-positive macro)', () => {
+      const result = converter.markdownToStorage('> Use **INFO** at the start of a callout.');
+      expect(result).toContain('<blockquote>');
+      expect(result).not.toContain('ac:name="info"');
+      expect(result).toContain('<strong>INFO</strong>');
+    });
+
+    test('**INFO** followed by trailing same-line text stays a plain blockquote', () => {
+      const result = converter.markdownToStorage('> **INFO** is an acronym\n> for Information.');
+      expect(result).toContain('<blockquote>');
+      expect(result).not.toContain('ac:name="info"');
+      expect(result).toContain('<strong>INFO</strong>');
+      expect(result).toContain('is an acronym');
+    });
+
+    test('**INFO** as the second word stays a plain blockquote', () => {
+      const result = converter.markdownToStorage('> Some **INFO** text here\n> next line.');
+      expect(result).toContain('<blockquote>');
+      expect(result).not.toContain('ac:name="info"');
+      expect(result).toContain('<strong>INFO</strong>');
+    });
+  });
+
 });
 
 describe('MacroConverter storageToMarkdown EXPAND round-trip', () => {
