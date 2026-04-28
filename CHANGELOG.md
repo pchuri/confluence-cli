@@ -1,3 +1,10 @@
+# [2.1.0](https://github.com/pchuri/confluence-cli/compare/v2.0.2...v2.1.0) (2026-04-28)
+
+
+### Features
+
+* **converter:** add EXPAND marker for collapsible expand macro ([#130](https://github.com/pchuri/confluence-cli/issues/130)) ([efe0677](https://github.com/pchuri/confluence-cli/commit/efe067736e0abec034e08b4052f0375e4e066a94))
+
 ## [2.0.2](https://github.com/pchuri/confluence-cli/compare/v2.0.1...v2.0.2) (2026-04-27)
 
 
