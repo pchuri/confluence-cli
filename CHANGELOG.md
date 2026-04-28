@@ -1,3 +1,10 @@
+## [2.1.1](https://github.com/pchuri/confluence-cli/compare/v2.1.0...v2.1.1) (2026-04-28)
+
+
+### Bug Fixes
+
+* strip callout markers and narrow detection to paragraph start ([#132](https://github.com/pchuri/confluence-cli/issues/132)) ([8bec8b3](https://github.com/pchuri/confluence-cli/commit/8bec8b36c98a9ef1929760aef313471f05bf10d4))
+
 # [2.1.0](https://github.com/pchuri/confluence-cli/compare/v2.0.2...v2.1.0) (2026-04-28)
 
 
