@@ -28,6 +28,7 @@
     "commander": "^11.1.0",
     "form-data": "^4.0.5",
     "html-to-text": "^9.0.5",
+    "htmlparser2": "^9.1.0",
     "inquirer": "^8.2.6",
     "markdown-it": "^14.1.0"
   },
