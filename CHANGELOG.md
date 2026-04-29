@@ -1,3 +1,10 @@
+## [2.1.5](https://github.com/pchuri/confluence-cli/compare/v2.1.4...v2.1.5) (2026-04-29)
+
+
+### Bug Fixes
+
+* **html-to-markdown:** preserve indentation inside fenced code blocks ([#147](https://github.com/pchuri/confluence-cli/issues/147)) ([044e46b](https://github.com/pchuri/confluence-cli/commit/044e46b10b63d323634095e71edf81edbcecf177)), closes [#139](https://github.com/pchuri/confluence-cli/issues/139) [#146](https://github.com/pchuri/confluence-cli/issues/146) [#145](https://github.com/pchuri/confluence-cli/issues/145) [#149](https://github.com/pchuri/confluence-cli/issues/149) [#96](https://github.com/pchuri/confluence-cli/issues/96) [#x60](https://github.com/pchuri/confluence-cli/issues/x60) [#96](https://github.com/pchuri/confluence-cli/issues/96) [#96](https://github.com/pchuri/confluence-cli/issues/96) [#96](https://github.com/pchuri/confluence-cli/issues/96)
+
 ## [2.1.4](https://github.com/pchuri/confluence-cli/compare/v2.1.3...v2.1.4) (2026-04-29)
 
 
