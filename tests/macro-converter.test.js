@@ -849,4 +849,9 @@ describe('MacroConverter storageToMarkdown fenced code preserves indentation', (
     const storage = codeMacro('py', 'x = 1   \ny = 2   ');
     expect(converter.storageToMarkdown(storage)).toBe('```py\nx = 1   \ny = 2   \n```');
   });
+
+  test('consecutive blank lines inside fenced code are preserved (no 3+ collapse)', () => {
+    const storage = codeMacro('text', 'a\n\n\n\nb');
+    expect(converter.storageToMarkdown(storage)).toBe('```text\na\n\n\n\nb\n```');
+  });
 });
