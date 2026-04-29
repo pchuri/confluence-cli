@@ -278,5 +278,15 @@ describe('htmlToMarkdown', () => {
       const html = '<pre><code class="language-md">a`&#96;&#96;b</code></pre>';
       expect(htmlToMarkdown(html)).toBe('````md\na```b\n````');
     });
+
+    test('prose with mid-line ``` before a code block does not steal fence boundary', () => {
+      const html = '<p>literal ``` marker</p><pre><code class="language-js">const x = 1;</code></pre><p>tail</p>';
+      expect(htmlToMarkdown(html)).toBe('literal ``` marker\n\n```js\nconst x = 1;\n```\n\ntail');
+    });
+
+    test('prose with mid-line ``` before a code block preserves the code body indent', () => {
+      const html = '<p>before ``` after</p><pre><code class="language-py">def foo():\n    return 1</code></pre>';
+      expect(htmlToMarkdown(html)).toBe('before ``` after\n\n```py\ndef foo():\n    return 1\n```');
+    });
   });
 });
