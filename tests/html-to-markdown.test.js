@@ -263,5 +263,20 @@ describe('htmlToMarkdown', () => {
       const html = '<pre><code class="language-md">x ```` y</code></pre>';
       expect(htmlToMarkdown(html)).toBe('`````md\nx ```` y\n`````');
     });
+
+    test('payload with &#96; decimal entities for backticks sizes fence after decode', () => {
+      const html = '<pre><code class="language-md">before\n&#96;&#96;&#96;\nafter</code></pre>';
+      expect(htmlToMarkdown(html)).toBe('````md\nbefore\n```\nafter\n````');
+    });
+
+    test('payload with &#x60; hex entities for backticks sizes fence after decode', () => {
+      const html = '<pre><code class="language-md">before\n&#x60;&#x60;&#x60;\nafter</code></pre>';
+      expect(htmlToMarkdown(html)).toBe('````md\nbefore\n```\nafter\n````');
+    });
+
+    test('payload mixing literal backtick and &#96; entity totals correctly for fence sizing', () => {
+      const html = '<pre><code class="language-md">a`&#96;&#96;b</code></pre>';
+      expect(htmlToMarkdown(html)).toBe('````md\na```b\n````');
+    });
   });
 });
