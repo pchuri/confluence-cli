@@ -447,6 +447,94 @@ describe('MacroConverter storageToMarkdown EXPAND round-trip', () => {
   });
 });
 
+describe('MacroConverter storageToMarkdown callout round-trip', () => {
+  // Storage → markdown emits the `> **MARKER**` blockquote form (matching
+  // README) rather than the bare `[!marker]` shorthand, because the bare form
+  // has no body terminator — a blank line inside a multi-paragraph body is
+  // indistinguishable from the body ending, so re-uploading the bare form
+  // silently drops every paragraph after the first. The blockquote form's
+  // `>` prefix gives the body an explicit boundary.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('info macro emits the > **INFO** blockquote form', () => {
+    const storage = '<ac:structured-macro ac:name="info"><ac:rich-text-body><p>heads up</p></ac:rich-text-body></ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('> **INFO**');
+    expect(result).toContain('> heads up');
+    expect(result).not.toMatch(/^\[!info\]/m);
+  });
+
+  test('warning macro emits the > **WARNING** blockquote form', () => {
+    const storage = '<ac:structured-macro ac:name="warning"><ac:rich-text-body><p>be careful</p></ac:rich-text-body></ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('> **WARNING**');
+    expect(result).toContain('> be careful');
+    expect(result).not.toMatch(/^\[!warning\]/m);
+  });
+
+  test('note macro emits the > **NOTE** blockquote form', () => {
+    const storage = '<ac:structured-macro ac:name="note"><ac:rich-text-body><p>side note</p></ac:rich-text-body></ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('> **NOTE**');
+    expect(result).toContain('> side note');
+    expect(result).not.toMatch(/^\[!note\]/m);
+  });
+
+  test('multi-paragraph body separates paragraphs with `>` (issue #135)', () => {
+    // Regression guard for the round-trip body-bounds bug: a blank line
+    // between paragraphs must round-trip as a `>` line, not a bare blank
+    // line, so re-upload preserves both paragraphs inside the macro.
+    const storage = '<ac:structured-macro ac:name="info"><ac:rich-text-body><p>foo</p><p>bar</p></ac:rich-text-body></ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('> **INFO**\n> foo\n>\n> bar');
+  });
+
+  test('full round-trip preserves multi-paragraph body inside the macro (issue #135)', () => {
+    const original = '> **INFO**\n> foo\n>\n> bar';
+    const storage1 = converter.markdownToStorage(original);
+    const downloaded = converter.storageToMarkdown(storage1);
+    const storage2 = converter.markdownToStorage(downloaded);
+    // Both paragraphs must remain inside the rich-text-body after re-upload.
+    // Previously, the second paragraph escaped the macro because the bare
+    // `[!info]` output form had ambiguous body bounds.
+    expect(storage2).toMatch(/<ac:rich-text-body>[\s\S]*<p>foo<\/p>[\s\S]*<p>bar<\/p>[\s\S]*<\/ac:rich-text-body>/);
+    expect(storage2).not.toMatch(/<\/ac:structured-macro>\s*<p>bar<\/p>/);
+  });
+
+  test('full round-trip preserves single-paragraph body', () => {
+    const original = '> **WARNING**\n> single line body';
+    const storage1 = converter.markdownToStorage(original);
+    const downloaded = converter.storageToMarkdown(storage1);
+    const storage2 = converter.markdownToStorage(downloaded);
+    expect(storage2).toContain('<ac:structured-macro ac:name="warning">');
+    expect(storage2).toContain('single line body');
+    expect(storage2).not.toContain('**WARNING**');
+  });
+
+  test('adjacent paragraphs stay outside the macro on round-trip', () => {
+    // Without leading + trailing `\n` around the emitted blockquote, an
+    // adjacent following paragraph lazy-continues into the blockquote body
+    // and lands inside the macro on re-upload. Markdown blockquotes have no
+    // closing delimiter — only a blank line ends them — so the separator
+    // newlines are load-bearing.
+    const storage = '<p>before content</p><ac:structured-macro ac:name="info"><ac:rich-text-body><p>foo</p><p>bar</p></ac:rich-text-body></ac:structured-macro><p>after content</p>';
+    const downloaded = converter.storageToMarkdown(storage);
+    const restored = converter.markdownToStorage(downloaded);
+    expect(restored).toMatch(/<p>foo<\/p>[\s\S]*<p>bar<\/p>[\s\S]*<\/ac:rich-text-body>/);
+    expect(restored).toMatch(/<\/ac:structured-macro>\s*<p>after content<\/p>/);
+    expect(restored).toMatch(/<p>before content<\/p>\s*<ac:structured-macro/);
+  });
+
+  test('downloaded markdown has blank-line separation around the callout', () => {
+    const storage = '<p>before</p><ac:structured-macro ac:name="info"><ac:rich-text-body><p>body</p></ac:rich-text-body></ac:structured-macro><p>after</p>';
+    const result = converter.storageToMarkdown(storage);
+    // Blank line between surrounding prose and the callout — same convention
+    // as `code` and `mermaid` macros (see confluence-client.test.js).
+    expect(result).toMatch(/before\n\n> \*\*INFO\*\*/);
+    expect(result).toMatch(/> body\n\nafter/);
+  });
+});
+
 describe('MacroConverter storageToMarkdown anchor round-trip', () => {
   const converter = new MacroConverter({ isCloud: true });
 
