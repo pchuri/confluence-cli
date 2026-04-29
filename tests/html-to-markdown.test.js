@@ -253,5 +253,15 @@ describe('htmlToMarkdown', () => {
       const html = '<pre><code class="language-js">a</code></pre><pre><code class="language-py">b</code></pre>';
       expect(htmlToMarkdown(html)).toBe('```js\na\n```\n\n```py\nb\n```');
     });
+
+    test('payload containing ``` uses a 4-backtick fence (CommonMark-safe)', () => {
+      const html = '<pre><code class="language-md">before\n```\nafter</code></pre>';
+      expect(htmlToMarkdown(html)).toBe('````md\nbefore\n```\nafter\n````');
+    });
+
+    test('payload containing a 4-backtick run uses a 5-backtick fence', () => {
+      const html = '<pre><code class="language-md">x ```` y</code></pre>';
+      expect(htmlToMarkdown(html)).toBe('`````md\nx ```` y\n`````');
+    });
   });
 });
