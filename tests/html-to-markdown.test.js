@@ -288,5 +288,15 @@ describe('htmlToMarkdown', () => {
       const html = '<p>before ``` after</p><pre><code class="language-py">def foo():\n    return 1</code></pre>';
       expect(htmlToMarkdown(html)).toBe('before ``` after\n\n```py\ndef foo():\n    return 1\n```');
     });
+
+    test('multi-class language attribute (Prism / highlight.js) extracts only the language token', () => {
+      const html = '<pre><code class="language-js hljs">x = 1</code></pre>';
+      expect(htmlToMarkdown(html)).toBe('```js\nx = 1\n```');
+    });
+
+    test('multi-class with sibling class after language- emits a clean info string', () => {
+      const html = '<pre><code class="language-python prism">x = 1</code></pre>';
+      expect(htmlToMarkdown(html)).toBe('```python\nx = 1\n```');
+    });
   });
 });
