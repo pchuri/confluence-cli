@@ -571,3 +571,102 @@ describe('MacroConverter storageToMarkdown anchor round-trip', () => {
     expect(back).toContain('[details](#section-a)');
   });
 });
+
+describe('MacroConverter storageToMarkdown nested macros (regex pipeline could not express these)', () => {
+  // The previous regex-based pipeline used non-greedy `[\s\S]*?` matchers
+  // that landed on the first closing tag they saw, so nesting any rich-text
+  // body macro inside another would mis-pair tags and silently drop content.
+  // The parser-based walker handles nesting via the parse tree itself.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('triple-nested callouts (info > warning > note) preserve every level', () => {
+    const storage = [
+      '<ac:structured-macro ac:name="info"><ac:rich-text-body>',
+      '<p>outer</p>',
+      '<ac:structured-macro ac:name="warning"><ac:rich-text-body>',
+      '<p>middle</p>',
+      '<ac:structured-macro ac:name="note"><ac:rich-text-body>',
+      '<p>inner</p>',
+      '</ac:rich-text-body></ac:structured-macro>',
+      '</ac:rich-text-body></ac:structured-macro>',
+      '</ac:rich-text-body></ac:structured-macro>',
+    ].join('');
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('> **INFO**');
+    expect(result).toContain('outer');
+    expect(result).toContain('**WARNING**');
+    expect(result).toContain('middle');
+    expect(result).toContain('**NOTE**');
+    expect(result).toContain('inner');
+  });
+
+  test('expand inside an info macro preserves both wrappers and the body', () => {
+    const storage = [
+      '<ac:structured-macro ac:name="info"><ac:rich-text-body>',
+      '<p>heads up</p>',
+      '<ac:structured-macro ac:name="expand">',
+      '<ac:parameter ac:name="title">Show details</ac:parameter>',
+      '<ac:rich-text-body><p>hidden body</p></ac:rich-text-body>',
+      '</ac:structured-macro>',
+      '</ac:rich-text-body></ac:structured-macro>',
+    ].join('');
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('> **INFO**');
+    expect(result).toContain('heads up');
+    expect(result).toContain('**EXPAND: Show details**');
+    expect(result).toContain('hidden body');
+    expect(result).toContain('**EXPAND_END**');
+  });
+
+  test('panel inside an expand preserves both titles and the body', () => {
+    const storage = [
+      '<ac:structured-macro ac:name="expand">',
+      '<ac:parameter ac:name="title">Outer</ac:parameter>',
+      '<ac:rich-text-body>',
+      '<ac:structured-macro ac:name="panel">',
+      '<ac:parameter ac:name="title">Inner</ac:parameter>',
+      '<ac:rich-text-body><p>panel body</p></ac:rich-text-body>',
+      '</ac:structured-macro>',
+      '</ac:rich-text-body>',
+      '</ac:structured-macro>',
+    ].join('');
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('**EXPAND: Outer**');
+    expect(result).toContain('**Inner**');
+    expect(result).toContain('panel body');
+    expect(result).toContain('**EXPAND_END**');
+  });
+
+  test('macro with reordered attributes (ac:macro-id before ac:name) is recognized', () => {
+    const storage = '<ac:structured-macro ac:macro-id="abc" ac:schema-version="1" ac:name="info"><ac:rich-text-body><p>body</p></ac:rich-text-body></ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('> **INFO**');
+    expect(result).toContain('body');
+  });
+});
+
+describe('MacroConverter storageToMarkdown depth guard', () => {
+  const { StorageDepthExceededError } = require('../lib/storage-walker');
+
+  test('throws StorageDepthExceededError on pathologically deep nesting rather than crashing the process', () => {
+    // Build a 1000-deep chain of <p> wrappers — well past the default cap of
+    // 256. A native stack overflow would abort any caller mid-export; a
+    // typed error lets the caller skip the page and continue.
+    const open = '<p>'.repeat(1000);
+    const close = '</p>'.repeat(1000);
+    const storage = `${open}content${close}`;
+    const converter = new MacroConverter({ isCloud: true });
+    expect(() => converter.storageToMarkdown(storage)).toThrow(StorageDepthExceededError);
+  });
+
+  test('within-limit nesting (50 levels) walks without error', () => {
+    // 50 levels comfortably exceeds the deepest realistic Confluence layout
+    // (a few layout sections + nested macros rarely top 30) but stays well
+    // under the 256 cap, so it must succeed.
+    const open = '<p>'.repeat(50);
+    const close = '</p>'.repeat(50);
+    const storage = `${open}content${close}`;
+    const converter = new MacroConverter({ isCloud: true });
+    expect(() => converter.storageToMarkdown(storage)).not.toThrow();
+  });
+});
