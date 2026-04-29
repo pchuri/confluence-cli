@@ -243,5 +243,15 @@ describe('htmlToMarkdown', () => {
       expect(htmlToMarkdown('<p>use <code>npm install</code> first</p>'))
         .toBe('use `npm install` first');
     });
+
+    test('empty <pre><code> body produces an empty fenced block', () => {
+      expect(htmlToMarkdown('<pre><code class="language-py"></code></pre>'))
+        .toBe('```py\n\n```');
+    });
+
+    test('two adjacent <pre><code> blocks each emit their own fence', () => {
+      const html = '<pre><code class="language-js">a</code></pre><pre><code class="language-py">b</code></pre>';
+      expect(htmlToMarkdown(html)).toBe('```js\na\n```\n\n```py\nb\n```');
+    });
   });
 });
