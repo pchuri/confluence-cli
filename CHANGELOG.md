@@ -1,3 +1,10 @@
+## [2.1.6](https://github.com/pchuri/confluence-cli/compare/v2.1.5...v2.1.6) (2026-04-29)
+
+
+### Bug Fixes
+
+* **html-to-markdown:** stop language token at whitespace in fence info ([#150](https://github.com/pchuri/confluence-cli/issues/150)) ([17a31e2](https://github.com/pchuri/confluence-cli/commit/17a31e2719e6426d0961903f2a55625d0091e4db)), closes [#148](https://github.com/pchuri/confluence-cli/issues/148)
+
 ## [2.1.5](https://github.com/pchuri/confluence-cli/compare/v2.1.4...v2.1.5) (2026-04-29)
 
 
