@@ -298,5 +298,10 @@ describe('htmlToMarkdown', () => {
       const html = '<pre><code class="language-python prism">x = 1</code></pre>';
       expect(htmlToMarkdown(html)).toBe('```python\nx = 1\n```');
     });
+
+    test('hyphenated language identifier (e.g. objective-c) is preserved verbatim', () => {
+      const html = '<pre><code class="language-objective-c">int x;</code></pre>';
+      expect(htmlToMarkdown(html)).toBe('```objective-c\nint x;\n```');
+    });
   });
 });
