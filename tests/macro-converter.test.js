@@ -670,3 +670,69 @@ describe('MacroConverter storageToMarkdown depth guard', () => {
     expect(() => converter.storageToMarkdown(storage)).not.toThrow();
   });
 });
+
+describe('MacroConverter storageToMarkdown HTML named entity decoding', () => {
+  // htmlparser2 in xmlMode decodes only the five XML entities
+  // (&amp; &lt; &gt; &quot; &apos;). Confluence storage prose still ships
+  // HTML named entities (&nbsp;, &eacute;, &ndash;, …) and they must be
+  // decoded before reaching markdown — otherwise an exported page renders
+  // with literal `&nbsp;` strings to the user.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('decodes &nbsp; to a (non-breaking) space', () => {
+    expect(converter.storageToMarkdown('<p>foo&nbsp;bar</p>')).toBe('foo bar');
+  });
+
+  test('decodes accented Latin named entities', () => {
+    expect(converter.storageToMarkdown('<p>caf&eacute; na&iuml;ve &ntilde;</p>'))
+      .toBe('café naïve ñ');
+  });
+
+  test('decodes typographic punctuation entities and normalizes the same subset the original ASCII-mapped', () => {
+    // Smart quotes, single quotes, and ellipsis are normalized to ASCII to
+    // preserve the original htmlToMarkdown final-pass behavior. Em-dash and
+    // en-dash stay as Unicode (the original mapped them to Unicode too).
+    expect(converter.storageToMarkdown('<p>&ldquo;hi&rdquo; &lsquo;a&rsquo; &mdash; &ndash; &hellip;</p>'))
+      .toBe('"hi" \'a\' — – ...');
+  });
+});
+
+describe('MacroConverter storageToMarkdown ac:link without body', () => {
+  // The original regex pipeline dropped <ac:link> nodes that lacked an
+  // explicit text body — the catch-all swept them away. The walker must
+  // match that, otherwise malformed exports show visible `[](url)` /
+  // `[](#anchor)` markers instead of clean prose.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('ac:link with ac:anchor but no plain-text-link-body is dropped (no empty marker)', () => {
+    const storage = '<p>Before</p><ac:link ac:anchor="section"><ri:page ri:content-title="Page" /></ac:link><p>After</p>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).not.toContain('[]');
+    expect(result).not.toContain('(#section)');
+    expect(result).toContain('Before');
+    expect(result).toContain('After');
+  });
+
+  test('ac:link with ri:url but no plain-text-link-body is dropped', () => {
+    const storage = '<p>Before</p><ac:link><ri:url ri:value="https://example.com" /></ac:link><p>After</p>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).not.toContain('[]');
+    expect(result).not.toContain('(https://example.com)');
+    expect(result).toContain('Before');
+    expect(result).toContain('After');
+  });
+});
+
+describe('MacroConverter storageToMarkdown panel formatting', () => {
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('panel body does not produce extra `>` blank lines bracketing the content', () => {
+    const storage = '<ac:structured-macro ac:name="panel"><ac:parameter ac:name="title">T</ac:parameter><ac:rich-text-body><p>body</p></ac:rich-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('> **T**\n>\n> body');
+  });
+
+  test('multi-paragraph panel body keeps inter-paragraph `>` separators', () => {
+    const storage = '<ac:structured-macro ac:name="panel"><ac:parameter ac:name="title">T</ac:parameter><ac:rich-text-body><p>foo</p><p>bar</p></ac:rich-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('> **T**\n>\n> foo\n>\n> bar');
+  });
+});
