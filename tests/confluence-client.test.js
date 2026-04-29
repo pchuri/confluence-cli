@@ -940,9 +940,9 @@ describe('ConfluenceClient', () => {
     test('should convert Confluence macros to admonitions', () => {
       const storage = '<ac:structured-macro ac:name="info"><ac:rich-text-body><p>This is info</p></ac:rich-text-body></ac:structured-macro>';
       const result = client.storageToMarkdown(storage);
-      
-      expect(result).toContain('[!info]');
-      expect(result).toContain('This is info');
+
+      expect(result).toContain('> **INFO**');
+      expect(result).toContain('> This is info');
     });
 
     test('should convert Confluence links to markdown', () => {
