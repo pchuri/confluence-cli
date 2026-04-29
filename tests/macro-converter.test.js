@@ -855,3 +855,44 @@ describe('MacroConverter storageToMarkdown fenced code preserves indentation', (
     expect(converter.storageToMarkdown(storage)).toBe('```text\na\n\n\n\nb\n```');
   });
 });
+
+describe('MacroConverter storageToMarkdown dynamic fence sizing', () => {
+  const converter = new MacroConverter({ isCloud: true });
+  const codeMacro = (lang, body) =>
+    `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">${lang}</ac:parameter><ac:plain-text-body><![CDATA[${body}]]></ac:plain-text-body></ac:structured-macro>`;
+
+  test('payload containing ``` uses a 4-backtick fence (CommonMark-safe)', () => {
+    const storage = codeMacro('md', 'before\n```\nafter');
+    expect(converter.storageToMarkdown(storage)).toBe('````md\nbefore\n```\nafter\n````');
+  });
+
+  test('payload containing a 4-backtick run uses a 5-backtick fence', () => {
+    const storage = codeMacro('md', 'x ```` y');
+    expect(converter.storageToMarkdown(storage)).toBe('`````md\nx ```` y\n`````');
+  });
+
+  test('payload with &#96; decimal entities for backticks sizes fence after decode', () => {
+    const storage = codeMacro('md', 'before\n&#96;&#96;&#96;\nafter');
+    expect(converter.storageToMarkdown(storage)).toBe('````md\nbefore\n```\nafter\n````');
+  });
+
+  test('payload with &#x60; hex entities for backticks sizes fence after decode', () => {
+    const storage = codeMacro('md', 'before\n&#x60;&#x60;&#x60;\nafter');
+    expect(converter.storageToMarkdown(storage)).toBe('````md\nbefore\n```\nafter\n````');
+  });
+
+  test('mermaid payload containing ``` uses a 4-backtick fence', () => {
+    const storage = '<ac:structured-macro ac:name="mermaid-macro"><ac:plain-text-body><![CDATA[graph TD\n    A["literal ```"] --> B]]></ac:plain-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('````mermaid\ngraph TD\n    A["literal ```"] --> B\n````');
+  });
+
+  test('prose with mid-line ``` before a code macro does not steal fence boundary', () => {
+    const storage = `<p>literal \`\`\` marker</p>${codeMacro('js', 'const x = 1;')}<p>tail</p>`;
+    expect(converter.storageToMarkdown(storage)).toBe('literal ``` marker\n\n```js\nconst x = 1;\n```\n\ntail');
+  });
+
+  test('prose with mid-line ``` before a code macro preserves the code body indent', () => {
+    const storage = `<p>before \`\`\` after</p>${codeMacro('py', 'def foo():\n    return 1')}`;
+    expect(converter.storageToMarkdown(storage)).toBe('before ``` after\n\n```py\ndef foo():\n    return 1\n```');
+  });
+});
