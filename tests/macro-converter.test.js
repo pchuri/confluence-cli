@@ -839,4 +839,14 @@ describe('MacroConverter storageToMarkdown fenced code preserves indentation', (
     const storage = `<p>    para</p>${codeMacro('py', 'x = 1')}<p>    para2</p>`;
     expect(converter.storageToMarkdown(storage)).toBe('para\n\n```py\nx = 1\n```\n\npara2');
   });
+
+  test('# comment lines inside fenced code do not trigger header blank-line rule', () => {
+    const storage = codeMacro('python', '# comment\nx = 1');
+    expect(converter.storageToMarkdown(storage)).toBe('```python\n# comment\nx = 1\n```');
+  });
+
+  test('trailing whitespace inside fenced code is preserved', () => {
+    const storage = codeMacro('py', 'x = 1   \ny = 2   ');
+    expect(converter.storageToMarkdown(storage)).toBe('```py\nx = 1   \ny = 2   \n```');
+  });
 });
