@@ -571,3 +571,231 @@ describe('MacroConverter storageToMarkdown anchor round-trip', () => {
     expect(back).toContain('[details](#section-a)');
   });
 });
+
+describe('MacroConverter storageToMarkdown nested macros (regex pipeline could not express these)', () => {
+  // The previous regex-based pipeline used non-greedy `[\s\S]*?` matchers
+  // that landed on the first closing tag they saw, so nesting any rich-text
+  // body macro inside another would mis-pair tags and silently drop content.
+  // The parser-based walker handles nesting via the parse tree itself.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('triple-nested callouts (info > warning > note) preserve every level', () => {
+    const storage = [
+      '<ac:structured-macro ac:name="info"><ac:rich-text-body>',
+      '<p>outer</p>',
+      '<ac:structured-macro ac:name="warning"><ac:rich-text-body>',
+      '<p>middle</p>',
+      '<ac:structured-macro ac:name="note"><ac:rich-text-body>',
+      '<p>inner</p>',
+      '</ac:rich-text-body></ac:structured-macro>',
+      '</ac:rich-text-body></ac:structured-macro>',
+      '</ac:rich-text-body></ac:structured-macro>',
+    ].join('');
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('> **INFO**');
+    expect(result).toContain('outer');
+    expect(result).toContain('**WARNING**');
+    expect(result).toContain('middle');
+    expect(result).toContain('**NOTE**');
+    expect(result).toContain('inner');
+  });
+
+  test('expand inside an info macro preserves both wrappers and the body', () => {
+    const storage = [
+      '<ac:structured-macro ac:name="info"><ac:rich-text-body>',
+      '<p>heads up</p>',
+      '<ac:structured-macro ac:name="expand">',
+      '<ac:parameter ac:name="title">Show details</ac:parameter>',
+      '<ac:rich-text-body><p>hidden body</p></ac:rich-text-body>',
+      '</ac:structured-macro>',
+      '</ac:rich-text-body></ac:structured-macro>',
+    ].join('');
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('> **INFO**');
+    expect(result).toContain('heads up');
+    expect(result).toContain('**EXPAND: Show details**');
+    expect(result).toContain('hidden body');
+    expect(result).toContain('**EXPAND_END**');
+  });
+
+  test('panel inside an expand preserves both titles and the body', () => {
+    const storage = [
+      '<ac:structured-macro ac:name="expand">',
+      '<ac:parameter ac:name="title">Outer</ac:parameter>',
+      '<ac:rich-text-body>',
+      '<ac:structured-macro ac:name="panel">',
+      '<ac:parameter ac:name="title">Inner</ac:parameter>',
+      '<ac:rich-text-body><p>panel body</p></ac:rich-text-body>',
+      '</ac:structured-macro>',
+      '</ac:rich-text-body>',
+      '</ac:structured-macro>',
+    ].join('');
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('**EXPAND: Outer**');
+    expect(result).toContain('**Inner**');
+    expect(result).toContain('panel body');
+    expect(result).toContain('**EXPAND_END**');
+  });
+
+  test('macro with reordered attributes (ac:macro-id before ac:name) is recognized', () => {
+    const storage = '<ac:structured-macro ac:macro-id="abc" ac:schema-version="1" ac:name="info"><ac:rich-text-body><p>body</p></ac:rich-text-body></ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('> **INFO**');
+    expect(result).toContain('body');
+  });
+});
+
+describe('MacroConverter storageToMarkdown depth guard', () => {
+  const { StorageDepthExceededError } = require('../lib/storage-walker');
+
+  test('throws StorageDepthExceededError on pathologically deep nesting rather than crashing the process', () => {
+    // Build a 1000-deep chain of <p> wrappers — well past the default cap of
+    // 256. A native stack overflow would abort any caller mid-export; a
+    // typed error lets the caller skip the page and continue.
+    const open = '<p>'.repeat(1000);
+    const close = '</p>'.repeat(1000);
+    const storage = `${open}content${close}`;
+    const converter = new MacroConverter({ isCloud: true });
+    expect(() => converter.storageToMarkdown(storage)).toThrow(StorageDepthExceededError);
+  });
+
+  test('within-limit nesting (50 levels) walks without error', () => {
+    // 50 levels comfortably exceeds the deepest realistic Confluence layout
+    // (a few layout sections + nested macros rarely top 30) but stays well
+    // under the 256 cap, so it must succeed.
+    const open = '<p>'.repeat(50);
+    const close = '</p>'.repeat(50);
+    const storage = `${open}content${close}`;
+    const converter = new MacroConverter({ isCloud: true });
+    expect(() => converter.storageToMarkdown(storage)).not.toThrow();
+  });
+});
+
+describe('MacroConverter storageToMarkdown HTML named entity decoding', () => {
+  // htmlparser2 in xmlMode decodes only the five XML entities
+  // (&amp; &lt; &gt; &quot; &apos;). Confluence storage prose still ships
+  // HTML named entities (&nbsp;, &eacute;, &ndash;, …) and they must be
+  // decoded before reaching markdown — otherwise an exported page renders
+  // with literal `&nbsp;` strings to the user.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('decodes &nbsp; to a (non-breaking) space', () => {
+    expect(converter.storageToMarkdown('<p>foo&nbsp;bar</p>')).toBe('foo bar');
+  });
+
+  test('decodes accented Latin named entities', () => {
+    expect(converter.storageToMarkdown('<p>caf&eacute; na&iuml;ve &ntilde;</p>'))
+      .toBe('café naïve ñ');
+  });
+
+  test('decodes typographic punctuation entities and normalizes the same subset the original ASCII-mapped', () => {
+    // Smart quotes, single quotes, and ellipsis are normalized to ASCII to
+    // preserve the original htmlToMarkdown final-pass behavior. Em-dash and
+    // en-dash stay as Unicode (the original mapped them to Unicode too).
+    expect(converter.storageToMarkdown('<p>&ldquo;hi&rdquo; &lsquo;a&rsquo; &mdash; &ndash; &hellip;</p>'))
+      .toBe('"hi" \'a\' — – ...');
+  });
+
+  test('literal Unicode codepoints already in source pass through untouched', () => {
+    // Earlier versions applied a blanket Unicode → ASCII pass that mangled
+    // pages where the author typed “…” or … directly. Only `&…;` entity
+    // sequences should be normalized; literal codepoints must survive.
+    expect(converter.storageToMarkdown('<p>“hi” ‘a’ …</p>'))
+      .toBe('“hi” ‘a’ …');
+  });
+
+  test('decodes numeric character references', () => {
+    expect(converter.storageToMarkdown('<p>&#65;&#66;&#67; &#x41;&#x42;</p>')).toBe('ABC AB');
+  });
+
+  test('decodes entities inside macro parameter text (titles, ids, keys)', () => {
+    // getTextContent reads parameter children; without decoding, an expand
+    // title containing &eacute; would export verbatim as `caf&eacute;`.
+    const expand = '<ac:structured-macro ac:name="expand"><ac:parameter ac:name="title">caf&eacute; details</ac:parameter><ac:rich-text-body><p>body</p></ac:rich-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(expand)).toContain('**EXPAND: café details**');
+
+    const anchor = '<ac:structured-macro ac:name="anchor"><ac:parameter ac:name="">id&#45;a</ac:parameter></ac:structured-macro>';
+    expect(converter.storageToMarkdown(anchor)).toContain('**ANCHOR: id-a**');
+  });
+
+  test('decodes entities inside ri:content-title and ri:filename attributes', () => {
+    // Attribute values bypass walkNode's text-node decode path; without an
+    // explicit decode at the read site, internal-link text would still leak
+    // the entity verbatim.
+    const link = '<ac:link><ri:page ri:content-title="caf&eacute; page" /></ac:link>';
+    expect(converter.storageToMarkdown(link)).toContain('[café page]');
+
+    const image = '<ac:image><ri:attachment ri:filename="r&eacute;sum&eacute;.png" /></ac:image>';
+    expect(converter.storageToMarkdown(image)).toContain('résumé.png');
+  });
+
+  test('decodes entities inside CDATA bodies (link bodies, code, mermaid)', () => {
+    // getRawText reads CDATA verbatim — without a decode pass at the
+    // boundary, link text and code blocks would leak the entity. Confluence
+    // sometimes encodes `<` / `>` inside `<ac:plain-text-body>` as
+    // `&lt;` / `&gt;` even though CDATA does not require it; the previous
+    // implementation's final htmlToMarkdown pass decoded these.
+    const link = '<ac:link><ri:url ri:value="https://x.com" /><ac:plain-text-link-body><![CDATA[caf&eacute;]]></ac:plain-text-link-body></ac:link>';
+    expect(converter.storageToMarkdown(link)).toContain('[café](https://x.com)');
+
+    const code = '<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">html</ac:parameter><ac:plain-text-body><![CDATA[&lt;div&gt;]]></ac:plain-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(code)).toContain('<div>');
+  });
+
+  test('decodes entities inside ac:anchor and ri:value URL attributes', () => {
+    // ac:anchor gets used as a URL fragment, ri:value as the link target.
+    // Both still need named-entity decoding even though they look URL-y.
+    const anchorLink = '<ac:link ac:anchor="caf&eacute;"><ac:plain-text-link-body><![CDATA[Jump]]></ac:plain-text-link-body></ac:link>';
+    expect(converter.storageToMarkdown(anchorLink)).toContain('[Jump](#café)');
+
+    const urlLink = '<ac:link><ri:url ri:value="https://example.com?q=caf&eacute;" /><ac:plain-text-link-body><![CDATA[Ex]]></ac:plain-text-link-body></ac:link>';
+    expect(converter.storageToMarkdown(urlLink)).toContain('[Ex](https://example.com?q=café)');
+  });
+
+  test('decodes entities inside generic <a href> URLs', () => {
+    // The generic HTML link path also reads href directly. Less common in
+    // Confluence storage than ac:link, but still a parity gap if untouched.
+    const html = '<p><a href="https://example.com?q=caf&eacute;">Ex</a></p>';
+    expect(converter.storageToMarkdown(html)).toContain('[Ex](https://example.com?q=café)');
+  });
+});
+
+describe('MacroConverter storageToMarkdown ac:link without body', () => {
+  // The original regex pipeline dropped <ac:link> nodes that lacked an
+  // explicit text body — the catch-all swept them away. The walker must
+  // match that, otherwise malformed exports show visible `[](url)` /
+  // `[](#anchor)` markers instead of clean prose.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('ac:link with ac:anchor but no plain-text-link-body is dropped (no empty marker)', () => {
+    const storage = '<p>Before</p><ac:link ac:anchor="section"><ri:page ri:content-title="Page" /></ac:link><p>After</p>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).not.toContain('[]');
+    expect(result).not.toContain('(#section)');
+    expect(result).toContain('Before');
+    expect(result).toContain('After');
+  });
+
+  test('ac:link with ri:url but no plain-text-link-body is dropped', () => {
+    const storage = '<p>Before</p><ac:link><ri:url ri:value="https://example.com" /></ac:link><p>After</p>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).not.toContain('[]');
+    expect(result).not.toContain('(https://example.com)');
+    expect(result).toContain('Before');
+    expect(result).toContain('After');
+  });
+});
+
+describe('MacroConverter storageToMarkdown panel formatting', () => {
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('panel body does not produce extra `>` blank lines bracketing the content', () => {
+    const storage = '<ac:structured-macro ac:name="panel"><ac:parameter ac:name="title">T</ac:parameter><ac:rich-text-body><p>body</p></ac:rich-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('> **T**\n>\n> body');
+  });
+
+  test('multi-paragraph panel body keeps inter-paragraph `>` separators', () => {
+    const storage = '<ac:structured-macro ac:name="panel"><ac:parameter ac:name="title">T</ac:parameter><ac:rich-text-body><p>foo</p><p>bar</p></ac:rich-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('> **T**\n>\n> foo\n>\n> bar');
+  });
+});
