@@ -789,7 +789,7 @@ A blockquote whose first line is `**INFO**`, `**WARNING**`, or `**NOTE**` become
 > Side note for the reader.
 ```
 
-The reverse direction emits the equivalent shorthand (`[!info]` / `[!warning]` / `[!note]` followed by the body), which markdown→storage then re-expands.
+The reverse direction emits the same `> **INFO**` / `> **WARNING**` / `> **NOTE**` blockquote form, so multi-paragraph bodies round-trip cleanly. The bare `[!info]` / `[!warning]` / `[!note]` shorthand is still accepted on input for backwards compatibility.
 
 A blockquote without one of these markers stays a **plain blockquote** (`<blockquote>…</blockquote>`) — `> …` is treated as a quotation, not an alert. Use the markers above when you want a callout.
 

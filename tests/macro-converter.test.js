@@ -510,6 +510,29 @@ describe('MacroConverter storageToMarkdown callout round-trip', () => {
     expect(storage2).toContain('single line body');
     expect(storage2).not.toContain('**WARNING**');
   });
+
+  test('adjacent paragraphs stay outside the macro on round-trip', () => {
+    // Without leading + trailing `\n` around the emitted blockquote, an
+    // adjacent following paragraph lazy-continues into the blockquote body
+    // and lands inside the macro on re-upload. Markdown blockquotes have no
+    // closing delimiter — only a blank line ends them — so the separator
+    // newlines are load-bearing.
+    const storage = '<p>before content</p><ac:structured-macro ac:name="info"><ac:rich-text-body><p>foo</p><p>bar</p></ac:rich-text-body></ac:structured-macro><p>after content</p>';
+    const downloaded = converter.storageToMarkdown(storage);
+    const restored = converter.markdownToStorage(downloaded);
+    expect(restored).toMatch(/<p>foo<\/p>[\s\S]*<p>bar<\/p>[\s\S]*<\/ac:rich-text-body>/);
+    expect(restored).toMatch(/<\/ac:structured-macro>\s*<p>after content<\/p>/);
+    expect(restored).toMatch(/<p>before content<\/p>\s*<ac:structured-macro/);
+  });
+
+  test('downloaded markdown has blank-line separation around the callout', () => {
+    const storage = '<p>before</p><ac:structured-macro ac:name="info"><ac:rich-text-body><p>body</p></ac:rich-text-body></ac:structured-macro><p>after</p>';
+    const result = converter.storageToMarkdown(storage);
+    // Blank line between surrounding prose and the callout — same convention
+    // as `code` and `mermaid` macros (see confluence-client.test.js).
+    expect(result).toMatch(/before\n\n> \*\*INFO\*\*/);
+    expect(result).toMatch(/> body\n\nafter/);
+  });
 });
 
 describe('MacroConverter storageToMarkdown anchor round-trip', () => {
