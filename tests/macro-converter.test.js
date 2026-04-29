@@ -799,3 +799,44 @@ describe('MacroConverter storageToMarkdown panel formatting', () => {
     expect(converter.storageToMarkdown(storage)).toBe('> **T**\n>\n> foo\n>\n> bar');
   });
 });
+
+describe('MacroConverter storageToMarkdown fenced code preserves indentation', () => {
+  const converter = new MacroConverter({ isCloud: true });
+  const codeMacro = (lang, body) =>
+    `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">${lang}</ac:parameter><ac:plain-text-body><![CDATA[${body}]]></ac:plain-text-body></ac:structured-macro>`;
+
+  test('leading 4-space indent in fenced code is preserved', () => {
+    const storage = codeMacro('python', 'def foo():\n    return 1');
+    expect(converter.storageToMarkdown(storage)).toBe('```python\ndef foo():\n    return 1\n```');
+  });
+
+  test('nested 8-space indent in fenced code is preserved', () => {
+    const storage = codeMacro('python', 'def foo():\n    if x:\n        return 1');
+    expect(converter.storageToMarkdown(storage)).toBe('```python\ndef foo():\n    if x:\n        return 1\n```');
+  });
+
+  test('tab indent in fenced code is preserved', () => {
+    const storage = codeMacro('go', 'func f() {\n\treturn 1\n}');
+    expect(converter.storageToMarkdown(storage)).toBe('```go\nfunc f() {\n\treturn 1\n}\n```');
+  });
+
+  test('inline multi-space inside fenced code is preserved', () => {
+    const storage = codeMacro('text', 'a    b    c');
+    expect(converter.storageToMarkdown(storage)).toBe('```text\na    b    c\n```');
+  });
+
+  test('mermaid macro indent is preserved', () => {
+    const storage = '<ac:structured-macro ac:name="mermaid-macro"><ac:plain-text-body><![CDATA[graph TD\n    A --> B\n    A --> C]]></ac:plain-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('```mermaid\ngraph TD\n    A --> B\n    A --> C\n```');
+  });
+
+  test('non-fence content still has leading whitespace stripped', () => {
+    const storage = '<p>    hello world</p>';
+    expect(converter.storageToMarkdown(storage)).toBe('hello world');
+  });
+
+  test('cleanup still applies between fenced blocks', () => {
+    const storage = `<p>    para</p>${codeMacro('py', 'x = 1')}<p>    para2</p>`;
+    expect(converter.storageToMarkdown(storage)).toBe('para\n\n```py\nx = 1\n```\n\npara2');
+  });
+});
