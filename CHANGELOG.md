@@ -1,3 +1,10 @@
+## [2.1.4](https://github.com/pchuri/confluence-cli/compare/v2.1.3...v2.1.4) (2026-04-29)
+
+
+### Bug Fixes
+
+* **walker:** preserve indentation inside fenced code blocks ([#145](https://github.com/pchuri/confluence-cli/issues/145)) ([709aaee](https://github.com/pchuri/confluence-cli/commit/709aaee9266d34960b748db11700975ffdbfac62)), closes [#139](https://github.com/pchuri/confluence-cli/issues/139)
+
 ## [2.1.3](https://github.com/pchuri/confluence-cli/compare/v2.1.2...v2.1.3) (2026-04-29)
 
 
