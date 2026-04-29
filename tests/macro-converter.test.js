@@ -695,6 +695,39 @@ describe('MacroConverter storageToMarkdown HTML named entity decoding', () => {
     expect(converter.storageToMarkdown('<p>&ldquo;hi&rdquo; &lsquo;a&rsquo; &mdash; &ndash; &hellip;</p>'))
       .toBe('"hi" \'a\' — – ...');
   });
+
+  test('literal Unicode codepoints already in source pass through untouched', () => {
+    // Earlier versions applied a blanket Unicode → ASCII pass that mangled
+    // pages where the author typed “…” or … directly. Only `&…;` entity
+    // sequences should be normalized; literal codepoints must survive.
+    expect(converter.storageToMarkdown('<p>“hi” ‘a’ …</p>'))
+      .toBe('“hi” ‘a’ …');
+  });
+
+  test('decodes numeric character references', () => {
+    expect(converter.storageToMarkdown('<p>&#65;&#66;&#67; &#x41;&#x42;</p>')).toBe('ABC AB');
+  });
+
+  test('decodes entities inside macro parameter text (titles, ids, keys)', () => {
+    // getTextContent reads parameter children; without decoding, an expand
+    // title containing &eacute; would export verbatim as `caf&eacute;`.
+    const expand = '<ac:structured-macro ac:name="expand"><ac:parameter ac:name="title">caf&eacute; details</ac:parameter><ac:rich-text-body><p>body</p></ac:rich-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(expand)).toContain('**EXPAND: café details**');
+
+    const anchor = '<ac:structured-macro ac:name="anchor"><ac:parameter ac:name="">id&#45;a</ac:parameter></ac:structured-macro>';
+    expect(converter.storageToMarkdown(anchor)).toContain('**ANCHOR: id-a**');
+  });
+
+  test('decodes entities inside ri:content-title and ri:filename attributes', () => {
+    // Attribute values bypass walkNode's text-node decode path; without an
+    // explicit decode at the read site, internal-link text would still leak
+    // the entity verbatim.
+    const link = '<ac:link><ri:page ri:content-title="caf&eacute; page" /></ac:link>';
+    expect(converter.storageToMarkdown(link)).toContain('[café page]');
+
+    const image = '<ac:image><ri:attachment ri:filename="r&eacute;sum&eacute;.png" /></ac:image>';
+    expect(converter.storageToMarkdown(image)).toContain('résumé.png');
+  });
 });
 
 describe('MacroConverter storageToMarkdown ac:link without body', () => {
