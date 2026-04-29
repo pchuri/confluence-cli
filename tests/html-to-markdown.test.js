@@ -180,4 +180,68 @@ describe('htmlToMarkdown', () => {
       expect(htmlToMarkdown('<p><span class="x">visible</span></p>')).toBe('visible');
     });
   });
+
+  describe('fenced code from <pre><code> preserves indentation', () => {
+    const preCode = (lang, body) =>
+      `<pre><code class="language-${lang}">${body}</code></pre>`;
+
+    test('leading 4-space indent in fenced code is preserved', () => {
+      const html = preCode('python', 'def foo():\n    return 1');
+      expect(htmlToMarkdown(html)).toBe('```python\ndef foo():\n    return 1\n```');
+    });
+
+    test('nested 8-space indent in fenced code is preserved', () => {
+      const html = preCode('python', 'def foo():\n    if x:\n        return 1');
+      expect(htmlToMarkdown(html)).toBe('```python\ndef foo():\n    if x:\n        return 1\n```');
+    });
+
+    test('tab indent in fenced code is preserved', () => {
+      const html = preCode('go', 'func f() {\n\treturn 1\n}');
+      expect(htmlToMarkdown(html)).toBe('```go\nfunc f() {\n\treturn 1\n}\n```');
+    });
+
+    test('inline multi-space inside fenced code is preserved', () => {
+      const html = preCode('text', 'a    b    c');
+      expect(htmlToMarkdown(html)).toBe('```text\na    b    c\n```');
+    });
+
+    test('<pre><code> without language class emits a bare fence', () => {
+      const html = '<pre><code>raw line\n    indented</code></pre>';
+      expect(htmlToMarkdown(html)).toBe('```\nraw line\n    indented\n```');
+    });
+
+    test('non-fence content still has leading whitespace stripped', () => {
+      expect(htmlToMarkdown('<p>    hello world</p>')).toBe('hello world');
+    });
+
+    test('cleanup still applies between fenced blocks', () => {
+      const html = `<p>    para</p>${preCode('py', 'x = 1')}<p>    para2</p>`;
+      expect(htmlToMarkdown(html)).toBe('para\n\n```py\nx = 1\n```\n\npara2');
+    });
+
+    test('# comment lines inside fenced code do not trigger header blank-line rule', () => {
+      const html = preCode('python', '# comment\nx = 1');
+      expect(htmlToMarkdown(html)).toBe('```python\n# comment\nx = 1\n```');
+    });
+
+    test('trailing whitespace inside fenced code is preserved', () => {
+      const html = preCode('py', 'x = 1   \ny = 2   ');
+      expect(htmlToMarkdown(html)).toBe('```py\nx = 1   \ny = 2   \n```');
+    });
+
+    test('consecutive blank lines inside fenced code are preserved (no 3+ collapse)', () => {
+      const html = preCode('text', 'a\n\n\n\nb');
+      expect(htmlToMarkdown(html)).toBe('```text\na\n\n\n\nb\n```');
+    });
+
+    test('HTML entities inside fenced code are decoded', () => {
+      const html = preCode('go', 'if x &lt; 10 &amp;&amp; y &gt; 0 {}');
+      expect(htmlToMarkdown(html)).toBe('```go\nif x < 10 && y > 0 {}\n```');
+    });
+
+    test('inline <code> still becomes single backticks (no regression)', () => {
+      expect(htmlToMarkdown('<p>use <code>npm install</code> first</p>'))
+        .toBe('use `npm install` first');
+    });
+  });
 });
