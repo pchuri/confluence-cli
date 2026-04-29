@@ -728,6 +728,36 @@ describe('MacroConverter storageToMarkdown HTML named entity decoding', () => {
     const image = '<ac:image><ri:attachment ri:filename="r&eacute;sum&eacute;.png" /></ac:image>';
     expect(converter.storageToMarkdown(image)).toContain('résumé.png');
   });
+
+  test('decodes entities inside CDATA bodies (link bodies, code, mermaid)', () => {
+    // getRawText reads CDATA verbatim — without a decode pass at the
+    // boundary, link text and code blocks would leak the entity. Confluence
+    // sometimes encodes `<` / `>` inside `<ac:plain-text-body>` as
+    // `&lt;` / `&gt;` even though CDATA does not require it; the previous
+    // implementation's final htmlToMarkdown pass decoded these.
+    const link = '<ac:link><ri:url ri:value="https://x.com" /><ac:plain-text-link-body><![CDATA[caf&eacute;]]></ac:plain-text-link-body></ac:link>';
+    expect(converter.storageToMarkdown(link)).toContain('[café](https://x.com)');
+
+    const code = '<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">html</ac:parameter><ac:plain-text-body><![CDATA[&lt;div&gt;]]></ac:plain-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(code)).toContain('<div>');
+  });
+
+  test('decodes entities inside ac:anchor and ri:value URL attributes', () => {
+    // ac:anchor gets used as a URL fragment, ri:value as the link target.
+    // Both still need named-entity decoding even though they look URL-y.
+    const anchorLink = '<ac:link ac:anchor="caf&eacute;"><ac:plain-text-link-body><![CDATA[Jump]]></ac:plain-text-link-body></ac:link>';
+    expect(converter.storageToMarkdown(anchorLink)).toContain('[Jump](#café)');
+
+    const urlLink = '<ac:link><ri:url ri:value="https://example.com?q=caf&eacute;" /><ac:plain-text-link-body><![CDATA[Ex]]></ac:plain-text-link-body></ac:link>';
+    expect(converter.storageToMarkdown(urlLink)).toContain('[Ex](https://example.com?q=café)');
+  });
+
+  test('decodes entities inside generic <a href> URLs', () => {
+    // The generic HTML link path also reads href directly. Less common in
+    // Confluence storage than ac:link, but still a parity gap if untouched.
+    const html = '<p><a href="https://example.com?q=caf&eacute;">Ex</a></p>';
+    expect(converter.storageToMarkdown(html)).toContain('[Ex](https://example.com?q=café)');
+  });
 });
 
 describe('MacroConverter storageToMarkdown ac:link without body', () => {
