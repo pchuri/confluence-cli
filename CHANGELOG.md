@@ -1,3 +1,10 @@
+## [2.1.3](https://github.com/pchuri/confluence-cli/compare/v2.1.2...v2.1.3) (2026-04-29)
+
+
+### Bug Fixes
+
+* **converter:** emit `> **MARKER**` form to close admonition round-trip ([#136](https://github.com/pchuri/confluence-cli/issues/136)) ([d5a2d9f](https://github.com/pchuri/confluence-cli/commit/d5a2d9f29d4aecf621e3fb1bb394b294d94a02f2)), closes [#135](https://github.com/pchuri/confluence-cli/issues/135)
+
 ## [2.1.2](https://github.com/pchuri/confluence-cli/compare/v2.1.1...v2.1.2) (2026-04-28)
 
 
