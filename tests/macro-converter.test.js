@@ -786,6 +786,31 @@ describe('MacroConverter storageToMarkdown ac:link without body', () => {
   });
 });
 
+describe('MacroConverter storageToMarkdown ac:image external URL', () => {
+  // <ac:image> wraps either <ri:attachment> (uploaded asset) or <ri:url>
+  // (external image). The walker originally only handled the attachment
+  // branch; external images were silently dropped from the export.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('<ri:url> image renders with empty alt and the external URL', () => {
+    const storage = '<ac:image><ri:url ri:value="https://example.com/diagram.png" /></ac:image>';
+    expect(converter.storageToMarkdown(storage)).toBe('![](https://example.com/diagram.png)');
+  });
+
+  test('<ri:url> image decodes entities in the URL value', () => {
+    const storage = '<ac:image><ri:url ri:value="https://example.com/path?q=caf&eacute;" /></ac:image>';
+    expect(converter.storageToMarkdown(storage)).toBe('![](https://example.com/path?q=café)');
+  });
+
+  test('<ac:image> with neither ri:attachment nor ri:url emits nothing', () => {
+    const storage = '<p>Before</p><ac:image></ac:image><p>After</p>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).not.toContain('![]');
+    expect(result).toContain('Before');
+    expect(result).toContain('After');
+  });
+});
+
 describe('MacroConverter storageToMarkdown panel formatting', () => {
   const converter = new MacroConverter({ isCloud: true });
 
