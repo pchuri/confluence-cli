@@ -1,3 +1,10 @@
+## [2.1.7](https://github.com/pchuri/confluence-cli/compare/v2.1.6...v2.1.7) (2026-04-30)
+
+
+### Bug Fixes
+
+* **walker:** handle external <ri:url> images in handleImage ([#152](https://github.com/pchuri/confluence-cli/issues/152)) ([97e290b](https://github.com/pchuri/confluence-cli/commit/97e290bc3701f736f71044cd6074ae232f64249e)), closes [#142](https://github.com/pchuri/confluence-cli/issues/142)
+
 ## [2.1.6](https://github.com/pchuri/confluence-cli/compare/v2.1.5...v2.1.6) (2026-04-29)
 
 
