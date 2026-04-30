@@ -1,3 +1,10 @@
+## [2.1.8](https://github.com/pchuri/confluence-cli/compare/v2.1.7...v2.1.8) (2026-04-30)
+
+
+### Bug Fixes
+
+* **walker:** preserve <s>/<del> strikethrough on storage → markdown ([#154](https://github.com/pchuri/confluence-cli/issues/154)) ([788efaf](https://github.com/pchuri/confluence-cli/commit/788efafee678c1fe4758c7ef361feccdf53db3a7)), closes [#141](https://github.com/pchuri/confluence-cli/issues/141) [#141](https://github.com/pchuri/confluence-cli/issues/141)
+
 ## [2.1.7](https://github.com/pchuri/confluence-cli/compare/v2.1.6...v2.1.7) (2026-04-30)
 
 
