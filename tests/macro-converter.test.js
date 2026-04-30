@@ -214,6 +214,49 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
     });
   });
 
+  describe('nested blockquote balanced parsing', () => {
+    test('nested blockquote with INFO marker on inner level keeps outer balanced', () => {
+      const result = converter.markdownToStorage('> > **INFO**\n> > body');
+      // outer blockquote wraps the inner info macro; nothing dangles outside
+      expect(result).toMatch(/<blockquote>[\s\S]*<ac:structured-macro ac:name="info">[\s\S]*<\/ac:structured-macro>[\s\S]*<\/blockquote>/);
+      expect(result).not.toMatch(/<\/ac:structured-macro>\s*<\/blockquote>\s*<\/blockquote>/);
+    });
+
+    test('plain nested blockquote without any marker preserves both levels', () => {
+      const result = converter.markdownToStorage('> > nested quote');
+      expect(result).toMatch(/<blockquote>\s*<blockquote>[\s\S]*<\/blockquote>\s*<\/blockquote>/);
+      expect(result).not.toContain('ac:structured-macro');
+    });
+
+    test('INFO marker on outer with plain nested blockquote inside body', () => {
+      const result = converter.markdownToStorage('> **INFO**\n>\n> > nested inside info');
+      // info macro contains the inner plain blockquote — no stray outer </blockquote> outside the macro
+      expect(result).toMatch(/<ac:structured-macro ac:name="info">[\s\S]*<blockquote>[\s\S]*<\/blockquote>[\s\S]*<\/ac:structured-macro>/);
+      const macroEnd = result.indexOf('</ac:structured-macro>');
+      expect(result.slice(macroEnd)).not.toContain('</blockquote>');
+    });
+
+    test('three-level nesting with INFO marker at deepest level keeps both outer levels balanced', () => {
+      const result = converter.markdownToStorage('> > > **INFO**\n> > > body');
+      // two outer blockquotes wrap the innermost info macro
+      expect(result).toMatch(
+        /<blockquote>[\s\S]*<blockquote>[\s\S]*<ac:structured-macro ac:name="info">[\s\S]*<\/ac:structured-macro>[\s\S]*<\/blockquote>[\s\S]*<\/blockquote>/
+      );
+      // depth tracking past two: no inner close should leak past the outer pair
+      expect(result).not.toMatch(/<\/ac:structured-macro>\s*<\/blockquote>\s*<\/blockquote>\s*<\/blockquote>/);
+    });
+
+    test('two sibling top-level blockquotes with different markers each become their own macro', () => {
+      const result = converter.markdownToStorage('> **INFO**\n> info body\n\n> **WARNING**\n> warning body');
+      // both macros are emitted as siblings; the walker advances past the first match cleanly
+      expect(result).toMatch(
+        /<ac:structured-macro ac:name="info">[\s\S]*<\/ac:structured-macro>[\s\S]*<ac:structured-macro ac:name="warning">[\s\S]*<\/ac:structured-macro>/
+      );
+      // neither sibling leaks a plain <blockquote> wrapper
+      expect(result).not.toContain('<blockquote>');
+    });
+  });
+
   describe('admonition preprocessor respects markdown context', () => {
     // The previous raw-text preprocessor would transform any `[!info]`
     // anywhere in the source — including inside fenced code blocks, inline
@@ -256,11 +299,6 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
     });
 
     test('GitHub-style `> [!info]` defers to plain blockquote', () => {
-      // Recognizing `> [!info]` here would emit nested blockquote tokens
-      // that the storage handler's lazy regex can't balance — producing
-      // malformed XML that Confluence rejects with 400. Until the storage
-      // handler supports balanced blockquote parsing, this form must fall
-      // through to a plain `<blockquote>` containing literal `[!info]`.
       const result = converter.markdownToStorage('> [!info]\n> body');
       expect(result).toContain('<blockquote>');
       expect(result).toContain('[!info]');
@@ -894,5 +932,49 @@ describe('MacroConverter storageToMarkdown dynamic fence sizing', () => {
   test('prose with mid-line ``` before a code macro preserves the code body indent', () => {
     const storage = `<p>before \`\`\` after</p>${codeMacro('py', 'def foo():\n    return 1')}`;
     expect(converter.storageToMarkdown(storage)).toBe('before ``` after\n\n```py\ndef foo():\n    return 1\n```');
+  });
+});
+
+describe('MacroConverter integration smoke tests', () => {
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('code fence with literal HTML adjacent to an INFO marker does not corrupt either', () => {
+    // Regression for the CDATA-confused-by-blockquote-literal class: a code
+    // block whose body contains `<blockquote>` literal text used to derail
+    // the regex blockquote walker for any real blockquote that followed.
+    const result = converter.markdownToStorage(
+      '```html\n<blockquote>code</blockquote>\n```\n\n> **INFO**\n> after code'
+    );
+    expect(result).toContain('<![CDATA[<blockquote>code</blockquote>]]>');
+    expect(result).toContain('<ac:structured-macro ac:name="info">');
+    expect(result).toContain('after code');
+  });
+
+  test('htmlToConfluenceStorage transforms raw HTML directly (public CLI/API path)', () => {
+    // `confluence convert --input-format html` and `--format html` go through
+    // this method without first rendering markdown-it, so it must convert
+    // structural HTML on its own.
+    const html = '<blockquote>\n<p><strong>WARNING</strong></p>\n<p>raw html input</p>\n</blockquote>';
+    const result = converter.htmlToConfluenceStorage(html);
+    expect(result).toContain('<ac:structured-macro ac:name="warning">');
+    expect(result).toContain('raw html input');
+    expect(result).not.toContain('<strong>WARNING</strong>');
+  });
+
+  test('task list checkboxes survive as literal text — push-side write is not implemented', () => {
+    // Locks the current limitation. If/when a future change adds proper
+    // ac:task-list emission, this test will fail and signal the change.
+    const result = converter.markdownToStorage('- [ ] open\n- [x] done');
+    expect(result).toContain('<li><p>[ ] open</p></li>');
+    expect(result).toContain('<li><p>[x] done</p></li>');
+    expect(result).not.toContain('ac:task-list');
+  });
+
+  test('table cells receive `<p>` wrap for single-line content', () => {
+    // V1's `<td>(.*?)</td>` non-greedy regex wrapped single-line cells in
+    // `<p>`; the walker reproduces that for byte parity.
+    const result = converter.markdownToStorage('| h |\n|---|\n| c |');
+    expect(result).toContain('<th><p>h</p></th>');
+    expect(result).toContain('<td><p>c</p></td>');
   });
 });
