@@ -811,6 +811,28 @@ describe('MacroConverter storageToMarkdown ac:image external URL', () => {
   });
 });
 
+describe('MacroConverter storageToMarkdown <s>/<del> strikethrough', () => {
+  // markdownToStorage enables markdown-it's strikethrough plugin, but the
+  // walker had no <s>/<del> handler — both fell through to the default
+  // branch and the wrapper was dropped, losing strikethrough on round-trip.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('<s> renders as ~~text~~', () => {
+    const storage = '<p><s>old</s> new</p>';
+    expect(converter.storageToMarkdown(storage)).toBe('~~old~~ new');
+  });
+
+  test('<del> renders as ~~text~~ (HTML5 alias)', () => {
+    const storage = '<p><del>removed</del> kept</p>';
+    expect(converter.storageToMarkdown(storage)).toBe('~~removed~~ kept');
+  });
+
+  test('round-trip: ~~old~~ new survives markdown → storage → markdown', () => {
+    const storage = converter.markdownToStorage('~~old~~ new');
+    expect(converter.storageToMarkdown(storage)).toBe('~~old~~ new');
+  });
+});
+
 describe('MacroConverter storageToMarkdown panel formatting', () => {
   const converter = new MacroConverter({ isCloud: true });
 
