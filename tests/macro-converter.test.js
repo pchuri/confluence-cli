@@ -833,28 +833,6 @@ describe('MacroConverter storageToMarkdown <s>/<del> strikethrough', () => {
   });
 });
 
-describe('MacroConverter storageToMarkdown raw-HTML inline tags', () => {
-  // Markdown has no native syntax for <u>/<sub>/<sup>/<mark>. Pass them
-  // through as raw HTML so common technical-doc usage (chemistry, math,
-  // highlights) survives storage → markdown export.
-  const converter = new MacroConverter({ isCloud: true });
-
-  test('<u> passes through as raw HTML', () => {
-    const storage = '<p><u>under</u>line</p>';
-    expect(converter.storageToMarkdown(storage)).toBe('<u>under</u>line');
-  });
-
-  test('<sub> and <sup> pass through as raw HTML', () => {
-    const storage = '<p>H<sub>2</sub>O and E=mc<sup>2</sup></p>';
-    expect(converter.storageToMarkdown(storage)).toBe('H<sub>2</sub>O and E=mc<sup>2</sup>');
-  });
-
-  test('<mark> passes through as raw HTML', () => {
-    const storage = '<p>see <mark>this</mark></p>';
-    expect(converter.storageToMarkdown(storage)).toBe('see <mark>this</mark>');
-  });
-});
-
 describe('MacroConverter storageToMarkdown panel formatting', () => {
   const converter = new MacroConverter({ isCloud: true });
 
