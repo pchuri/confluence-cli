@@ -811,6 +811,50 @@ describe('MacroConverter storageToMarkdown ac:image external URL', () => {
   });
 });
 
+describe('MacroConverter storageToMarkdown <s>/<del> strikethrough', () => {
+  // markdownToStorage enables markdown-it's strikethrough plugin, but the
+  // walker had no <s>/<del> handler — both fell through to the default
+  // branch and the wrapper was dropped, losing strikethrough on round-trip.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('<s> renders as ~~text~~', () => {
+    const storage = '<p><s>old</s> new</p>';
+    expect(converter.storageToMarkdown(storage)).toBe('~~old~~ new');
+  });
+
+  test('<del> renders as ~~text~~ (HTML5 alias)', () => {
+    const storage = '<p><del>removed</del> kept</p>';
+    expect(converter.storageToMarkdown(storage)).toBe('~~removed~~ kept');
+  });
+
+  test('round-trip: ~~old~~ new survives markdown → storage → markdown', () => {
+    const storage = converter.markdownToStorage('~~old~~ new');
+    expect(converter.storageToMarkdown(storage)).toBe('~~old~~ new');
+  });
+});
+
+describe('MacroConverter storageToMarkdown raw-HTML inline tags', () => {
+  // Markdown has no native syntax for <u>/<sub>/<sup>/<mark>. Pass them
+  // through as raw HTML so common technical-doc usage (chemistry, math,
+  // highlights) survives storage → markdown export.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('<u> passes through as raw HTML', () => {
+    const storage = '<p><u>under</u>line</p>';
+    expect(converter.storageToMarkdown(storage)).toBe('<u>under</u>line');
+  });
+
+  test('<sub> and <sup> pass through as raw HTML', () => {
+    const storage = '<p>H<sub>2</sub>O and E=mc<sup>2</sup></p>';
+    expect(converter.storageToMarkdown(storage)).toBe('H<sub>2</sub>O and E=mc<sup>2</sup>');
+  });
+
+  test('<mark> passes through as raw HTML', () => {
+    const storage = '<p>see <mark>this</mark></p>';
+    expect(converter.storageToMarkdown(storage)).toBe('see <mark>this</mark>');
+  });
+});
+
 describe('MacroConverter storageToMarkdown panel formatting', () => {
   const converter = new MacroConverter({ isCloud: true });
 
