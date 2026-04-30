@@ -824,6 +824,51 @@ describe('MacroConverter storageToMarkdown ac:link without body', () => {
   });
 });
 
+describe('MacroConverter storageToMarkdown ri:content-title escaping', () => {
+  // Page titles routinely contain `()` (e.g. "Release notes (v2.0)") and
+  // could in theory contain `[]` or `\`. Interpolating raw into markdown link
+  // syntax breaks downstream parsers and — for adversarially-crafted titles —
+  // allows a sibling link to be injected. Escape the four structural chars
+  // plus backslash at every site that splices a title into `[…](…)`.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('ri:page title with parentheses is escaped in [title] form', () => {
+    const storage = '<ac:link><ri:page ri:content-title="Release notes (v2.0)" /></ac:link>';
+    expect(converter.storageToMarkdown(storage)).toContain('[Release notes \\(v2.0\\)]');
+  });
+
+  test('ri:page title with brackets is escaped in [title] form', () => {
+    const storage = '<ac:link><ri:page ri:content-title="Plan [Q4]" /></ac:link>';
+    expect(converter.storageToMarkdown(storage)).toContain('[Plan \\[Q4\\]]');
+  });
+
+  test('ri:page title with backslash is escaped in [title] form', () => {
+    const storage = '<ac:link><ri:page ri:content-title="path\\\\name" /></ac:link>';
+    expect(converter.storageToMarkdown(storage)).toContain('[path\\\\\\\\name]');
+  });
+
+  test('include-page macro escapes title in markdown link text but not in URL', () => {
+    const storage = '<ac:structured-macro ac:name="include"><ac:parameter ac:name=""><ac:link><ri:page ri:space-key="~user" ri:content-title="Notes (draft)" /></ac:link></ac:parameter></ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('[Notes \\(draft\\)]');
+    expect(result).toContain('Notes%20(draft)');
+  });
+
+  test('include-shared-block escapes pageTitle interpolated into prose', () => {
+    const storage = '<ac:structured-macro ac:name="include-shared-block"><ac:parameter ac:name="shared-block-key">B1</ac:parameter><ac:parameter ac:name="page"><ac:link><ri:page ri:content-title="Specs (v3)" /></ac:link></ac:parameter></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toContain('Specs \\(v3\\)');
+  });
+
+  test('adversarial title cannot inject a sibling markdown link', () => {
+    const storage = '<ac:link><ri:page ri:content-title="evil) [pwn](http://attacker.com" /></ac:link>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).not.toMatch(/\]\(http:\/\/attacker\.com/);
+    expect(result).toContain('\\(');
+    expect(result).toContain('\\[');
+    expect(result).toContain('\\]');
+  });
+});
+
 describe('MacroConverter storageToMarkdown ac:image external URL', () => {
   // <ac:image> wraps either <ri:attachment> (uploaded asset) or <ri:url>
   // (external image). The walker originally only handled the attachment
