@@ -1,3 +1,10 @@
+## [2.1.10](https://github.com/pchuri/confluence-cli/compare/v2.1.9...v2.1.10) (2026-05-01)
+
+
+### Bug Fixes
+
+* **walker:** drop malformed marker text for empty/missing macro params ([#140](https://github.com/pchuri/confluence-cli/issues/140)) ([#157](https://github.com/pchuri/confluence-cli/issues/157)) ([ecde713](https://github.com/pchuri/confluence-cli/commit/ecde713ef2d78fddfc31291f7a089c4760ff49c7))
+
 ## [2.1.9](https://github.com/pchuri/confluence-cli/compare/v2.1.8...v2.1.9) (2026-05-01)
 
 
