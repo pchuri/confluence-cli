@@ -1,3 +1,10 @@
+## [2.1.11](https://github.com/pchuri/confluence-cli/compare/v2.1.10...v2.1.11) (2026-05-01)
+
+
+### Bug Fixes
+
+* **walker:** drop malformed markers for empty expand title and shared-block key ([#158](https://github.com/pchuri/confluence-cli/issues/158)) ([#161](https://github.com/pchuri/confluence-cli/issues/161)) ([3a49a57](https://github.com/pchuri/confluence-cli/commit/3a49a57976bfb527ca6149d4ef55548393c56636))
+
 ## [2.1.10](https://github.com/pchuri/confluence-cli/compare/v2.1.9...v2.1.10) (2026-05-01)
 
 
