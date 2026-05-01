@@ -1,3 +1,10 @@
+## [2.1.9](https://github.com/pchuri/confluence-cli/compare/v2.1.8...v2.1.9) (2026-05-01)
+
+
+### Bug Fixes
+
+* **walker:** escape markdown special chars in ri:content-title ([#143](https://github.com/pchuri/confluence-cli/issues/143)) ([#156](https://github.com/pchuri/confluence-cli/issues/156)) ([3e3c53e](https://github.com/pchuri/confluence-cli/commit/3e3c53e53a783091055174625ac980bf3b45ce4a))
+
 ## [2.1.8](https://github.com/pchuri/confluence-cli/compare/v2.1.7...v2.1.8) (2026-04-30)
 
 
