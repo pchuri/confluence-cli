@@ -967,6 +967,81 @@ describe('MacroConverter storageToMarkdown empty/missing macro parameters', () =
     const storage = '<ac:structured-macro ac:name="panel"></ac:structured-macro>';
     expect(converter.storageToMarkdown(storage)).toBe('');
   });
+
+  test('expand with empty title parameter falls through to <details> block', () => {
+    const storage = '<ac:structured-macro ac:name="expand">'
+      + '<ac:parameter ac:name="title"></ac:parameter>'
+      + '<ac:rich-text-body><p>Body</p></ac:rich-text-body>'
+      + '</ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).not.toContain('**EXPAND:');
+    expect(result).toContain('<details>');
+    expect(result).toContain('<summary>Expand Details</summary>');
+    expect(result).toContain('Body');
+  });
+
+  test('expand with whitespace-only title parameter falls through to <details> block', () => {
+    const storage = '<ac:structured-macro ac:name="expand">'
+      + '<ac:parameter ac:name="title">   </ac:parameter>'
+      + '<ac:rich-text-body><p>Body</p></ac:rich-text-body>'
+      + '</ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).not.toContain('**EXPAND:');
+    expect(result).toContain('<details>');
+  });
+
+  test('shared-block with empty key emits header without colon suffix', () => {
+    const storage = '<ac:structured-macro ac:name="shared-block">'
+      + '<ac:parameter ac:name="shared-block-key"></ac:parameter>'
+      + '<ac:rich-text-body><p>Inside</p></ac:rich-text-body>'
+      + '</ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('> **Shared Block**\n>\n> Inside');
+  });
+
+  test('shared-block with whitespace-only key emits header without colon suffix', () => {
+    const storage = '<ac:structured-macro ac:name="shared-block">'
+      + '<ac:parameter ac:name="shared-block-key">   </ac:parameter>'
+      + '<ac:rich-text-body><p>Inside</p></ac:rich-text-body>'
+      + '</ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('> **Shared Block**\n>\n> Inside');
+  });
+
+  test('shared-block with neither key nor body is dropped entirely', () => {
+    const storage = '<ac:structured-macro ac:name="shared-block">'
+      + '<ac:parameter ac:name="shared-block-key"></ac:parameter>'
+      + '</ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('');
+  });
+
+  test('shared-block with key but no body emits header-only blockquote', () => {
+    const storage = '<ac:structured-macro ac:name="shared-block">'
+      + '<ac:parameter ac:name="shared-block-key">K</ac:parameter>'
+      + '</ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('> **Shared Block: K**');
+  });
+
+  test('include-shared-block with empty key drops the colon-key suffix before page note', () => {
+    const storage = '<ac:structured-macro ac:name="include-shared-block">'
+      + '<ac:parameter ac:name="shared-block-key"></ac:parameter>'
+      + '<ac:parameter ac:name="page">'
+      + '<ac:link><ri:page ri:content-title="SomePage"/></ac:link>'
+      + '</ac:parameter>'
+      + '</ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('**Include Shared Block** (from page: SomePage');
+    expect(result).not.toContain('**: ');
+  });
+
+  test('include-shared-block with key keeps the colon-key suffix', () => {
+    const storage = '<ac:structured-macro ac:name="include-shared-block">'
+      + '<ac:parameter ac:name="shared-block-key">K</ac:parameter>'
+      + '<ac:parameter ac:name="page">'
+      + '<ac:link><ri:page ri:content-title="SomePage"/></ac:link>'
+      + '</ac:parameter>'
+      + '</ac:structured-macro>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toContain('**Include Shared Block**: K (from page: SomePage');
+  });
 });
 
 describe('MacroConverter storageToMarkdown fenced code preserves indentation', () => {
