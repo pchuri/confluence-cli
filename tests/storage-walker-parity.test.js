@@ -16,6 +16,21 @@ describe('storage walker parity corpus', () => {
   const writeMode = process.env.WRITE_PARITY_EXPECTED === '1';
   const converter = new MacroConverter({ isCloud: true });
 
+  // walker output ends with a `.trim()` from cleanupWithFences, so the raw
+  // string has no trailing newline. Adding one when we serialize keeps the
+  // .expected.md POSIX-compliant (most editors auto-add a final newline on
+  // save); comparing the same `actual + '\n'` on read so a re-saved fixture
+  // does not falsely fail.
+  const withFinalNewline = (s) => (s.endsWith('\n') ? s : s + '\n');
+
+  if (writeMode) {
+    // Loud heads-up so a stray `WRITE_PARITY_EXPECTED=1` in a shell rc cannot
+    // silently rewrite the corpus during a CI run.
+    console.warn(
+      '[parity] WRITE_PARITY_EXPECTED=1 is set — regenerating .expected.md files instead of asserting.',
+    );
+  }
+
   const xmlFiles = fs
     .readdirSync(fixturesDir)
     .filter((f) => f.endsWith('.xml'))
@@ -29,17 +44,17 @@ describe('storage walker parity corpus', () => {
   }
 
   for (const xmlFile of xmlFiles) {
-    test(`${xmlFile} round-trips to its pinned markdown`, () => {
+    test(`${xmlFile} matches its pinned markdown`, () => {
       const xmlPath = path.join(fixturesDir, xmlFile);
       const expectedPath = path.join(
         fixturesDir,
         xmlFile.replace(/\.xml$/, '.expected.md'),
       );
       const xml = fs.readFileSync(xmlPath, 'utf8');
-      const actual = converter.storageToMarkdown(xml);
+      const actualWithNl = withFinalNewline(converter.storageToMarkdown(xml));
 
       if (writeMode) {
-        fs.writeFileSync(expectedPath, actual);
+        fs.writeFileSync(expectedPath, actualWithNl);
         return;
       }
 
@@ -50,7 +65,7 @@ describe('storage walker parity corpus', () => {
         );
       }
       const expected = fs.readFileSync(expectedPath, 'utf8');
-      expect(actual).toBe(expected);
+      expect(actualWithNl).toBe(expected);
     });
   }
 });

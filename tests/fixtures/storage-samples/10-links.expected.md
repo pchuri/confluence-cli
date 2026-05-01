@@ -7,3 +7,5 @@ Page link with rich body: **bold body**.
 Page link with no body: [Plain Page].
 
 Page link with markdown specials in title: [Title \(with\) \[chars\]].
+
+Empty ac:link: (drops).
