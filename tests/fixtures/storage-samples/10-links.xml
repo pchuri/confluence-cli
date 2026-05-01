@@ -1,0 +1,6 @@
+<p>Anchor link: <ac:link ac:anchor="section-one"><ac:plain-text-link-body><![CDATA[Jump to section]]></ac:plain-text-link-body></ac:link>.</p>
+<p>External via ri:url: <ac:link><ri:url ri:value="https://example.com/path?x=1&amp;y=2"/><ac:plain-text-link-body><![CDATA[example link]]></ac:plain-text-link-body></ac:link>.</p>
+<p>Page link with rich body: <ac:link><ri:page ri:content-title="Other Page"/><ac:link-body><strong>bold body</strong></ac:link-body></ac:link>.</p>
+<p>Page link with no body: <ac:link><ri:page ri:content-title="Plain Page"/></ac:link>.</p>
+<p>Page link with markdown specials in title: <ac:link><ri:page ri:content-title="Title (with) [chars]"/></ac:link>.</p>
+<p>Empty ac:link: <ac:link></ac:link>(drops).</p>

@@ -1,0 +1,16 @@
+<ac:layout>
+  <ac:layout-section ac:type="two_equal">
+    <ac:layout-cell>
+      <p>Left cell content.</p>
+    </ac:layout-cell>
+    <ac:layout-cell>
+      <p>Right cell with <strong>bold</strong>.</p>
+    </ac:layout-cell>
+  </ac:layout-section>
+</ac:layout>
+<ac:structured-macro ac:name="toc"/>
+<ac:structured-macro ac:name="floatmenu"/>
+<p>Unknown macro: <ac:structured-macro ac:name="not-a-real-macro"><ac:rich-text-body><p>silently dropped</p></ac:rich-text-body></ac:structured-macro>after.</p>
+<p>Mixed CDATA and entities: <code><![CDATA[a < b && c > d]]></code> compared to literal &lt;tag&gt;.</p>
+<blockquote><p>A quoted paragraph with <em>emphasis</em>.</p><p>And a second.</p></blockquote>
+<p>Unknown tag fallback: <unknown-tag>visible text</unknown-tag> wraps through children.</p>

@@ -1,0 +1,14 @@
+<h1>Top heading</h1>
+<h2>Sub heading</h2>
+<h3>H3</h3>
+<h4>H4</h4>
+<h5>H5</h5>
+<h6>H6</h6>
+<p>Plain prose with <strong>bold</strong>, <em>italic</em>, <s>strike</s>, <del>removed</del>, and <code>inline()</code>.</p>
+<p>Nested formatting: <strong>bold with <em>italic inside</em> still bold</strong>.</p>
+<p>Line one<br/>line two after a break.</p>
+<hr/>
+<p>An <a href="https://example.com/?q=1&amp;r=2">external link</a> and a bare <a>anchor with no href</a>.</p>
+<p>Datetime: <time datetime="2026-05-01"/> and <time datetime="2026-12-31">31st</time>.</p>
+<p>Entities: non-break&nbsp;space, smart &ldquo;quotes&rdquo;, &lsquo;single&rsquo;, ellipsis&hellip;, eacute &eacute;, ndash &ndash;, mdash &mdash;, copyright &copy;.</p>
+<p>Numeric refs: hex &#x2014; and dec &#8212;.</p>

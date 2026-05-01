@@ -1,0 +1,5 @@
+<p>Attached image: <ac:image><ri:attachment ri:filename="diagram.png"/></ac:image></p>
+<p>External image: <ac:image><ri:url ri:value="https://example.com/remote.jpg"/></ac:image></p>
+<p>External image with empty value: <ac:image><ri:url ri:value=""/></ac:image>(drops).</p>
+<p>Image with no source: <ac:image></ac:image>after.</p>
+<ac:structured-macro ac:name="view-file"><ac:parameter ac:name="name"><ri:attachment ri:filename="report.pdf"/></ac:parameter></ac:structured-macro>

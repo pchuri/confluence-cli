@@ -1,0 +1,8 @@
+<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">javascript</ac:parameter><ac:plain-text-body><![CDATA[function add(a, b) {
+  return a + b;
+}]]></ac:plain-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[no-language-here]]></ac:plain-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">markdown</ac:parameter><ac:plain-text-body><![CDATA[Some text with ```triple backticks``` inside.]]></ac:plain-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="mermaid-macro"><ac:plain-text-body><![CDATA[graph TD
+A --> B
+B --> C]]></ac:plain-text-body></ac:structured-macro>
