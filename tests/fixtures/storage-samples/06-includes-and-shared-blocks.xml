@@ -1,0 +1,5 @@
+<ac:structured-macro ac:name="include"><ac:parameter ac:name=""><ac:link><ri:page ri:space-key="DOCS" ri:content-title="Reference Page"/></ac:link></ac:parameter></ac:structured-macro>
+<ac:structured-macro ac:name="include"><ac:parameter ac:name=""><ac:link><ri:page ri:space-key="~user.name" ri:content-title="Personal Notes"/></ac:link></ac:parameter></ac:structured-macro>
+<ac:structured-macro ac:name="shared-block"><ac:parameter ac:name="shared-block-key">block-id-123</ac:parameter><ac:rich-text-body><p>Inline shared block body.</p></ac:rich-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="include-shared-block"><ac:parameter ac:name="shared-block-key">block-id-456</ac:parameter><ac:parameter ac:name="page"><ac:link><ri:page ri:content-title="Source Page"/></ac:link></ac:parameter></ac:structured-macro>
+<ac:structured-macro ac:name="include"><ac:parameter ac:name=""><ac:link><ri:page ri:space-key="DOCS" ri:content-title="Title with [brackets] (parens)"/></ac:link></ac:parameter></ac:structured-macro>

@@ -1,0 +1,3 @@
+<ac:structured-macro ac:name="panel"><ac:parameter ac:name="title">Important Notice</ac:parameter><ac:rich-text-body><p>Panel body with <em>emphasis</em>.</p></ac:rich-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="panel"><ac:rich-text-body><p>Body-only panel.</p></ac:rich-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="panel"><ac:parameter ac:name="title">Title Only</ac:parameter><ac:rich-text-body></ac:rich-text-body></ac:structured-macro>

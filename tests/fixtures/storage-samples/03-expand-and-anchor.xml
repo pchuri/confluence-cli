@@ -1,0 +1,4 @@
+<ac:structured-macro ac:name="expand"><ac:parameter ac:name="title">Show details</ac:parameter><ac:rich-text-body><p>Hidden content with <strong>formatting</strong>.</p></ac:rich-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="expand"><ac:rich-text-body><p>Body without title falls through to details/summary.</p></ac:rich-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="anchor"><ac:parameter ac:name="">section-one</ac:parameter></ac:structured-macro>
+<p>After anchor.</p>

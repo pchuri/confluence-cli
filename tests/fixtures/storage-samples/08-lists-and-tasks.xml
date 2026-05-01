@@ -1,0 +1,20 @@
+<ul>
+  <li>first bullet</li>
+  <li>second bullet with <strong>bold</strong></li>
+  <li>nested:
+    <ul>
+      <li>inner one</li>
+      <li>inner two</li>
+    </ul>
+  </li>
+</ul>
+<ol>
+  <li>step one</li>
+  <li>step two</li>
+  <li>step three</li>
+</ol>
+<ac:task-list>
+  <ac:task><ac:task-status>complete</ac:task-status><ac:task-body>Finished item</ac:task-body></ac:task>
+  <ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body>Pending item with <em>emphasis</em></ac:task-body></ac:task>
+  <ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body></ac:task-body></ac:task>
+</ac:task-list>

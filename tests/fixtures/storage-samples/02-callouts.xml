@@ -1,0 +1,4 @@
+<ac:structured-macro ac:name="info"><ac:rich-text-body><p>Heads up — single line.</p></ac:rich-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="warning"><ac:rich-text-body><p>First line.</p><p>Second line.</p></ac:rich-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="note"><ac:rich-text-body><p>Note with <strong>bold</strong> and <a href="https://example.com">a link</a>.</p></ac:rich-text-body></ac:structured-macro>
+<ac:structured-macro ac:name="info"><ac:rich-text-body></ac:rich-text-body></ac:structured-macro>
