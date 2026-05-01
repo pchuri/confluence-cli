@@ -930,6 +930,45 @@ describe('MacroConverter storageToMarkdown panel formatting', () => {
   });
 });
 
+describe('MacroConverter storageToMarkdown empty/missing macro parameters', () => {
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('anchor with no ac:parameter is dropped entirely', () => {
+    const storage = '<ac:structured-macro ac:name="anchor"></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('');
+  });
+
+  test('anchor with empty ac:parameter is dropped entirely', () => {
+    const storage = '<ac:structured-macro ac:name="anchor"><ac:parameter ac:name=""></ac:parameter></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('');
+  });
+
+  test('anchor with whitespace-only id is dropped entirely', () => {
+    const storage = '<ac:structured-macro ac:name="anchor"><ac:parameter ac:name="">   </ac:parameter></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('');
+  });
+
+  test('panel without title parameter emits body-only blockquote (no empty bold line)', () => {
+    const storage = '<ac:structured-macro ac:name="panel"><ac:rich-text-body><p>body</p></ac:rich-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('> body');
+  });
+
+  test('panel with empty title parameter emits body-only blockquote', () => {
+    const storage = '<ac:structured-macro ac:name="panel"><ac:parameter ac:name="title"></ac:parameter><ac:rich-text-body><p>body</p></ac:rich-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('> body');
+  });
+
+  test('panel with title but no body emits header-only blockquote', () => {
+    const storage = '<ac:structured-macro ac:name="panel"><ac:parameter ac:name="title">T</ac:parameter></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('> **T**');
+  });
+
+  test('panel with neither title nor body is dropped entirely', () => {
+    const storage = '<ac:structured-macro ac:name="panel"></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('');
+  });
+});
+
 describe('MacroConverter storageToMarkdown fenced code preserves indentation', () => {
   const converter = new MacroConverter({ isCloud: true });
   const codeMacro = (lang, body) =>
