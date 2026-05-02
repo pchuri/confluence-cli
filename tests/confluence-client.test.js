@@ -1170,6 +1170,30 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('getSpaces', () => {
+    test('should return spaces with default limit of 500', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/space').reply(config => {
+        expect(config.params.limit).toBe(500);
+        return [200, { results: [], _links: {} }];
+      });
+
+      await client.getSpaces();
+      mock.restore();
+    });
+
+    test('should return spaces with limit parameter', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/space').reply(config => {
+        expect(config.params.limit).toBe(1000);
+        return [200, { results: [], _links: {} }];
+      });
+
+      await client.getSpaces(1000);
+      mock.restore();
+    });
+  });
+
   describe('escapeCql', () => {
     test('escapes backslash and double quote', () => {
       expect(client.escapeCql('a"b')).toBe('a\\"b');

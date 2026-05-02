@@ -139,13 +139,14 @@ program
 // List spaces command
 program
   .command('spaces')
-  .description('List all Confluence spaces')
-  .action(async () => {
+  .description('List Confluence spaces')
+  .option('-l, --limit <limit>', 'Limit number of results', '500')
+  .action(async (options) => {
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
-      const spaces = await client.getSpaces();
+      const spaces = await client.getSpaces(parseInt(options.limit));
       
       console.log(chalk.blue('Available spaces:'));
       spaces.forEach(space => {
