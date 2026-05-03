@@ -1,3 +1,10 @@
+# [2.3.0](https://github.com/pchuri/confluence-cli/compare/v2.2.0...v2.3.0) (2026-05-03)
+
+
+### Features
+
+* add --type flag for folder support ([#165](https://github.com/pchuri/confluence-cli/issues/165)) ([d2958c8](https://github.com/pchuri/confluence-cli/commit/d2958c80c872b13f3009611379bf7e6053c733bc)), closes [#164](https://github.com/pchuri/confluence-cli/issues/164)
+
 # [2.2.0](https://github.com/pchuri/confluence-cli/compare/v2.1.12...v2.2.0) (2026-05-03)
 
 
