@@ -44,6 +44,20 @@ describe('StorageWalker parser warnings', () => {
     expect(tags).toContain('p');
   });
 
+  test('empty input produces no warnings', () => {
+    const walker = new StorageWalker();
+    walker.walk('');
+    expect(walker.warnings).toEqual([]);
+  });
+
+  test('orphan close tag does not crash and produces no warnings', () => {
+    // htmlparser2 in xmlMode silently drops a `</p>` with no preceding open.
+    // Guard against the openStack popping undefined and tripping on it.
+    const walker = new StorageWalker();
+    expect(() => walker.walk('</p>foo')).not.toThrow();
+    expect(walker.warnings).toEqual([]);
+  });
+
   test('warnings reset between walk() calls', () => {
     const walker = new StorageWalker();
     walker.walk('<p>broken <strong>x');
