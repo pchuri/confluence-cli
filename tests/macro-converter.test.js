@@ -948,6 +948,22 @@ describe('MacroConverter <u>/<sub>/<sup>/<mark> passthrough', () => {
     expect(converter.storageToMarkdown(converter.markdownToStorage(md)).trim()).toBe(md);
   });
 
+  test('round-trip: <u>under</u> survives markdown → storage → markdown', () => {
+    const md = '<u>under</u>';
+    expect(converter.storageToMarkdown(converter.markdownToStorage(md)).trim()).toBe(md);
+  });
+
+  test('round-trip: x<sup>2</sup> survives markdown → storage → markdown', () => {
+    const md = 'x<sup>2</sup>';
+    expect(converter.storageToMarkdown(converter.markdownToStorage(md)).trim()).toBe(md);
+  });
+
+  test('walker drops attributes on whitelisted tags (matches <details>/<summary> precedent)', () => {
+    // Asymmetric with markdown→storage which preserves attributes; documenting
+    // here so any future change is intentional rather than incidental.
+    expect(converter.storageToMarkdown('<p><sub class="chem">2</sub></p>')).toBe('<sub>2</sub>');
+  });
+
   test('attributes on whitelisted tags pass through markdown → storage', () => {
     const result = converter.markdownToStorage('<mark class="lit">x</mark>');
     expect(result).toContain('<mark class="lit">x</mark>');
