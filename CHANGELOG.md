@@ -1,3 +1,10 @@
+# [2.2.0](https://github.com/pchuri/confluence-cli/compare/v2.1.12...v2.2.0) (2026-05-03)
+
+
+### Features
+
+* **client:** add limit configurable in getSpaces and spaces command ([#166](https://github.com/pchuri/confluence-cli/issues/166)) ([c4d3830](https://github.com/pchuri/confluence-cli/commit/c4d383013df9f4445a0fb512101b9b1829e35368))
+
 ## [2.1.12](https://github.com/pchuri/confluence-cli/compare/v2.1.11...v2.1.12) (2026-05-03)
 
 
