@@ -22,6 +22,20 @@ function assertNonEmpty(value, label) {
   }
 }
 
+const VALID_TYPES = ['page', 'folder'];
+
+function assertValidType(type) {
+  if (!VALID_TYPES.includes(type)) {
+    throw new Error(`Invalid type "${type}". Valid: ${VALID_TYPES.join(', ')}`);
+  }
+}
+
+function assertNoBodyForFolder(type, options) {
+  if (type === 'folder' && (options.file || options.content)) {
+    throw new Error('--file/--content is not allowed with --type folder (folders have no body).');
+  }
+}
+
 function handleCommandError(analytics, commandName, error) {
   analytics.track(commandName, false);
   console.error(chalk.red('Error:'), error.message);
@@ -228,11 +242,8 @@ program
     try {
       assertNonEmpty(title, 'title');
       assertNonEmpty(spaceKey, 'spaceKey');
-
-      const VALID_TYPES = ['page', 'folder'];
-      if (!VALID_TYPES.includes(options.type)) {
-        throw new Error(`Invalid type "${options.type}". Valid: ${VALID_TYPES.join(', ')}`);
-      }
+      assertValidType(options.type);
+      assertNoBodyForFolder(options.type, options);
 
       const config = getConfig(getProfileName());
       assertWritable(config);
@@ -280,11 +291,8 @@ program
     try {
       assertNonEmpty(title, 'title');
       assertNonEmpty(parentId, 'parentId');
-
-      const VALID_TYPES = ['page', 'folder'];
-      if (!VALID_TYPES.includes(options.type)) {
-        throw new Error(`Invalid type "${options.type}". Valid: ${VALID_TYPES.join(', ')}`);
-      }
+      assertValidType(options.type);
+      assertNoBodyForFolder(options.type, options);
 
       const config = getConfig(getProfileName());
       assertWritable(config);
@@ -2097,6 +2105,8 @@ module.exports = {
     sanitizeFilename,
     assertWritable,
     assertNonEmpty,
+    assertValidType,
+    assertNoBodyForFolder,
     handleCommandError,
   },
 };
