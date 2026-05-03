@@ -1299,6 +1299,52 @@ describe('ConfluenceClient', () => {
       expect(typeof client.findPageByTitle).toBe('function');
       expect(typeof client.deletePage).toBe('function');
     });
+
+    test('createPage should default to type "page"', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onPost('/content').reply(200, {
+        id: '111', title: 'Test', type: 'page',
+        space: { key: 'TEST', name: 'Test' },
+        _links: { webui: '/spaces/TEST/pages/111' }
+      });
+
+      await client.createPage('Test', 'TEST', '<p>Hello</p>');
+      const requestData = JSON.parse(mock.history.post[0].data);
+      expect(requestData.type).toBe('page');
+      expect(requestData.body).toBeDefined();
+      mock.restore();
+    });
+
+    test('createPage should support type "folder" without body', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onPost('/content').reply(200, {
+        id: '222', title: 'My Folder', type: 'folder',
+        space: { key: 'TEST', name: 'Test' },
+        _links: { webui: '/spaces/TEST/pages/222' }
+      });
+
+      await client.createPage('My Folder', 'TEST', '', 'storage', 'folder');
+      const requestData = JSON.parse(mock.history.post[0].data);
+      expect(requestData.type).toBe('folder');
+      expect(requestData.body).toBeUndefined();
+      mock.restore();
+    });
+
+    test('createChildPage should support type "folder" without body', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onPost('/content').reply(200, {
+        id: '333', title: 'Child Folder', type: 'folder',
+        space: { key: 'TEST', name: 'Test' },
+        _links: { webui: '/spaces/TEST/pages/333' }
+      });
+
+      await client.createChildPage('Child Folder', 'TEST', '100', '', 'storage', 'folder');
+      const requestData = JSON.parse(mock.history.post[0].data);
+      expect(requestData.type).toBe('folder');
+      expect(requestData.ancestors).toEqual([{ id: '100' }]);
+      expect(requestData.body).toBeUndefined();
+      mock.restore();
+    });
   });
 
   describe('deletePage', () => {

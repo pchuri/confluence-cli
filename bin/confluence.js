@@ -218,15 +218,21 @@ program
 // Create command
 program
   .command('create <title> <spaceKey>')
-  .description('Create a new Confluence page')
+  .description('Create a new Confluence page or folder')
   .option('-f, --file <file>', 'Read content from file')
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
+  .option('--type <type>', 'Content type (page, folder)', 'page')
   .action(async (title, spaceKey, options) => {
     const analytics = new Analytics();
     try {
       assertNonEmpty(title, 'title');
       assertNonEmpty(spaceKey, 'spaceKey');
+
+      const VALID_TYPES = ['page', 'folder'];
+      if (!VALID_TYPES.includes(options.type)) {
+        throw new Error(`Invalid type "${options.type}". Valid: ${VALID_TYPES.join(', ')}`);
+      }
 
       const config = getConfig(getProfileName());
       assertWritable(config);
@@ -242,13 +248,14 @@ program
         content = fs.readFileSync(options.file, 'utf8');
       } else if (options.content) {
         content = options.content;
-      } else {
+      } else if (options.type !== 'folder') {
         throw new Error('Either --file or --content option is required');
       }
 
-      const result = await client.createPage(title, spaceKey, content, options.format);
-      
-      console.log(chalk.green('✅ Page created successfully!'));
+      const result = await client.createPage(title, spaceKey, content, options.format, options.type);
+
+      const label = options.type === 'folder' ? 'Folder' : 'Page';
+      console.log(chalk.green(`✅ ${label} created successfully!`));
       console.log(`Title: ${chalk.blue(result.title)}`);
       console.log(`ID: ${chalk.blue(result.id)}`);
       console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
@@ -263,15 +270,21 @@ program
 // Create child page command
 program
   .command('create-child <title> <parentId>')
-  .description('Create a new Confluence page as a child of another page')
+  .description('Create a new Confluence page or folder as a child of another page')
   .option('-f, --file <file>', 'Read content from file')
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
+  .option('--type <type>', 'Content type (page, folder)', 'page')
   .action(async (title, parentId, options) => {
     const analytics = new Analytics();
     try {
       assertNonEmpty(title, 'title');
       assertNonEmpty(parentId, 'parentId');
+
+      const VALID_TYPES = ['page', 'folder'];
+      if (!VALID_TYPES.includes(options.type)) {
+        throw new Error(`Invalid type "${options.type}". Valid: ${VALID_TYPES.join(', ')}`);
+      }
 
       const config = getConfig(getProfileName());
       assertWritable(config);
@@ -280,9 +293,9 @@ program
       // Get parent page info to get space key
       const parentInfo = await client.getPageInfo(parentId);
       const spaceKey = parentInfo.space.key;
-      
+
       let content = '';
-      
+
       if (options.file) {
         const fs = require('fs');
         if (!fs.existsSync(options.file)) {
@@ -291,13 +304,14 @@ program
         content = fs.readFileSync(options.file, 'utf8');
       } else if (options.content) {
         content = options.content;
-      } else {
+      } else if (options.type !== 'folder') {
         throw new Error('Either --file or --content option is required');
       }
-      
-      const result = await client.createChildPage(title, spaceKey, parentId, content, options.format);
-      
-      console.log(chalk.green('✅ Child page created successfully!'));
+
+      const result = await client.createChildPage(title, spaceKey, parentId, content, options.format, options.type);
+
+      const label = options.type === 'folder' ? 'Folder' : 'Child page';
+      console.log(chalk.green(`✅ ${label} created successfully!`));
       console.log(`Title: ${chalk.blue(result.title)}`);
       console.log(`ID: ${chalk.blue(result.id)}`);
       console.log(`Parent: ${chalk.blue(parentInfo.title)} (${parentId})`);
