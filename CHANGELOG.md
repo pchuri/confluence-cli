@@ -1,3 +1,10 @@
+## [2.1.12](https://github.com/pchuri/confluence-cli/compare/v2.1.11...v2.1.12) (2026-05-03)
+
+
+### Bug Fixes
+
+* **walker:** surface parser warnings for malformed storage XML ([#144](https://github.com/pchuri/confluence-cli/issues/144)) ([#162](https://github.com/pchuri/confluence-cli/issues/162)) ([995cdaa](https://github.com/pchuri/confluence-cli/commit/995cdaafee1869dcbca1a855b1713a1f31e54f33))
+
 ## [2.1.11](https://github.com/pchuri/confluence-cli/compare/v2.1.10...v2.1.11) (2026-05-01)
 
 
