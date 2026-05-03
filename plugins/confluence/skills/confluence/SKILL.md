@@ -221,7 +221,7 @@ confluence search --cql 'siteSearch ~ "deployment pipeline" and space = "MYSPACE
 
 ### `spaces`
 
-List all accessible Confluence spaces (key and name).
+List accessible Confluence spaces (key and name).
 
 ```sh
 confluence spaces

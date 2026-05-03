@@ -7,7 +7,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - 📖 **Read pages** - Get page content in text or HTML format
 - 🔍 **Search** - Find pages using Confluence's powerful search
 - ℹ️ **Page info** - Get detailed information about pages
-- 🏠 **List spaces** - View all available Confluence spaces
+- 🏠 **List spaces** - View available Confluence spaces
 - ✏️ **Create pages** - Create new pages with support for Markdown, HTML, or Storage format
 - 📝 **Update pages** - Update existing page content and titles
 - 🗑️ **Delete pages** - Delete (or move to trash) pages by ID or URL
@@ -691,7 +691,7 @@ confluence stats
 | `read <pageId_or_url>` | Read page content | `--format <html\|text\|storage\|markdown>` |
 | `info <pageId_or_url>` | Get page information | `--format <text\|json>` |
 | `search <query>` | Search for pages | `--limit <number>` |
-| `spaces` | List all available spaces | |
+| `spaces` | List available spaces | `--limit <number>` |
 | `find <title>` | Find a page by its title | `--space <spaceKey>` |
 | `children <pageId>` | List child pages of a page | `--recursive`, `--max-depth <number>`, `--format <list\|tree\|json>`, `--show-url`, `--show-id` |
 | `create <title> <spaceKey>` | Create a new page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`|
@@ -739,7 +739,7 @@ confluence info 123456789
 # Search with limit
 confluence search "API documentation" --limit 3
 
-# List all spaces
+# List spaces
 confluence spaces
 
 # Move a page to a new parent
