@@ -987,6 +987,25 @@ describe('MacroConverter <u>/<sub>/<sup>/<mark> passthrough', () => {
     expect(result).toContain('<![CDATA[<u>x</u>]]>');
   });
 
+  test('literal <u> inside 4-space indented code is preserved as code body', () => {
+    // Regression guard: an earlier draft pre-stashed <u> with a regex that
+    // ignored indented code blocks. The placeholder ended up inside the
+    // rendered <pre><code>, the restored raw <u> was re-parsed as a real tag,
+    // and convertCodeBlock's text-only collection silently emptied the body.
+    const result = converter.markdownToStorage('    <u>x</u>');
+    expect(result).toContain('<![CDATA[<u>x</u>]]>');
+    expect(result).not.toContain('<![CDATA[]]>');
+  });
+
+  test('list-item continuation aligned to 4 spaces is NOT treated as code', () => {
+    // Tokenizer-based detection must distinguish indented code blocks from
+    // list-item continuations that happen to align to four spaces; otherwise
+    // <u> in continuations would be wrongly stashed-and-escaped.
+    const result = converter.markdownToStorage('- item1\n    <u>x</u>');
+    expect(result).toContain('<u>x</u>');
+    expect(result).not.toContain('&lt;u&gt;');
+  });
+
   test('markdownToNativeStorage applies the same passthrough policy', () => {
     const result = converter.markdownToNativeStorage('H<sub>2</sub>O');
     expect(result).toContain('<sub>2</sub>');
