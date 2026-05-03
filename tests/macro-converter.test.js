@@ -916,6 +916,67 @@ describe('MacroConverter storageToMarkdown <s>/<del> strikethrough', () => {
   });
 });
 
+describe('MacroConverter <u>/<sub>/<sup>/<mark> passthrough', () => {
+  // Markdown has no native syntax for these inline tags, so the walker emits
+  // them as raw HTML and markdownToStorage stashes them around MarkdownIt's
+  // html: false escape so they round-trip end-to-end.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('walker preserves <sub> in storage → markdown', () => {
+    expect(converter.storageToMarkdown('<p>H<sub>2</sub>O</p>')).toBe('H<sub>2</sub>O');
+  });
+
+  test('walker preserves <sup> in storage → markdown', () => {
+    expect(converter.storageToMarkdown('<p>x<sup>2</sup></p>')).toBe('x<sup>2</sup>');
+  });
+
+  test('walker preserves <u> in storage → markdown', () => {
+    expect(converter.storageToMarkdown('<p><u>under</u></p>')).toBe('<u>under</u>');
+  });
+
+  test('walker preserves <mark> in storage → markdown', () => {
+    expect(converter.storageToMarkdown('<p><mark>hi</mark></p>')).toBe('<mark>hi</mark>');
+  });
+
+  test('round-trip: H<sub>2</sub>O survives markdown → storage → markdown', () => {
+    const md = 'H<sub>2</sub>O';
+    expect(converter.storageToMarkdown(converter.markdownToStorage(md)).trim()).toBe(md);
+  });
+
+  test('round-trip: <mark>highlight</mark> survives markdown → storage → markdown', () => {
+    const md = '<mark>highlight</mark>';
+    expect(converter.storageToMarkdown(converter.markdownToStorage(md)).trim()).toBe(md);
+  });
+
+  test('attributes on whitelisted tags pass through markdown → storage', () => {
+    const result = converter.markdownToStorage('<mark class="lit">x</mark>');
+    expect(result).toContain('<mark class="lit">x</mark>');
+  });
+
+  test('whitelist does not allow non-listed tags through (e.g., <script> is escaped)', () => {
+    const result = converter.markdownToStorage('<script>alert(1)</script>');
+    expect(result).not.toContain('<script>');
+    expect(result).toContain('&lt;script&gt;');
+  });
+
+  test('literal <u> inside inline code is escaped, not passed through', () => {
+    const result = converter.markdownToStorage('`<u>x</u>`');
+    expect(result).toContain('&lt;u&gt;x&lt;/u&gt;');
+    expect(result).not.toMatch(/<u>x<\/u>/);
+  });
+
+  test('literal <u> inside fenced code is preserved as code body, not passthrough', () => {
+    const result = converter.markdownToStorage('```\n<u>x</u>\n```');
+    // Fenced code becomes a code macro with the literal source as plain-text-body.
+    expect(result).toContain('<![CDATA[<u>x</u>]]>');
+  });
+
+  test('markdownToNativeStorage applies the same passthrough policy', () => {
+    const result = converter.markdownToNativeStorage('H<sub>2</sub>O');
+    expect(result).toContain('<sub>2</sub>');
+  });
+});
+
 describe('MacroConverter storageToMarkdown panel formatting', () => {
   const converter = new MacroConverter({ isCloud: true });
 
