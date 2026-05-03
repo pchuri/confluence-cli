@@ -255,10 +255,10 @@ confluence children 123456789 --recursive --format tree --show-id
 
 ### `create <title> <spaceKey>`
 
-Create a new top-level page in a space.
+Create a new top-level page or folder in a space.
 
 ```sh
-confluence create <title> <spaceKey> [--content <string>] [--file <path>] [--format storage|html|markdown]
+confluence create <title> <spaceKey> [--content <string>] [--file <path>] [--format storage|html|markdown] [--type page|folder]
 ```
 
 | Option | Default | Description |
@@ -266,31 +266,34 @@ confluence create <title> <spaceKey> [--content <string>] [--file <path>] [--for
 | `--content` | — | Inline content string |
 | `--file` | — | Path to content file |
 | `--format` | `storage` | Content format |
+| `--type` | `page` | Content type — `page` (default) or `folder`. Folders have no body. |
 
-Either `--content` or `--file` is required.
+Either `--content` or `--file` is required for pages. Folders take no content — passing `--content` or `--file` with `--type folder` is rejected.
 
 ```sh
 confluence create "Project Overview" MYSPACE --content "# Hello" --format markdown
 confluence create "Release Notes" MYSPACE --file ./notes.md --format markdown
+confluence create "Engineering Docs" MYSPACE --type folder
 ```
 
-Outputs the new page ID and URL on success.
+Outputs the new page (or folder) ID and URL on success.
 
 ---
 
 ### `create-child <title> <parentId>`
 
-Create a child page under an existing page. Inherits the parent's space automatically.
+Create a child page or folder under an existing page. Inherits the parent's space automatically.
 
 ```sh
-confluence create-child <title> <parentId> [--content <string>] [--file <path>] [--format storage|html|markdown]
+confluence create-child <title> <parentId> [--content <string>] [--file <path>] [--format storage|html|markdown] [--type page|folder]
 ```
 
-Options are identical to `create`. Either `--content` or `--file` is required.
+Options are identical to `create`. Either `--content` or `--file` is required for pages; folders take no content.
 
 ```sh
 confluence create-child "Chapter 1" 123456789 --content "Content here" --format markdown
 confluence create-child "API Guide" 123456789 --file ./api.md --format markdown
+confluence create-child "Sub-folder" 123456789 --type folder
 ```
 
 ---

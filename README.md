@@ -694,8 +694,8 @@ confluence stats
 | `spaces` | List available spaces | `--limit <number>` |
 | `find <title>` | Find a page by its title | `--space <spaceKey>` |
 | `children <pageId>` | List child pages of a page | `--recursive`, `--max-depth <number>`, `--format <list\|tree\|json>`, `--show-url`, `--show-id` |
-| `create <title> <spaceKey>` | Create a new page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`|
-| `create-child <title> <parentId>` | Create a child page | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
+| `create <title> <spaceKey>` | Create a new page or folder | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`, `--type <page\|folder>` |
+| `create-child <title> <parentId>` | Create a child page or folder | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`, `--type <page\|folder>` |
 | `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--copy-suffix <text>`, `--dry-run`, `--fail-on-error`, `--quiet` |
 | `update <pageId>` | Update a page's title or content | `--title <string>`, `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
 | `move <pageId_or_url> <newParentId_or_url>` | Move a page to a new parent location | `--title <string>` |
@@ -751,6 +751,10 @@ confluence move 123456789 987654321 --title "New Title"
 # Upload and delete an attachment
 confluence attachment-upload 123456789 --file ./report.pdf
 confluence attachment-delete 123456789 998877 --yes
+
+# Create a folder (no content body required)
+confluence create "Engineering Docs" MYSPACE --type folder
+confluence create-child "Sub-folder" 123456789 --type folder
 
 # View usage statistics
 confluence stats
