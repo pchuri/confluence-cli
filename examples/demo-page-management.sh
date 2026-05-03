@@ -30,7 +30,7 @@ echo "5. Searching for pages..."
 echo "confluence search \"CLI\""
 
 echo ""
-echo "6. Listing all spaces..."
+echo "6. Listing spaces..."
 echo "confluence spaces"
 
 echo ""

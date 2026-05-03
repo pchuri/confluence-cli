@@ -13,7 +13,7 @@ if ! command -v confluence &> /dev/null; then
 fi
 
 echo ""
-echo "📋 Listing all spaces..."
+echo "📋 Listing spaces..."
 confluence spaces
 
 echo ""
