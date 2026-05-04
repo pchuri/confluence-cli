@@ -916,6 +916,138 @@ describe('MacroConverter storageToMarkdown <s>/<del> strikethrough', () => {
   });
 });
 
+describe('MacroConverter <u>/<sub>/<sup>/<mark> passthrough', () => {
+  // Markdown has no native syntax for these inline tags, so the walker emits
+  // them as raw HTML and markdownToStorage stashes them around MarkdownIt's
+  // html: false escape so they round-trip end-to-end.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('walker preserves <sub> in storage → markdown', () => {
+    expect(converter.storageToMarkdown('<p>H<sub>2</sub>O</p>')).toBe('H<sub>2</sub>O');
+  });
+
+  test('walker preserves <sup> in storage → markdown', () => {
+    expect(converter.storageToMarkdown('<p>x<sup>2</sup></p>')).toBe('x<sup>2</sup>');
+  });
+
+  test('walker preserves <u> in storage → markdown', () => {
+    expect(converter.storageToMarkdown('<p><u>under</u></p>')).toBe('<u>under</u>');
+  });
+
+  test('walker preserves <mark> in storage → markdown', () => {
+    expect(converter.storageToMarkdown('<p><mark>hi</mark></p>')).toBe('<mark>hi</mark>');
+  });
+
+  test('round-trip: H<sub>2</sub>O survives markdown → storage → markdown', () => {
+    const md = 'H<sub>2</sub>O';
+    expect(converter.storageToMarkdown(converter.markdownToStorage(md)).trim()).toBe(md);
+  });
+
+  test('round-trip: <mark>highlight</mark> survives markdown → storage → markdown', () => {
+    const md = '<mark>highlight</mark>';
+    expect(converter.storageToMarkdown(converter.markdownToStorage(md)).trim()).toBe(md);
+  });
+
+  test('round-trip: <u>under</u> survives markdown → storage → markdown', () => {
+    const md = '<u>under</u>';
+    expect(converter.storageToMarkdown(converter.markdownToStorage(md)).trim()).toBe(md);
+  });
+
+  test('round-trip: x<sup>2</sup> survives markdown → storage → markdown', () => {
+    const md = 'x<sup>2</sup>';
+    expect(converter.storageToMarkdown(converter.markdownToStorage(md)).trim()).toBe(md);
+  });
+
+  test('walker drops attributes on whitelisted tags (matches <details>/<summary> precedent)', () => {
+    // Asymmetric with markdown→storage which preserves attributes; documenting
+    // here so any future change is intentional rather than incidental.
+    expect(converter.storageToMarkdown('<p><sub class="chem">2</sub></p>')).toBe('<sub>2</sub>');
+  });
+
+  test('attributes on whitelisted tags pass through markdown → storage', () => {
+    const result = converter.markdownToStorage('<mark class="lit">x</mark>');
+    expect(result).toContain('<mark class="lit">x</mark>');
+  });
+
+  test('whitelist does not allow non-listed tags through (e.g., <script> is escaped)', () => {
+    const result = converter.markdownToStorage('<script>alert(1)</script>');
+    expect(result).not.toContain('<script>');
+    expect(result).toContain('&lt;script&gt;');
+  });
+
+  test('literal <u> inside inline code is escaped, not passed through', () => {
+    const result = converter.markdownToStorage('`<u>x</u>`');
+    expect(result).toContain('&lt;u&gt;x&lt;/u&gt;');
+    expect(result).not.toMatch(/<u>x<\/u>/);
+  });
+
+  test('literal <u> inside fenced code is preserved as code body, not passthrough', () => {
+    const result = converter.markdownToStorage('```\n<u>x</u>\n```');
+    // Fenced code becomes a code macro with the literal source as plain-text-body.
+    expect(result).toContain('<![CDATA[<u>x</u>]]>');
+  });
+
+  test('literal <u> inside 4-space indented code is preserved as code body', () => {
+    // Regression guard: an earlier draft pre-stashed <u> with a regex that
+    // ignored indented code blocks. The placeholder ended up inside the
+    // rendered <pre><code>, the restored raw <u> was re-parsed as a real tag,
+    // and convertCodeBlock's text-only collection silently emptied the body.
+    const result = converter.markdownToStorage('    <u>x</u>');
+    expect(result).toContain('<![CDATA[<u>x</u>]]>');
+    expect(result).not.toContain('<![CDATA[]]>');
+  });
+
+  test('list-item continuation aligned to 4 spaces is NOT treated as code', () => {
+    // Tokenizer-based detection must distinguish indented code blocks from
+    // list-item continuations that happen to align to four spaces; otherwise
+    // <u> in continuations would be wrongly stashed-and-escaped.
+    const result = converter.markdownToStorage('- item1\n    <u>x</u>');
+    expect(result).toContain('<u>x</u>');
+    expect(result).not.toContain('&lt;u&gt;');
+  });
+
+  test('quoted attribute containing > is preserved verbatim', () => {
+    // Regression guard: a `[^>]*` body in the whitelist regex stopped at the
+    // first `>` inside the quoted value, leaving an incomplete tag that
+    // collapsed to `<p></p>` and silently dropped the user content.
+    const result = converter.markdownToStorage('<mark title="1>0">x</mark>');
+    expect(result).toContain('<mark title="1>0">x</mark>');
+  });
+
+  test('single-quoted attribute is accepted (htmlToStorage normalizes to double-quote on output)', () => {
+    const result = converter.markdownToStorage('<mark class=\'lit\'>y</mark>');
+    expect(result).toContain('<mark class="lit">y</mark>');
+  });
+
+  test('angle-bracket autolinks are not mistaken for whitelisted tags', () => {
+    // Regression guard: a plain `\b` boundary after the tag name allowed
+    // markdown autolinks like `<u@example.com>` and `<sub:foo>` to be stashed
+    // as if they were HTML tags, bypassing markdown-it's linkify path and
+    // emitting bogus `<u@example.com></u@example.com>` pairs.
+    const email = converter.markdownToStorage('<u@example.com>');
+    expect(email).toContain('href="mailto:u@example.com"');
+    expect(email).not.toMatch(/<u@example\.com>/);
+
+    const uri = converter.markdownToStorage('<sub:foo>');
+    expect(uri).toContain('href="sub:foo"');
+    expect(uri).not.toMatch(/<sub:foo>/);
+  });
+
+  test('hyphenated custom-element-like names are NOT passed through (e.g., <u-foo>)', () => {
+    // Tightened from the original `\b` behaviour: a custom element whose name
+    // starts with `u`/`sub`/etc. is not really a `<u>` tag, so we let
+    // markdown-it escape it like any other HTML.
+    const result = converter.markdownToStorage('<u-foo>x</u-foo>');
+    expect(result).toContain('&lt;u-foo&gt;');
+    expect(result).not.toMatch(/<u-foo>/);
+  });
+
+  test('markdownToNativeStorage applies the same passthrough policy', () => {
+    const result = converter.markdownToNativeStorage('H<sub>2</sub>O');
+    expect(result).toContain('<sub>2</sub>');
+  });
+});
+
 describe('MacroConverter storageToMarkdown panel formatting', () => {
   const converter = new MacroConverter({ isCloud: true });
 
