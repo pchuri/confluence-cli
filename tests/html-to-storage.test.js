@@ -92,6 +92,26 @@ describe('htmlToStorage', () => {
       expect(htmlToStorage('<ol><li>one</li></ol>'))
         .toBe('<ol><li><p>one</p></li></ol>');
     });
+
+    test('<ul> attributes are preserved on output', () => {
+      expect(htmlToStorage('<ul class="task-list" style="color:red"><li>x</li></ul>'))
+        .toBe('<ul class="task-list" style="color:red"><li><p>x</p></li></ul>');
+    });
+
+    test('<ol> attributes including start are preserved', () => {
+      expect(htmlToStorage('<ol class="numbered" start="3"><li>x</li></ol>'))
+        .toBe('<ol class="numbered" start="3"><li><p>x</p></li></ol>');
+    });
+
+    test('<li> attributes are preserved on the opening tag', () => {
+      expect(htmlToStorage('<ul><li class="highlighted">x</li></ul>'))
+        .toBe('<ul><li class="highlighted"><p>x</p></li></ul>');
+    });
+
+    test('<li> attributes survive when wrap is suppressed (block child)', () => {
+      expect(htmlToStorage('<ul><li class="x">outer<ul><li>inner</li></ul></li></ul>'))
+        .toBe('<ul><li class="x">outer<ul><li><p>inner</p></li></ul></li></ul>');
+    });
   });
 
   describe('code blocks', () => {
