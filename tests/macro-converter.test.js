@@ -1006,6 +1006,42 @@ describe('MacroConverter <u>/<sub>/<sup>/<mark> passthrough', () => {
     expect(result).not.toContain('&lt;u&gt;');
   });
 
+  test('quoted attribute containing > is preserved verbatim', () => {
+    // Regression guard: a `[^>]*` body in the whitelist regex stopped at the
+    // first `>` inside the quoted value, leaving an incomplete tag that
+    // collapsed to `<p></p>` and silently dropped the user content.
+    const result = converter.markdownToStorage('<mark title="1>0">x</mark>');
+    expect(result).toContain('<mark title="1>0">x</mark>');
+  });
+
+  test('single-quoted attribute is accepted (htmlToStorage normalizes to double-quote on output)', () => {
+    const result = converter.markdownToStorage('<mark class=\'lit\'>y</mark>');
+    expect(result).toContain('<mark class="lit">y</mark>');
+  });
+
+  test('angle-bracket autolinks are not mistaken for whitelisted tags', () => {
+    // Regression guard: a plain `\b` boundary after the tag name allowed
+    // markdown autolinks like `<u@example.com>` and `<sub:foo>` to be stashed
+    // as if they were HTML tags, bypassing markdown-it's linkify path and
+    // emitting bogus `<u@example.com></u@example.com>` pairs.
+    const email = converter.markdownToStorage('<u@example.com>');
+    expect(email).toContain('href="mailto:u@example.com"');
+    expect(email).not.toMatch(/<u@example\.com>/);
+
+    const uri = converter.markdownToStorage('<sub:foo>');
+    expect(uri).toContain('href="sub:foo"');
+    expect(uri).not.toMatch(/<sub:foo>/);
+  });
+
+  test('hyphenated custom-element-like names are NOT passed through (e.g., <u-foo>)', () => {
+    // Tightened from the original `\b` behaviour: a custom element whose name
+    // starts with `u`/`sub`/etc. is not really a `<u>` tag, so we let
+    // markdown-it escape it like any other HTML.
+    const result = converter.markdownToStorage('<u-foo>x</u-foo>');
+    expect(result).toContain('&lt;u-foo&gt;');
+    expect(result).not.toMatch(/<u-foo>/);
+  });
+
   test('markdownToNativeStorage applies the same passthrough policy', () => {
     const result = converter.markdownToNativeStorage('H<sub>2</sub>O');
     expect(result).toContain('<sub>2</sub>');
