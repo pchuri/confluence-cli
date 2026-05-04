@@ -1,3 +1,10 @@
+# [2.4.0](https://github.com/pchuri/confluence-cli/compare/v2.3.1...v2.4.0) (2026-05-04)
+
+
+### Features
+
+* **spaces:** paginate getSpaces and add --all flag ([#169](https://github.com/pchuri/confluence-cli/issues/169)) ([f967861](https://github.com/pchuri/confluence-cli/commit/f96786137e172f4d7e5140ce54d8df79190adc3b)), closes [#168](https://github.com/pchuri/confluence-cli/issues/168)
+
 ## [2.3.1](https://github.com/pchuri/confluence-cli/compare/v2.3.0...v2.3.1) (2026-05-04)
 
 
