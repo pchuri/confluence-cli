@@ -154,15 +154,17 @@ program
 program
   .command('spaces')
   .description('List Confluence spaces')
-  .option('-l, --limit <limit>', 'Limit number of results', '500')
+  .option('-l, --limit <limit>', 'Maximum total spaces to return across paginated requests', '500')
+  .option('--all', 'Fetch every space, paginating through all results (overrides --limit)')
   .action(async (options) => {
     const analytics = new Analytics();
     try {
       const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
-      const spaces = await client.getSpaces(parseInt(options.limit));
-      
-      console.log(chalk.blue('Available spaces:'));
+      const maxResults = options.all ? null : parseInt(options.limit);
+      const spaces = await client.getSpaces(maxResults);
+
+      console.log(chalk.blue(`Available spaces (${spaces.length}):`));
       spaces.forEach(space => {
         console.log(`${chalk.green(space.key)} - ${space.name}`);
       });

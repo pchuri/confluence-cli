@@ -1171,25 +1171,105 @@ describe('ConfluenceClient', () => {
   });
 
   describe('getSpaces', () => {
-    test('should return spaces with default limit of 500', async () => {
+    test('should request a single page with default page size of 500 when no _links.next', async () => {
       const mock = new MockAdapter(client.client);
+      const calls = [];
       mock.onGet('/space').reply(config => {
-        expect(config.params.limit).toBe(500);
-        return [200, { results: [], _links: {} }];
+        calls.push({ ...config.params });
+        return [200, {
+          results: [{ key: 'A', name: 'Alpha', type: 'global' }],
+          _links: {}
+        }];
       });
 
-      await client.getSpaces();
+      const spaces = await client.getSpaces();
+      expect(calls).toHaveLength(1);
+      expect(calls[0].limit).toBe(500);
+      expect(calls[0].start).toBe(0);
+      expect(spaces).toEqual([{ key: 'A', name: 'Alpha', type: 'global' }]);
       mock.restore();
     });
 
-    test('should return spaces with limit parameter', async () => {
+    test('should follow _links.next and aggregate results across pages', async () => {
       const mock = new MockAdapter(client.client);
+      const calls = [];
       mock.onGet('/space').reply(config => {
-        expect(config.params.limit).toBe(1000);
-        return [200, { results: [], _links: {} }];
+        calls.push({ ...config.params });
+        if (config.params.start === 0) {
+          return [200, {
+            results: [{ key: 'A', name: 'Alpha', type: 'global' }],
+            _links: { next: '/rest/api/space?next=true&limit=500&start=500' }
+          }];
+        }
+        if (config.params.start === 500) {
+          return [200, {
+            results: [{ key: 'B', name: 'Beta', type: 'global' }],
+            _links: { next: '/rest/api/space?next=true&limit=500&start=1000' }
+          }];
+        }
+        return [200, {
+          results: [{ key: 'C', name: 'Gamma', type: 'global' }],
+          _links: {}
+        }];
       });
 
-      await client.getSpaces(1000);
+      const spaces = await client.getSpaces(null);
+      expect(calls.map(c => c.start)).toEqual([0, 500, 1000]);
+      expect(spaces.map(s => s.key)).toEqual(['A', 'B', 'C']);
+      mock.restore();
+    });
+
+    test('should stop paginating once maxResults cap is reached and slice excess', async () => {
+      const mock = new MockAdapter(client.client);
+      const calls = [];
+      mock.onGet('/space').reply(config => {
+        calls.push({ ...config.params });
+        if (config.params.start === 0) {
+          return [200, {
+            results: [
+              { key: 'A', name: 'Alpha', type: 'global' },
+              { key: 'B', name: 'Beta', type: 'global' }
+            ],
+            _links: { next: '/rest/api/space?next=true&limit=500&start=500' }
+          }];
+        }
+        return [200, {
+          results: [
+            { key: 'C', name: 'Gamma', type: 'global' },
+            { key: 'D', name: 'Delta', type: 'global' }
+          ],
+          _links: { next: '/rest/api/space?next=true&limit=500&start=1000' }
+        }];
+      });
+
+      const spaces = await client.getSpaces(3);
+      expect(calls).toHaveLength(2);
+      expect(spaces.map(s => s.key)).toEqual(['A', 'B', 'C']);
+      mock.restore();
+    });
+  });
+
+  describe('listSpaces', () => {
+    test('returns nextStart parsed from _links.next', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/space').reply(200, {
+        results: [{ key: 'A', name: 'Alpha', type: 'global' }],
+        _links: { next: '/rest/api/space?next=true&limit=500&start=500' }
+      });
+
+      const page = await client.listSpaces({ limit: 500, start: 0 });
+      expect(page.results).toEqual([{ key: 'A', name: 'Alpha', type: 'global' }]);
+      expect(page.nextStart).toBe(500);
+      mock.restore();
+    });
+
+    test('returns null nextStart when there is no next link', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/space').reply(200, { results: [], _links: {} });
+
+      const page = await client.listSpaces();
+      expect(page.results).toEqual([]);
+      expect(page.nextStart).toBeNull();
       mock.restore();
     });
   });
