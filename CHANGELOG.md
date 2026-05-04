@@ -1,3 +1,10 @@
+## [2.3.1](https://github.com/pchuri/confluence-cli/compare/v2.3.0...v2.3.1) (2026-05-04)
+
+
+### Bug Fixes
+
+* **walker:** preserve <u>/<sub>/<sup>/<mark> on storage ↔ markdown round-trip ([#167](https://github.com/pchuri/confluence-cli/issues/167)) ([a6857db](https://github.com/pchuri/confluence-cli/commit/a6857db27378e0754f88e6e8215592f56e862030)), closes [#155](https://github.com/pchuri/confluence-cli/issues/155) [#2](https://github.com/pchuri/confluence-cli/issues/2)
+
 # [2.3.0](https://github.com/pchuri/confluence-cli/compare/v2.2.0...v2.3.0) (2026-05-03)
 
 
