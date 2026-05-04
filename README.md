@@ -466,7 +466,14 @@ confluence export 123456789 --skip-attachments
 
 ### List Spaces
 ```bash
+# Default: up to 500 spaces (paginated automatically across requests)
 confluence spaces
+
+# Increase the cap when your tenant has more than 500 spaces
+confluence spaces --limit 2000
+
+# Fetch every space, regardless of how many pages it takes
+confluence spaces --all
 ```
 
 ### List Child Pages
@@ -691,7 +698,7 @@ confluence stats
 | `read <pageId_or_url>` | Read page content | `--format <html\|text\|storage\|markdown>` |
 | `info <pageId_or_url>` | Get page information | `--format <text\|json>` |
 | `search <query>` | Search for pages | `--limit <number>` |
-| `spaces` | List available spaces | `--limit <number>` |
+| `spaces` | List available spaces | `--limit <number>`, `--all` |
 | `find <title>` | Find a page by its title | `--space <spaceKey>` |
 | `children <pageId>` | List child pages of a page | `--recursive`, `--max-depth <number>`, `--format <list\|tree\|json>`, `--show-url`, `--show-id` |
 | `create <title> <spaceKey>` | Create a new page or folder | `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>`, `--type <page\|folder>` |
