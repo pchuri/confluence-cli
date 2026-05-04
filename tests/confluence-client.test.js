@@ -1215,7 +1215,54 @@ describe('ConfluenceClient', () => {
 
       const spaces = await client.getSpaces(null);
       expect(calls.map(c => c.start)).toEqual([0, 500, 1000]);
+      expect(calls.map(c => c.limit)).toEqual([500, 500, 500]);
       expect(spaces.map(s => s.key)).toEqual(['A', 'B', 'C']);
+      mock.restore();
+    });
+
+    test('should send limit equal to maxResults when smaller than the page size', async () => {
+      const mock = new MockAdapter(client.client);
+      const calls = [];
+      mock.onGet('/space').reply(config => {
+        calls.push({ ...config.params });
+        return [200, {
+          results: [{ key: 'A', name: 'Alpha', type: 'global' }],
+          _links: {}
+        }];
+      });
+
+      await client.getSpaces(1);
+      expect(calls).toHaveLength(1);
+      expect(calls[0].limit).toBe(1);
+      mock.restore();
+    });
+
+    test('should shrink the page request size to the remaining cap on each iteration', async () => {
+      const mock = new MockAdapter(client.client);
+      const calls = [];
+      mock.onGet('/space').reply(config => {
+        calls.push({ ...config.params });
+        if (config.params.start === 0) {
+          return [200, {
+            results: Array.from({ length: 500 }, (_, i) => ({
+              key: `K${i}`, name: `N${i}`, type: 'global'
+            })),
+            _links: { next: '/rest/api/space?next=true&limit=500&start=500' }
+          }];
+        }
+        return [200, {
+          results: Array.from({ length: 250 }, (_, i) => ({
+            key: `K${500 + i}`, name: `N${500 + i}`, type: 'global'
+          })),
+          _links: {}
+        }];
+      });
+
+      const spaces = await client.getSpaces(750);
+      expect(calls).toHaveLength(2);
+      expect(calls[0].limit).toBe(500);
+      expect(calls[1].limit).toBe(250);
+      expect(spaces).toHaveLength(750);
       mock.restore();
     });
 
@@ -1244,6 +1291,8 @@ describe('ConfluenceClient', () => {
 
       const spaces = await client.getSpaces(3);
       expect(calls).toHaveLength(2);
+      expect(calls[0].limit).toBe(3);
+      expect(calls[1].limit).toBe(1);
       expect(spaces.map(s => s.key)).toEqual(['A', 'B', 'C']);
       mock.restore();
     });
