@@ -524,9 +524,8 @@ program
     }
   });
 
-// Convenience: delete every non-current historical version of a page.
-// Used when re-uploading redacted content over a page whose history
-// still contains leaked secrets.
+// Convenience: delete every non-current historical version of a page,
+// keeping only the current one.
 program
   .command('versions-purge <pageId>')
   .description('Delete every non-current historical version of a page (keeps only current)')

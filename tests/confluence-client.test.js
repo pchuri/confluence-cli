@@ -1674,6 +1674,53 @@ describe('ConfluenceClient', () => {
 
       mock.restore();
     });
+
+    test('end-to-end fallback: list 404s on /api, deletes hit /experimental', async () => {
+      const mock = new MockAdapter(client.client);
+      // Modern path 404s on list — typical of Server/DC.
+      mock.onGet('/content/123/version').reply(404);
+      mock.onGet(/\/rest\/experimental\/content\/123\/version$/).reply(200, {
+        results: [
+          { number: 1, when: 't', by: { displayName: 'u' } },
+          { number: 2, when: 't', by: { displayName: 'u' } },
+          { number: 3, when: 't', by: { displayName: 'u' } }
+        ]
+      });
+      // Each deleteVersion attempts the modern path first, falls back.
+      // Register experimental matchers first so they take precedence
+      // over the broader modern-path regex.
+      mock.onDelete(/\/rest\/experimental\/content\/123\/version\/\d+$/).reply(204);
+      mock.onDelete(/\/content\/123\/version\/\d+$/).reply(404);
+
+      const result = await client.purgeNonCurrentVersions('123');
+      expect(result).toEqual({ id: '123', kept: 3, deleted: 2, failed: 0, errors: [] });
+
+      mock.restore();
+    });
+  });
+
+  describe('listVersions edge cases', () => {
+    test('returns empty array when API returns no results', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/version').reply(200, { results: [] });
+
+      const versions = await client.listVersions('123');
+      expect(versions).toEqual([]);
+
+      mock.restore();
+    });
+
+    test('propagates 404 when both modern and experimental return 404 (page not found)', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/missing/version').reply(404);
+      mock.onGet(/\/rest\/experimental\/content\/missing\/version$/).reply(404);
+
+      await expect(client.listVersions('missing')).rejects.toMatchObject({
+        response: { status: 404 }
+      });
+
+      mock.restore();
+    });
   });
 
   describe('movePage', () => {

@@ -707,6 +707,9 @@ confluence stats
 | `update <pageId>` | Update a page's title or content | `--title <string>`, `--content <string>`, `--file <path>`, `--format <storage\|html\|markdown>` |
 | `move <pageId_or_url> <newParentId_or_url>` | Move a page to a new parent location | `--title <string>` |
 | `delete <pageId_or_url>` | Delete a page by ID or URL | `--yes` |
+| `versions <pageId_or_url>` | List historical versions of a page | `--format <text\|json>` |
+| `version-delete <pageId_or_url> <versionNumber>` | Delete a single non-current version of a page | `--yes` |
+| `versions-purge <pageId_or_url>` | Delete every non-current historical version of a page | `--yes`, `--throttle <seconds>` |
 | `edit <pageId>` | Export page content for editing | `--output <file>` |
 | `attachments <pageId_or_url>` | List or download attachments for a page | `--limit <number>`, `--pattern <glob>`, `--download`, `--dest <directory>` |
 | `attachment-upload <pageId_or_url>` | Upload attachments to a page | `--file <path>`, `--comment <text>`, `--replace`, `--minor-edit` |
