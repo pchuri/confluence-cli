@@ -228,7 +228,7 @@ const md = new MarkdownIt().use(confluencePlugin, {
 
 ## HTML Passthrough
 
-Sometimes you need to embed HTML that doesn't have a markdown equivalent (like SVG):
+Sometimes you need to embed HTML that doesn't have a markdown equivalent (like SVG from diagram generators):
 
 ```markdown
 # My Page
@@ -240,7 +240,58 @@ Sometimes you need to embed HTML that doesn't have a markdown equivalent (like S
 Back to markdown.
 ```
 
-The HTML just passes through as-is. Turn it off if you don't want this:
+The complete HTML structure gets wrapped in the Confluence HTML macro with a unique ID:
+
+```xml
+<ac:structured-macro ac:name="html" ac:schema-version="1" ac:macro-id="...">
+  <ac:plain-text-body><![CDATA[
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="50" cy="50" r="40" fill="red" />
+</svg>
+  ]]></ac:plain-text-body>
+</ac:structured-macro>
+```
+
+**Works with both formats:**
+- Multi-line HTML (HTML blocks) - wrapped directly
+- One-line HTML elements (like SVG from mermaid/graphviz) - also wrapped via post-processing
+
+```markdown
+<!-- Both of these work -->
+<svg id="multi-line">
+  <g></g>
+</svg>
+
+<svg id="one-line"><g/><g class="test"></g></svg>
+```
+
+**Note:** Simple inline HTML fragments (like `<span>text</span>` within a paragraph) pass through as-is without wrapping, since wrapping individual tags would break complex structures.
+
+### Details/Summary → Expand Macro
+
+The `<details>` HTML element is automatically converted to Confluence's expand macro:
+
+```markdown
+<details>
+<summary>Click to expand</summary>
+
+Content here (can include code blocks, lists, etc.)
+
+</details>
+```
+
+Becomes:
+
+```xml
+<ac:structured-macro ac:name="expand" ac:schema-version="1" ac:macro-id="...">
+  <ac:parameter ac:name="title">Click to expand</ac:parameter>
+  <ac:rich-text-body>
+    <!-- rendered content here -->
+  </ac:rich-text-body>
+</ac:structured-macro>
+```
+
+Turn HTML passthrough off if you don't want this:
 
 ```javascript
 const md = new MarkdownIt().use(confluencePlugin, {

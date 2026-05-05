@@ -188,17 +188,116 @@ describe('markdown-confluence plugin', () => {
   });
 
   describe('HTML passthrough', () => {
-    test('allows raw HTML blocks to pass through', () => {
-      const svg = '<svg width="100" height="100"><circle cx="50" cy="50" r="40" /></svg>';
+    test('wraps HTML blocks in HTML macro', () => {
+      // HTML blocks are recognized when on their own lines
+      const svg = '<svg width="100" height="100">\n  <circle cx="50" cy="50" r="40" />\n</svg>';
       const result = converter.markdownToStorage(svg);
-      expect(result).toContain('<svg');
+      expect(result).toContain('<ac:structured-macro ac:name="html"');
+      expect(result).toContain('ac:schema-version="1"');
+      expect(result).toContain('ac:macro-id=');
+      expect(result).toContain('<![CDATA[<svg');
       expect(result).toContain('<circle');
-      expect(result).not.toContain('&lt;svg');
+      // Should be wrapped in a single macro
+      expect((result.match(/ac:structured-macro/g) || []).length).toBe(2); // one open, one close
     });
 
-    test('allows inline HTML', () => {
+    test('passes inline HTML through as-is', () => {
+      // Inline HTML is not wrapped because wrapping individual tags breaks multi-tag structures
       const result = converter.markdownToStorage('Text <span>inline</span> more text');
       expect(result).toContain('<span>inline</span>');
+      expect(result).not.toContain('<ac:structured-macro ac:name="html"');
+    });
+
+    test('escapes CDATA markers in HTML blocks', () => {
+      const html = '<div>test]]>end</div>';
+      const result = converter.markdownToStorage(html);
+      expect(result).toContain('test]]]]><![CDATA[>end');
+    });
+
+    test('generates unique macro IDs for separate HTML blocks', () => {
+      const markdown = '<div>first</div>\n\n<div>second</div>';
+      const result = converter.markdownToStorage(markdown);
+      // Extract macro IDs
+      const macroIds = result.match(/ac:macro-id="([^"]+)"/g);
+      expect(macroIds).toHaveLength(2);
+      expect(macroIds[0]).not.toBe(macroIds[1]);
+    });
+
+    test('keeps complex multi-line SVG intact in single macro', () => {
+      const svg = `<svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg">
+  <g></g>
+  <g class="commit-bullets"></g>
+</svg>`;
+      const result = converter.markdownToStorage(svg);
+
+      // Should have exactly one HTML macro (open + close tags)
+      const macroCount = (result.match(/<ac:structured-macro ac:name="html"/g) || []).length;
+      expect(macroCount).toBe(1);
+
+      // Should contain the complete SVG structure
+      expect(result).toContain('my-svg');
+      expect(result).toContain('<g></g>');
+      expect(result).toContain('commit-bullets');
+    });
+
+    test('wraps one-line SVG in single HTML macro', () => {
+      // SVG all on one line (common from diagram generators)
+      const svg = '<svg id="test" width="100%"><g/><g class="bullets"></g></svg>';
+      const result = converter.markdownToStorage(svg);
+
+      // Should be wrapped in HTML macro
+      expect(result).toContain('<ac:structured-macro ac:name="html"');
+      expect(result).toContain('<![CDATA[<svg id="test"');
+
+      // Should have exactly one HTML macro
+      const macroCount = (result.match(/<ac:structured-macro ac:name="html"/g) || []).length;
+      expect(macroCount).toBe(1);
+
+      // Should contain the complete SVG with all inner tags
+      expect(result).toContain('<g/>');
+      expect(result).toContain('class="bullets"');
+      expect(result).toContain('</svg>');
+    });
+
+    test('wraps one-line complex SVG with many attributes', () => {
+      const svg = '<svg id="my-svg" width="100%" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" style="max-width: 911.008px; background-color: white;" viewBox="-303 -36 911 638"><g/><g></g></svg>';
+      const result = converter.markdownToStorage(svg);
+
+      // Should wrap in single HTML macro
+      expect(result).toContain('<ac:structured-macro ac:name="html"');
+      const macroCount = (result.match(/<ac:structured-macro ac:name="html"/g) || []).length;
+      expect(macroCount).toBe(1);
+
+      // Should preserve all attributes and content
+      expect(result).toContain('my-svg');
+      expect(result).toContain('xmlns:xlink');
+      expect(result).toContain('viewBox');
+    });
+
+    test('converts details/summary to expand macro', () => {
+      const markdown = `<details>
+<summary>View code</summary>
+
+\`\`\`javascript
+console.log("test");
+\`\`\`
+
+</details>`;
+
+      const result = converter.markdownToStorage(markdown);
+
+      // Should convert to expand macro
+      expect(result).toContain('<ac:structured-macro ac:name="expand"');
+      expect(result).toContain('<ac:parameter ac:name="title">View code</ac:parameter>');
+      expect(result).toContain('<ac:rich-text-body>');
+
+      // Code block should be inside
+      expect(result).toContain('<ac:structured-macro ac:name="code">');
+      expect(result).toContain('console.log');
+
+      // Should NOT have leftover HTML macros for details/summary
+      expect(result).not.toContain('CDATA[<details>');
+      expect(result).not.toContain('CDATA[</details>');
     });
   });
 
