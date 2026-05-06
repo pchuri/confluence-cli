@@ -1451,6 +1451,9 @@ describe('ConfluenceClient', () => {
       expect(typeof client.createChildPage).toBe('function');
       expect(typeof client.findPageByTitle).toBe('function');
       expect(typeof client.deletePage).toBe('function');
+      expect(typeof client.listVersions).toBe('function');
+      expect(typeof client.deleteVersion).toBe('function');
+      expect(typeof client.purgeNonCurrentVersions).toBe('function');
     });
 
     test('createPage should default to type "page"', async () => {
@@ -1517,6 +1520,204 @@ describe('ConfluenceClient', () => {
       await expect(
         client.deletePage('https://test.atlassian.net/wiki/viewpage.action?pageId=987654321')
       ).resolves.toEqual({ id: '987654321' });
+
+      mock.restore();
+    });
+  });
+
+  describe('listVersions', () => {
+    test('returns versions sorted ascending with author + message', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/version').reply(200, {
+        results: [
+          { number: 3, when: '2026-04-01T00:00:00Z', by: { displayName: 'Alice' }, minorEdit: false, message: 'edit C' },
+          { number: 1, when: '2026-03-01T00:00:00Z', by: { displayName: 'Bob' }, minorEdit: true, message: '' },
+          { number: 2, when: '2026-03-15T00:00:00Z', by: { email: 'c@x.com' }, message: 'edit B' }
+        ]
+      });
+
+      const versions = await client.listVersions('123');
+      expect(versions.map(v => v.number)).toEqual([1, 2, 3]);
+      expect(versions[0].by).toBe('Bob');
+      expect(versions[1].by).toBe('c@x.com');
+      expect(versions[2].message).toBe('edit C');
+
+      mock.restore();
+    });
+
+    test('paginates over start/limit', async () => {
+      const mock = new MockAdapter(client.client);
+      const firstPage = Array.from({ length: 200 }, (_, i) => ({
+        number: i + 1, when: 't', by: { displayName: 'u' }
+      }));
+      const secondPage = [{ number: 201, when: 't', by: { displayName: 'u' } }];
+      mock.onGet('/content/123/version').replyOnce(200, { results: firstPage });
+      mock.onGet('/content/123/version').replyOnce(200, { results: secondPage });
+
+      const versions = await client.listVersions('123');
+      expect(versions).toHaveLength(201);
+      expect(versions[200].number).toBe(201);
+
+      mock.restore();
+    });
+
+    test('falls back to /rest/experimental/ on 404 (Server/DC)', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/version').reply(404);
+      mock.onGet(/\/rest\/experimental\/content\/123\/version$/).reply(200, {
+        results: [{ number: 1, when: 't', by: { displayName: 'u' } }]
+      });
+
+      const versions = await client.listVersions('123');
+      expect(versions).toHaveLength(1);
+
+      mock.restore();
+    });
+  });
+
+  describe('deleteVersion', () => {
+    test('deletes via /content/{id}/version/{n}', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onDelete('/content/123/version/4').reply(204);
+
+      await expect(client.deleteVersion('123', 4))
+        .resolves.toEqual({ id: '123', versionNumber: 4, viaExperimental: false });
+
+      mock.restore();
+    });
+
+    test('falls back to /rest/experimental/ on 405', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onDelete('/content/123/version/4').reply(405);
+      mock.onDelete(/\/rest\/experimental\/content\/123\/version\/4$/).reply(204);
+
+      const result = await client.deleteVersion('123', 4);
+      expect(result).toEqual({ id: '123', versionNumber: 4, viaExperimental: true });
+
+      mock.restore();
+    });
+
+    test('falls back to /rest/experimental/ on 404 (Server/DC path)', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onDelete('/content/123/version/4').reply(404);
+      mock.onDelete(/\/rest\/experimental\/content\/123\/version\/4$/).reply(204);
+
+      const result = await client.deleteVersion('123', 4);
+      expect(result).toEqual({ id: '123', versionNumber: 4, viaExperimental: true });
+
+      mock.restore();
+    });
+
+    test('rejects non-positive integer versionNumber', async () => {
+      await expect(client.deleteVersion('123', 0)).rejects.toThrow(/positive integer/);
+      await expect(client.deleteVersion('123', 'abc')).rejects.toThrow(/positive integer/);
+    });
+  });
+
+  describe('purgeNonCurrentVersions', () => {
+    test('keeps the highest version and deletes the rest in descending order', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/version').reply(200, {
+        results: [
+          { number: 1, when: 't', by: { displayName: 'u' } },
+          { number: 2, when: 't', by: { displayName: 'u' } },
+          { number: 3, when: 't', by: { displayName: 'u' } },
+          { number: 4, when: 't', by: { displayName: 'u' } }
+        ]
+      });
+      const calls = [];
+      mock.onDelete(/\/content\/123\/version\/(\d+)$/).reply(config => {
+        calls.push(config.url);
+        return [204];
+      });
+
+      const result = await client.purgeNonCurrentVersions('123');
+      expect(result).toEqual({ id: '123', kept: 4, deleted: 3, failed: 0, errors: [] });
+      expect(calls).toEqual([
+        '/content/123/version/3',
+        '/content/123/version/2',
+        '/content/123/version/1'
+      ]);
+
+      mock.restore();
+    });
+
+    test('returns 0/0 when only the current version exists', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/version').reply(200, {
+        results: [{ number: 1, when: 't', by: { displayName: 'u' } }]
+      });
+
+      const result = await client.purgeNonCurrentVersions('123');
+      expect(result).toEqual({ id: '123', kept: 1, deleted: 0, failed: 0, errors: [] });
+
+      mock.restore();
+    });
+
+    test('records failures without aborting the loop', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/version').reply(200, {
+        results: [
+          { number: 1, when: 't', by: { displayName: 'u' } },
+          { number: 2, when: 't', by: { displayName: 'u' } },
+          { number: 3, when: 't', by: { displayName: 'u' } }
+        ]
+      });
+      mock.onDelete('/content/123/version/2').reply(500);
+      mock.onDelete('/content/123/version/1').reply(204);
+
+      const result = await client.purgeNonCurrentVersions('123');
+      expect(result.deleted).toBe(1);
+      expect(result.failed).toBe(1);
+      expect(result.kept).toBe(3);
+      expect(result.errors[0].versionNumber).toBe(2);
+
+      mock.restore();
+    });
+
+    test('end-to-end fallback: list 404s on /api, deletes hit /experimental', async () => {
+      const mock = new MockAdapter(client.client);
+      // Modern path 404s on list — typical of Server/DC.
+      mock.onGet('/content/123/version').reply(404);
+      mock.onGet(/\/rest\/experimental\/content\/123\/version$/).reply(200, {
+        results: [
+          { number: 1, when: 't', by: { displayName: 'u' } },
+          { number: 2, when: 't', by: { displayName: 'u' } },
+          { number: 3, when: 't', by: { displayName: 'u' } }
+        ]
+      });
+      // Each deleteVersion attempts the modern path first, falls back.
+      // Register experimental matchers first so they take precedence
+      // over the broader modern-path regex.
+      mock.onDelete(/\/rest\/experimental\/content\/123\/version\/\d+$/).reply(204);
+      mock.onDelete(/\/content\/123\/version\/\d+$/).reply(404);
+
+      const result = await client.purgeNonCurrentVersions('123');
+      expect(result).toEqual({ id: '123', kept: 3, deleted: 2, failed: 0, errors: [] });
+
+      mock.restore();
+    });
+  });
+
+  describe('listVersions edge cases', () => {
+    test('returns empty array when API returns no results', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/version').reply(200, { results: [] });
+
+      const versions = await client.listVersions('123');
+      expect(versions).toEqual([]);
+
+      mock.restore();
+    });
+
+    test('propagates 404 when both modern and experimental return 404 (page not found)', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/missing/version').reply(404);
+      mock.onGet(/\/rest\/experimental\/content\/missing\/version$/).reply(404);
+
+      await expect(client.listVersions('missing')).rejects.toMatchObject({
+        response: { status: 404 }
+      });
 
       mock.restore();
     });
