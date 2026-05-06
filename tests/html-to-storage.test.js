@@ -393,4 +393,116 @@ describe('htmlToStorage', () => {
       expect(() => htmlToStorage(html)).not.toThrow();
     });
   });
+
+  describe('details/summary conversion', () => {
+    test('basic details with summary becomes expand macro', () => {
+      const html = '<details><summary>Click me</summary><p>Hidden content</p></details>';
+      const out = htmlToStorage(html);
+      expect(out).toContain('<ac:structured-macro ac:name="expand">');
+      expect(out).toContain('<ac:parameter ac:name="title">Click me</ac:parameter>');
+      expect(out).toContain('<ac:rich-text-body><p>Hidden content</p></ac:rich-text-body>');
+      expect(out).not.toContain('<details>');
+      expect(out).not.toContain('<summary>');
+    });
+
+    test('summary with inline HTML has tags stripped from title', () => {
+      const html = '<details><summary>View <em>code</em></summary><p>body</p></details>';
+      const out = htmlToStorage(html);
+      expect(out).toContain('<ac:parameter ac:name="title">View code</ac:parameter>');
+      expect(out).not.toContain('<em>code</em>');
+    });
+
+    test('details with multiple paragraphs in body', () => {
+      const html = '<details><summary>More</summary><p>First</p><p>Second</p></details>';
+      const out = htmlToStorage(html);
+      expect(out).toContain('<ac:rich-text-body><p>First</p><p>Second</p></ac:rich-text-body>');
+    });
+
+    test('details with code block inside body', () => {
+      const html = '<details><summary>Code</summary><pre><code class="language-js">console.log();</code></pre></details>';
+      const out = htmlToStorage(html);
+      expect(out).toContain('<ac:structured-macro ac:name="expand">');
+      expect(out).toContain('<ac:structured-macro ac:name="code">');
+      expect(out).toContain('console.log();');
+    });
+
+    test('details without summary falls through as plain HTML', () => {
+      const html = '<details><p>No summary here</p></details>';
+      const out = htmlToStorage(html);
+      expect(out).toContain('<details>');
+      expect(out).not.toContain('ac:structured-macro');
+    });
+
+    test('nested details inside info callout', () => {
+      const html = '<blockquote><p><strong>INFO</strong></p><details><summary>More</summary><p>Nested</p></details></blockquote>';
+      const out = htmlToStorage(html);
+      expect(out).toContain('<ac:structured-macro ac:name="info">');
+      expect(out).toContain('<ac:structured-macro ac:name="expand">');
+      expect(out).toContain('Nested');
+    });
+
+    test('details inside details (nested expand macros)', () => {
+      const html = '<details><summary>Outer</summary><details><summary>Inner</summary><p>Deep</p></details></details>';
+      const out = htmlToStorage(html);
+      const macroCount = (out.match(/ac:name="expand"/g) || []).length;
+      expect(macroCount).toBe(2);
+      expect(out).toContain('Deep');
+    });
+  });
+
+  describe('HTML macro wrapping', () => {
+    test('SVG block is wrapped in HTML macro with CDATA', () => {
+      const html = '<svg width="100" height="100"><circle cx="50" cy="50" r="40"/></svg>';
+      const out = htmlToStorage(html);
+      expect(out).toContain('<ac:structured-macro ac:name="html"');
+      expect(out).toContain('ac:schema-version="1"');
+      expect(out).toContain('ac:macro-id=');
+      expect(out).toContain('<![CDATA[<svg');
+      expect(out).toContain('<circle cx="50" cy="50" r="40">');
+      expect(out).toContain(']]></ac:plain-text-body>');
+    });
+
+    test('div block is wrapped in HTML macro', () => {
+      const html = '<div class="custom"><p>Content</p></div>';
+      const out = htmlToStorage(html);
+      expect(out).toContain('<ac:structured-macro ac:name="html"');
+      expect(out).toContain('<![CDATA[<div class="custom">');
+    });
+
+    test('CDATA end marker is escaped in HTML content', () => {
+      const html = '<div>test]]>end</div>';
+      const out = htmlToStorage(html);
+      expect(out).toContain('test]]]]><![CDATA[>end');
+      expect(out).not.toContain('test]]>end');
+    });
+
+    test('each HTML block gets unique UUID', () => {
+      const html = '<svg id="a"></svg><svg id="b"></svg>';
+      const out = htmlToStorage(html);
+      const ids = out.match(/ac:macro-id="([^"]+)"/g);
+      expect(ids).toHaveLength(2);
+      expect(ids[0]).not.toBe(ids[1]);
+    });
+
+    test('video tag is NOT wrapped (not in allowlist)', () => {
+      const html = '<video src="test.mp4"></video>';
+      const out = htmlToStorage(html);
+      expect(out).toBe('<video src="test.mp4"></video>');
+      expect(out).not.toContain('ac:structured-macro');
+    });
+
+    test('normal paragraph is NOT wrapped', () => {
+      const html = '<p>Regular paragraph</p>';
+      const out = htmlToStorage(html);
+      expect(out).toBe('<p>Regular paragraph</p>');
+      expect(out).not.toContain('ac:structured-macro');
+    });
+
+    test('span is NOT wrapped (not in allowlist)', () => {
+      const html = '<span>inline</span>';
+      const out = htmlToStorage(html);
+      expect(out).toBe('<span>inline</span>');
+      expect(out).not.toContain('ac:structured-macro');
+    });
+  });
 });

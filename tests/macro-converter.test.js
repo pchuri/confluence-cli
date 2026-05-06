@@ -1316,3 +1316,48 @@ describe('MacroConverter integration smoke tests', () => {
     expect(result).toContain('<td><p>c</p></td>');
   });
 });
+
+describe('markdown with details/summary', () => {
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('details in markdown converts to expand macro', () => {
+    const md = `<details>
+<summary>Show more</summary>
+
+Hidden paragraph
+
+</details>`;
+    const out = converter.markdownToStorage(md);
+    expect(out).toContain('<ac:structured-macro ac:name="expand">');
+    expect(out).toContain('<ac:parameter ac:name="title">Show more</ac:parameter>');
+    expect(out).toContain('Hidden paragraph');
+  });
+
+  test('details with code block inside', () => {
+    const md = `<details>
+<summary>View code</summary>
+
+\`\`\`javascript
+console.log("test");
+\`\`\`
+
+</details>`;
+    const out = converter.markdownToStorage(md);
+    expect(out).toContain('<ac:structured-macro ac:name="expand">');
+    expect(out).toContain('<ac:structured-macro ac:name="code">');
+    expect(out).toContain('console.log');
+  });
+});
+
+describe('markdown with HTML blocks', () => {
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('SVG in markdown wraps in HTML macro', () => {
+    const md = `<svg width="50" height="50">
+  <circle cx="25" cy="25" r="20"/>
+</svg>`;
+    const out = converter.markdownToStorage(md);
+    expect(out).toContain('<ac:structured-macro ac:name="html"');
+    expect(out).toContain('<![CDATA[<svg');
+  });
+});
