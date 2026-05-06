@@ -1,3 +1,16 @@
+# [2.5.0](https://github.com/pchuri/confluence-cli/compare/v2.4.0...v2.5.0) (2026-05-06)
+
+
+### Bug Fixes
+
+* **deps:** bump axios to ~1.15.2 to address security advisories ([#174](https://github.com/pchuri/confluence-cli/issues/174)) ([0a1492b](https://github.com/pchuri/confluence-cli/commit/0a1492ba0ffea887c9d392cd8f0a68c57144348e)), closes [GHSA-w9j2-pv#6h63](https://github.com/GHSA-w9j2-pv/issues/6h63) [#173](https://github.com/pchuri/confluence-cli/issues/173)
+* **walker:** preserve attributes on <ul>/<ol>/<li> in markdown→storage ([#170](https://github.com/pchuri/confluence-cli/issues/170)) ([b5c172a](https://github.com/pchuri/confluence-cli/commit/b5c172a79508203cfa45eda335e1c4fa8f4a3ef6)), closes [#153](https://github.com/pchuri/confluence-cli/issues/153)
+
+
+### Features
+
+* add page version listing and purge commands ([#171](https://github.com/pchuri/confluence-cli/issues/171)) ([2bd5c37](https://github.com/pchuri/confluence-cli/commit/2bd5c3735c1e14ca9b16dd32f53042df9e459ad9))
+
 # [2.4.0](https://github.com/pchuri/confluence-cli/compare/v2.3.1...v2.4.0) (2026-05-04)
 
 
