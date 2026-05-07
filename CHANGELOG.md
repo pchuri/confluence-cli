@@ -1,3 +1,10 @@
+# [2.6.0](https://github.com/pchuri/confluence-cli/compare/v2.5.0...v2.6.0) (2026-05-07)
+
+
+### Features
+
+* **converter:** add details/summary and HTML block support to markdown conversion ([#177](https://github.com/pchuri/confluence-cli/issues/177)) ([a4cc7a0](https://github.com/pchuri/confluence-cli/commit/a4cc7a04746f9a56798babf7d16e59eb40ed439c))
+
 # [2.5.0](https://github.com/pchuri/confluence-cli/compare/v2.4.0...v2.5.0) (2026-05-06)
 
 
