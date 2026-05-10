@@ -1,3 +1,10 @@
+## [2.6.1](https://github.com/pchuri/confluence-cli/compare/v2.6.0...v2.6.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* **convert:** route html → markdown through htmlToMarkdown ([#180](https://github.com/pchuri/confluence-cli/issues/180)) ([384d631](https://github.com/pchuri/confluence-cli/commit/384d63141fecdfa8a6d6b642f1928716b5c71a5d))
+
 # [2.6.0](https://github.com/pchuri/confluence-cli/compare/v2.5.0...v2.6.0) (2026-05-07)
 
 
