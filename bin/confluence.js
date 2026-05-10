@@ -44,6 +44,23 @@ function handleCommandError(analytics, commandName, error) {
   process.exit(1);
 }
 
+// Wraps a command action with the standard analytics + client + error pipeline.
+// The handler still calls analytics.track(name, true) on success so it can opt
+// into alternative tracking keys (e.g. *_cancel, *_dry_run).
+function withClient(commandName, handler, { writable = false } = {}) {
+  return async (...actionArgs) => {
+    const analytics = new Analytics();
+    try {
+      const config = getConfig(getProfileName());
+      if (writable) assertWritable(config);
+      const client = new ConfluenceClient(config);
+      await handler({ client, config, analytics }, ...actionArgs);
+    } catch (error) {
+      handleCommandError(analytics, commandName, error);
+    }
+  };
+}
+
 program
   .name('confluence')
   .description('CLI tool for Atlassian Confluence')
@@ -80,46 +97,34 @@ program
   .command('read <pageId>')
   .description('Read a Confluence page by ID or URL')
   .option('-f, --format <format>', 'Output format (html, text, storage, markdown)', 'text')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      const client = new ConfluenceClient(getConfig(getProfileName()));
-      const content = await client.readPage(pageId, options.format);
-      console.log(content);
-      analytics.track('read', true);
-    } catch (error) {
-      handleCommandError(analytics, 'read', error);
-    }
-  });
+  .action(withClient('read', async ({ client, analytics }, pageId, options) => {
+    const content = await client.readPage(pageId, options.format);
+    console.log(content);
+    analytics.track('read', true);
+  }));
 
 // Info command
 program
   .command('info <pageId>')
   .description('Get information about a Confluence page')
   .option('-f, --format <format>', 'Output format (text, json)', 'text')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      const client = new ConfluenceClient(getConfig(getProfileName()));
-      const info = await client.getPageInfo(pageId);
+  .action(withClient('info', async ({ client, analytics }, pageId, options) => {
+    const info = await client.getPageInfo(pageId);
 
-      if ((options.format || 'text').toLowerCase() === 'json') {
-        console.log(JSON.stringify(info, null, 2));
-      } else {
-        console.log(chalk.blue('Page Information:'));
-        console.log(`Title: ${chalk.green(info.title)}`);
-        console.log(`ID: ${chalk.green(info.id)}`);
-        console.log(`Type: ${chalk.green(info.type)}`);
-        console.log(`Status: ${chalk.green(info.status)}`);
-        if (info.space) {
-          console.log(`Space: ${chalk.green(info.space.name)} (${info.space.key})`);
-        }
+    if ((options.format || 'text').toLowerCase() === 'json') {
+      console.log(JSON.stringify(info, null, 2));
+    } else {
+      console.log(chalk.blue('Page Information:'));
+      console.log(`Title: ${chalk.green(info.title)}`);
+      console.log(`ID: ${chalk.green(info.id)}`);
+      console.log(`Type: ${chalk.green(info.type)}`);
+      console.log(`Status: ${chalk.green(info.status)}`);
+      if (info.space) {
+        console.log(`Space: ${chalk.green(info.space.name)} (${info.space.key})`);
       }
-      analytics.track('info', true);
-    } catch (error) {
-      handleCommandError(analytics, 'info', error);
     }
-  });
+    analytics.track('info', true);
+  }));
 
 // Search command
 program
@@ -127,30 +132,24 @@ program
   .description('Search for Confluence pages')
   .option('-l, --limit <limit>', 'Limit number of results', '10')
   .option('--cql', 'Pass query as raw CQL instead of text search')
-  .action(async (query, options) => {
-    const analytics = new Analytics();
-    try {
-      const client = new ConfluenceClient(getConfig(getProfileName()));
-      const results = await client.search(query, parseInt(options.limit), options.cql);
-      
-      if (results.length === 0) {
-        console.log(chalk.yellow('No results found.'));
-        analytics.track('search', true);
-        return;
-      }
+  .action(withClient('search', async ({ client, analytics }, query, options) => {
+    const results = await client.search(query, parseInt(options.limit), options.cql);
 
-      console.log(chalk.blue(`Found ${results.length} results:`));
-      results.forEach((result, index) => {
-        console.log(`${index + 1}. ${chalk.green(result.title)} (ID: ${result.id})`);
-        if (result.excerpt) {
-          console.log(`   ${chalk.gray(result.excerpt)}`);
-        }
-      });
+    if (results.length === 0) {
+      console.log(chalk.yellow('No results found.'));
       analytics.track('search', true);
-    } catch (error) {
-      handleCommandError(analytics, 'search', error);
+      return;
     }
-  });
+
+    console.log(chalk.blue(`Found ${results.length} results:`));
+    results.forEach((result, index) => {
+      console.log(`${index + 1}. ${chalk.green(result.title)} (ID: ${result.id})`);
+      if (result.excerpt) {
+        console.log(`   ${chalk.gray(result.excerpt)}`);
+      }
+    });
+    analytics.track('search', true);
+  }));
 
 // List spaces command
 program
@@ -158,23 +157,16 @@ program
   .description('List Confluence spaces')
   .option('-l, --limit <limit>', 'Maximum total spaces to return across paginated requests', '500')
   .option('--all', 'Fetch every space, paginating through all results (overrides --limit)')
-  .action(async (options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      const client = new ConfluenceClient(config);
-      const maxResults = options.all ? null : parseInt(options.limit);
-      const spaces = await client.getSpaces(maxResults);
+  .action(withClient('spaces', async ({ client, analytics }, options) => {
+    const maxResults = options.all ? null : parseInt(options.limit);
+    const spaces = await client.getSpaces(maxResults);
 
-      console.log(chalk.blue(`Available spaces (${spaces.length}):`));
-      spaces.forEach(space => {
-        console.log(`${chalk.green(space.key)} - ${space.name}`);
-      });
-      analytics.track('spaces', true);
-    } catch (error) {
-      handleCommandError(analytics, 'spaces', error);
-    }
-  });
+    console.log(chalk.blue(`Available spaces (${spaces.length}):`));
+    spaces.forEach(space => {
+      console.log(`${chalk.green(space.key)} - ${space.name}`);
+    });
+    analytics.track('spaces', true);
+  }));
 
 // Stats command
 program
@@ -240,45 +232,36 @@ program
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
   .option('--type <type>', 'Content type (page, folder)', 'page')
-  .action(async (title, spaceKey, options) => {
-    const analytics = new Analytics();
-    try {
-      assertNonEmpty(title, 'title');
-      assertNonEmpty(spaceKey, 'spaceKey');
-      assertValidType(options.type);
-      assertNoBodyForFolder(options.type, options);
+  .action(withClient('create', async ({ client, analytics }, title, spaceKey, options) => {
+    assertNonEmpty(title, 'title');
+    assertNonEmpty(spaceKey, 'spaceKey');
+    assertValidType(options.type);
+    assertNoBodyForFolder(options.type, options);
 
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
+    let content = '';
 
-      let content = '';
-
-      if (options.file) {
-        if (!fs.existsSync(options.file)) {
-          throw new Error(`File not found: ${options.file}`);
-        }
-        content = fs.readFileSync(options.file, 'utf8');
-      } else if (options.content) {
-        content = options.content;
-      } else if (options.type !== 'folder') {
-        throw new Error('Either --file or --content option is required');
+    if (options.file) {
+      if (!fs.existsSync(options.file)) {
+        throw new Error(`File not found: ${options.file}`);
       }
-
-      const result = await client.createPage(title, spaceKey, content, options.format, options.type);
-
-      const label = options.type === 'folder' ? 'Folder' : 'Page';
-      console.log(chalk.green(`✅ ${label} created successfully!`));
-      console.log(`Title: ${chalk.blue(result.title)}`);
-      console.log(`ID: ${chalk.blue(result.id)}`);
-      console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
-      console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
-
-      analytics.track('create', true);
-    } catch (error) {
-      handleCommandError(analytics, 'create', error);
+      content = fs.readFileSync(options.file, 'utf8');
+    } else if (options.content) {
+      content = options.content;
+    } else if (options.type !== 'folder') {
+      throw new Error('Either --file or --content option is required');
     }
-  });
+
+    const result = await client.createPage(title, spaceKey, content, options.format, options.type);
+
+    const label = options.type === 'folder' ? 'Folder' : 'Page';
+    console.log(chalk.green(`✅ ${label} created successfully!`));
+    console.log(`Title: ${chalk.blue(result.title)}`);
+    console.log(`ID: ${chalk.blue(result.id)}`);
+    console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
+    console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
+
+    analytics.track('create', true);
+  }, { writable: true }));
 
 // Create child page command
 program
@@ -288,50 +271,41 @@ program
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
   .option('--type <type>', 'Content type (page, folder)', 'page')
-  .action(async (title, parentId, options) => {
-    const analytics = new Analytics();
-    try {
-      assertNonEmpty(title, 'title');
-      assertNonEmpty(parentId, 'parentId');
-      assertValidType(options.type);
-      assertNoBodyForFolder(options.type, options);
+  .action(withClient('create_child', async ({ client, analytics }, title, parentId, options) => {
+    assertNonEmpty(title, 'title');
+    assertNonEmpty(parentId, 'parentId');
+    assertValidType(options.type);
+    assertNoBodyForFolder(options.type, options);
 
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
+    // Get parent page info to get space key
+    const parentInfo = await client.getPageInfo(parentId);
+    const spaceKey = parentInfo.space.key;
 
-      // Get parent page info to get space key
-      const parentInfo = await client.getPageInfo(parentId);
-      const spaceKey = parentInfo.space.key;
+    let content = '';
 
-      let content = '';
-
-      if (options.file) {
-        if (!fs.existsSync(options.file)) {
-          throw new Error(`File not found: ${options.file}`);
-        }
-        content = fs.readFileSync(options.file, 'utf8');
-      } else if (options.content) {
-        content = options.content;
-      } else if (options.type !== 'folder') {
-        throw new Error('Either --file or --content option is required');
+    if (options.file) {
+      if (!fs.existsSync(options.file)) {
+        throw new Error(`File not found: ${options.file}`);
       }
-
-      const result = await client.createChildPage(title, spaceKey, parentId, content, options.format, options.type);
-
-      const label = options.type === 'folder' ? 'Folder' : 'Child page';
-      console.log(chalk.green(`✅ ${label} created successfully!`));
-      console.log(`Title: ${chalk.blue(result.title)}`);
-      console.log(`ID: ${chalk.blue(result.id)}`);
-      console.log(`Parent: ${chalk.blue(parentInfo.title)} (${parentId})`);
-      console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
-      console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
-
-      analytics.track('create_child', true);
-    } catch (error) {
-      handleCommandError(analytics, 'create_child', error);
+      content = fs.readFileSync(options.file, 'utf8');
+    } else if (options.content) {
+      content = options.content;
+    } else if (options.type !== 'folder') {
+      throw new Error('Either --file or --content option is required');
     }
-  });
+
+    const result = await client.createChildPage(title, spaceKey, parentId, content, options.format, options.type);
+
+    const label = options.type === 'folder' ? 'Folder' : 'Child page';
+    console.log(chalk.green(`✅ ${label} created successfully!`));
+    console.log(`Title: ${chalk.blue(result.title)}`);
+    console.log(`ID: ${chalk.blue(result.id)}`);
+    console.log(`Parent: ${chalk.blue(parentInfo.title)} (${parentId})`);
+    console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
+    console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
+
+    analytics.track('create_child', true);
+  }, { writable: true }));
 
 // Update command
 program
@@ -341,185 +315,145 @@ program
   .option('-f, --file <file>', 'Read content from file')
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      // Check if at least one option is provided
-      if (!options.title && !options.file && !options.content) {
-        throw new Error('At least one of --title, --file, or --content must be provided.');
-      }
-
-      if (options.title !== undefined) {
-        assertNonEmpty(options.title, '--title');
-      }
-
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
-
-      let content = null; // Use null to indicate no content change
-      
-      if (options.file) {
-        if (!fs.existsSync(options.file)) {
-          throw new Error(`File not found: ${options.file}`);
-        }
-        content = fs.readFileSync(options.file, 'utf8');
-      } else if (options.content) {
-        content = options.content;
-      }
-      
-      const result = await client.updatePage(pageId, options.title, content, options.format);
-      
-      console.log(chalk.green('✅ Page updated successfully!'));
-      console.log(`Title: ${chalk.blue(result.title)}`);
-      console.log(`ID: ${chalk.blue(result.id)}`);
-      console.log(`Version: ${chalk.blue(result.version.number)}`);
-      console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
-
-      analytics.track('update', true);
-    } catch (error) {
-      handleCommandError(analytics, 'update', error);
+  .action(withClient('update', async ({ client, analytics }, pageId, options) => {
+    // Check if at least one option is provided
+    if (!options.title && !options.file && !options.content) {
+      throw new Error('At least one of --title, --file, or --content must be provided.');
     }
-  });
+
+    if (options.title !== undefined) {
+      assertNonEmpty(options.title, '--title');
+    }
+
+    let content = null; // Use null to indicate no content change
+
+    if (options.file) {
+      if (!fs.existsSync(options.file)) {
+        throw new Error(`File not found: ${options.file}`);
+      }
+      content = fs.readFileSync(options.file, 'utf8');
+    } else if (options.content) {
+      content = options.content;
+    }
+
+    const result = await client.updatePage(pageId, options.title, content, options.format);
+
+    console.log(chalk.green('✅ Page updated successfully!'));
+    console.log(`Title: ${chalk.blue(result.title)}`);
+    console.log(`ID: ${chalk.blue(result.id)}`);
+    console.log(`Version: ${chalk.blue(result.version.number)}`);
+    console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
+
+    analytics.track('update', true);
+  }, { writable: true }));
 
 // Move command
 program
   .command('move <pageId_or_url> <newParentId_or_url>')
   .description('Move a page to a new parent location (within same space)')
   .option('-t, --title <title>', 'New page title (optional)')
-  .action(async (pageId, newParentId, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
-      const result = await client.movePage(pageId, newParentId, options.title);
+  .action(withClient('move', async ({ client, analytics }, pageId, newParentId, options) => {
+    const result = await client.movePage(pageId, newParentId, options.title);
 
-      console.log(chalk.green('✅ Page moved successfully!'));
-      console.log(`Title: ${chalk.blue(result.title)}`);
-      console.log(`ID: ${chalk.blue(result.id)}`);
-      console.log(`New Parent: ${chalk.blue(newParentId)}`);
-      console.log(`Version: ${chalk.blue(result.version.number)}`);
-      console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
+    console.log(chalk.green('✅ Page moved successfully!'));
+    console.log(`Title: ${chalk.blue(result.title)}`);
+    console.log(`ID: ${chalk.blue(result.id)}`);
+    console.log(`New Parent: ${chalk.blue(newParentId)}`);
+    console.log(`Version: ${chalk.blue(result.version.number)}`);
+    console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
 
-      analytics.track('move', true);
-    } catch (error) {
-      handleCommandError(analytics, 'move', error);
-    }
-  });
+    analytics.track('move', true);
+  }, { writable: true }));
 
 // Delete command
 program
   .command('delete <pageIdOrUrl>')
   .description('Delete a Confluence page by ID or URL')
   .option('-y, --yes', 'Skip confirmation prompt')
-  .action(async (pageIdOrUrl, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
-      const pageInfo = await client.getPageInfo(pageIdOrUrl);
+  .action(withClient('delete', async ({ client, analytics }, pageIdOrUrl, options) => {
+    const pageInfo = await client.getPageInfo(pageIdOrUrl);
 
-      if (!options.yes) {
-        const spaceLabel = pageInfo.space?.key ? ` (${pageInfo.space.key})` : '';
-        const { confirmed } = await inquirer.prompt([
-          {
-            type: 'confirm',
-            name: 'confirmed',
-            default: false,
-            message: `Delete "${pageInfo.title}" (ID: ${pageInfo.id})${spaceLabel}?`
-          }
-        ]);
-
-        if (!confirmed) {
-          console.log(chalk.yellow('Cancelled.'));
-          analytics.track('delete_cancel', true);
-          return;
+    if (!options.yes) {
+      const spaceLabel = pageInfo.space?.key ? ` (${pageInfo.space.key})` : '';
+      const { confirmed } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirmed',
+          default: false,
+          message: `Delete "${pageInfo.title}" (ID: ${pageInfo.id})${spaceLabel}?`
         }
+      ]);
+
+      if (!confirmed) {
+        console.log(chalk.yellow('Cancelled.'));
+        analytics.track('delete_cancel', true);
+        return;
       }
-
-      const result = await client.deletePage(pageInfo.id);
-
-      console.log(chalk.green('✅ Page deleted successfully!'));
-      console.log(`Title: ${chalk.blue(pageInfo.title)}`);
-      console.log(`ID: ${chalk.blue(result.id)}`);
-      analytics.track('delete', true);
-    } catch (error) {
-      handleCommandError(analytics, 'delete', error);
     }
-  });
+
+    const result = await client.deletePage(pageInfo.id);
+
+    console.log(chalk.green('✅ Page deleted successfully!'));
+    console.log(`Title: ${chalk.blue(pageInfo.title)}`);
+    console.log(`ID: ${chalk.blue(result.id)}`);
+    analytics.track('delete', true);
+  }, { writable: true }));
 
 // List historical versions of a page
 program
   .command('versions <pageId>')
   .description('List historical versions of a Confluence page')
   .option('--format <format>', 'Output format: text or json (default: text)', 'text')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      const client = new ConfluenceClient(config);
-      const resolvedId = String(await client.extractPageId(pageId));
-      const versions = await client.listVersions(resolvedId);
+  .action(withClient('versions', async ({ client, analytics }, pageId, options) => {
+    const resolvedId = String(await client.extractPageId(pageId));
+    const versions = await client.listVersions(resolvedId);
 
-      if (options.format === 'json') {
-        console.log(JSON.stringify({ pageId: resolvedId, versions }, null, 2));
-      } else {
-        const max = versions.length ? Math.max(...versions.map(v => v.number)) : 0;
-        console.log(chalk.blue(`Versions for page ${resolvedId} (${versions.length} total):`));
-        if (versions.length === 0) {
-          console.log(chalk.yellow('  (no versions returned)'));
-        }
-        for (const v of versions) {
-          const tag = v.number === max ? chalk.green(' [current]') : '';
-          const author = v.by || 'unknown';
-          const note = v.message ? `  — ${v.message}` : '';
-          console.log(`  v${v.number}${tag}  ${v.when}  ${author}${note}`);
-        }
+    if (options.format === 'json') {
+      console.log(JSON.stringify({ pageId: resolvedId, versions }, null, 2));
+    } else {
+      const max = versions.length ? Math.max(...versions.map(v => v.number)) : 0;
+      console.log(chalk.blue(`Versions for page ${resolvedId} (${versions.length} total):`));
+      if (versions.length === 0) {
+        console.log(chalk.yellow('  (no versions returned)'));
       }
-      analytics.track('versions', true);
-    } catch (error) {
-      handleCommandError(analytics, 'versions', error);
+      for (const v of versions) {
+        const tag = v.number === max ? chalk.green(' [current]') : '';
+        const author = v.by || 'unknown';
+        const note = v.message ? `  — ${v.message}` : '';
+        console.log(`  v${v.number}${tag}  ${v.when}  ${author}${note}`);
+      }
     }
-  });
+    analytics.track('versions', true);
+  }));
 
 // Delete a single historical version of a page
 program
   .command('version-delete <pageId> <versionNumber>')
   .description('Delete a single historical version of a page (cannot delete the current version)')
   .option('-y, --yes', 'Skip confirmation prompt')
-  .action(async (pageId, versionNumber, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
-      const resolvedId = String(await client.extractPageId(pageId));
-      const n = Number(versionNumber);
+  .action(withClient('version_delete', async ({ client, analytics }, pageId, versionNumber, options) => {
+    const resolvedId = String(await client.extractPageId(pageId));
+    const n = Number(versionNumber);
 
-      if (!options.yes) {
-        const { confirmed } = await inquirer.prompt([{
-          type: 'confirm',
-          name: 'confirmed',
-          default: false,
-          message: `Delete v${n} of page ${resolvedId}? This cannot be undone.`
-        }]);
-        if (!confirmed) {
-          console.log(chalk.yellow('Cancelled.'));
-          analytics.track('version_delete_cancel', true);
-          return;
-        }
+    if (!options.yes) {
+      const { confirmed } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'confirmed',
+        default: false,
+        message: `Delete v${n} of page ${resolvedId}? This cannot be undone.`
+      }]);
+      if (!confirmed) {
+        console.log(chalk.yellow('Cancelled.'));
+        analytics.track('version_delete_cancel', true);
+        return;
       }
-
-      const result = await client.deleteVersion(resolvedId, n);
-      const note = result.viaExperimental ? chalk.yellow(' (via experimental endpoint)') : '';
-      console.log(chalk.green(`✅ Deleted v${result.versionNumber} of page ${result.id}${note}`));
-      analytics.track('version_delete', true);
-    } catch (error) {
-      handleCommandError(analytics, 'version_delete', error);
     }
-  });
+
+    const result = await client.deleteVersion(resolvedId, n);
+    const note = result.viaExperimental ? chalk.yellow(' (via experimental endpoint)') : '';
+    console.log(chalk.green(`✅ Deleted v${result.versionNumber} of page ${result.id}${note}`));
+    analytics.track('version_delete', true);
+  }, { writable: true }));
 
 // Convenience: delete every non-current historical version of a page,
 // keeping only the current one.
@@ -528,127 +462,104 @@ program
   .description('Delete every non-current historical version of a page (keeps only current)')
   .option('-y, --yes', 'Skip confirmation prompt')
   .option('--throttle <seconds>', 'Sleep between version-delete calls', '0')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
-      const resolvedId = String(await client.extractPageId(pageId));
-      const versions = await client.listVersions(resolvedId);
+  .action(withClient('versions_purge', async ({ client, analytics }, pageId, options) => {
+    const resolvedId = String(await client.extractPageId(pageId));
+    const versions = await client.listVersions(resolvedId);
 
-      if (versions.length === 0) {
-        console.log(chalk.yellow(`No versions returned for page ${resolvedId}.`));
-        analytics.track('versions_purge', true);
-        return;
-      }
-      const max = Math.max(...versions.map(v => v.number));
-      const historicalCount = versions.filter(v => v.number !== max).length;
-      if (historicalCount === 0) {
-        console.log(chalk.yellow(`Only current version v${max} exists for page ${resolvedId}; nothing to purge.`));
-        analytics.track('versions_purge', true);
-        return;
-      }
-
-      if (!options.yes) {
-        const { confirmed } = await inquirer.prompt([{
-          type: 'confirm',
-          name: 'confirmed',
-          default: false,
-          message: `Delete ${historicalCount} historical version(s) of page ${resolvedId}? Current version (v${max}) will be kept.`
-        }]);
-        if (!confirmed) {
-          console.log(chalk.yellow('Cancelled.'));
-          analytics.track('versions_purge_cancel', true);
-          return;
-        }
-      }
-
-      const throttleMs = Math.max(0, parseFloat(options.throttle || '0')) * 1000;
-      const result = await client.purgeNonCurrentVersions(resolvedId, {
-        onProgress: async (event) => {
-          if (event.kind === 'deleted') {
-            const note = event.viaExperimental ? chalk.yellow(' (experimental)') : '';
-            console.log(chalk.green(`  ✓ deleted v${event.versionNumber}${note}`));
-          } else if (event.kind === 'failed') {
-            console.log(chalk.red(`  ✗ v${event.versionNumber}: ${event.message}`));
-          }
-          if (throttleMs > 0) {
-            await new Promise(r => setTimeout(r, throttleMs));
-          }
-        }
-      });
-
-      console.log('');
-      console.log(chalk.green(`✅ Purge complete for page ${result.id}: ` +
-        `${result.deleted} deleted, ${result.failed} failed, kept v${result.kept}.`));
-      analytics.track('versions_purge', result.failed === 0);
-      if (result.failed > 0) {
-        process.exitCode = 1;
-      }
-    } catch (error) {
-      handleCommandError(analytics, 'versions_purge', error);
+    if (versions.length === 0) {
+      console.log(chalk.yellow(`No versions returned for page ${resolvedId}.`));
+      analytics.track('versions_purge', true);
+      return;
     }
-  });
+    const max = Math.max(...versions.map(v => v.number));
+    const historicalCount = versions.filter(v => v.number !== max).length;
+    if (historicalCount === 0) {
+      console.log(chalk.yellow(`Only current version v${max} exists for page ${resolvedId}; nothing to purge.`));
+      analytics.track('versions_purge', true);
+      return;
+    }
+
+    if (!options.yes) {
+      const { confirmed } = await inquirer.prompt([{
+        type: 'confirm',
+        name: 'confirmed',
+        default: false,
+        message: `Delete ${historicalCount} historical version(s) of page ${resolvedId}? Current version (v${max}) will be kept.`
+      }]);
+      if (!confirmed) {
+        console.log(chalk.yellow('Cancelled.'));
+        analytics.track('versions_purge_cancel', true);
+        return;
+      }
+    }
+
+    const throttleMs = Math.max(0, parseFloat(options.throttle || '0')) * 1000;
+    const result = await client.purgeNonCurrentVersions(resolvedId, {
+      onProgress: async (event) => {
+        if (event.kind === 'deleted') {
+          const note = event.viaExperimental ? chalk.yellow(' (experimental)') : '';
+          console.log(chalk.green(`  ✓ deleted v${event.versionNumber}${note}`));
+        } else if (event.kind === 'failed') {
+          console.log(chalk.red(`  ✗ v${event.versionNumber}: ${event.message}`));
+        }
+        if (throttleMs > 0) {
+          await new Promise(r => setTimeout(r, throttleMs));
+        }
+      }
+    });
+
+    console.log('');
+    console.log(chalk.green(`✅ Purge complete for page ${result.id}: ` +
+      `${result.deleted} deleted, ${result.failed} failed, kept v${result.kept}.`));
+    analytics.track('versions_purge', result.failed === 0);
+    if (result.failed > 0) {
+      process.exitCode = 1;
+    }
+  }, { writable: true }));
 
 // Edit command - opens page content for editing
 program
   .command('edit <pageId>')
   .description('Get page content for editing')
   .option('-o, --output <file>', 'Save content to file')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
-      const pageData = await client.getPageForEdit(pageId);
-      
-      console.log(chalk.blue('Page Information:'));
-      console.log(`Title: ${chalk.green(pageData.title)}`);
-      console.log(`ID: ${chalk.green(pageData.id)}`);
-      console.log(`Version: ${chalk.green(pageData.version)}`);
-      console.log(`Space: ${chalk.green(pageData.space.name)} (${pageData.space.key})`);
-      console.log('');
-      
-      if (options.output) {
-        fs.writeFileSync(options.output, pageData.content);
-        console.log(chalk.green(`✅ Content saved to: ${options.output}`));
-        console.log(chalk.yellow('💡 Edit the file and use "confluence update" to save changes'));
-      } else {
-        console.log(chalk.blue('Page Content:'));
-        console.log(pageData.content);
-      }
-      
-      analytics.track('edit', true);
-    } catch (error) {
-      handleCommandError(analytics, 'edit', error);
+  .action(withClient('edit', async ({ client, analytics }, pageId, options) => {
+    const pageData = await client.getPageForEdit(pageId);
+
+    console.log(chalk.blue('Page Information:'));
+    console.log(`Title: ${chalk.green(pageData.title)}`);
+    console.log(`ID: ${chalk.green(pageData.id)}`);
+    console.log(`Version: ${chalk.green(pageData.version)}`);
+    console.log(`Space: ${chalk.green(pageData.space.name)} (${pageData.space.key})`);
+    console.log('');
+
+    if (options.output) {
+      fs.writeFileSync(options.output, pageData.content);
+      console.log(chalk.green(`✅ Content saved to: ${options.output}`));
+      console.log(chalk.yellow('💡 Edit the file and use "confluence update" to save changes'));
+    } else {
+      console.log(chalk.blue('Page Content:'));
+      console.log(pageData.content);
     }
-  });
+
+    analytics.track('edit', true);
+  }, { writable: true }));
 
 // Find page by title command
 program
   .command('find <title>')
   .description('Find a page by title')
   .option('-s, --space <spaceKey>', 'Limit search to specific space')
-  .action(async (title, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      const client = new ConfluenceClient(config);
-      const pageInfo = await client.findPageByTitle(title, options.space);
-      
-      console.log(chalk.blue('Page found:'));
-      console.log(`Title: ${chalk.green(pageInfo.title)}`);
-      console.log(`ID: ${chalk.green(pageInfo.id)}`);
-      console.log(`Space: ${chalk.green(pageInfo.space.name)} (${pageInfo.space.key})`);
-      console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${pageInfo.url}`)}`)}`);
+  .action(withClient('find', async ({ client, analytics }, title, options) => {
+    const pageInfo = await client.findPageByTitle(title, options.space);
 
-      analytics.track('find', true);
-    } catch (error) {
-      handleCommandError(analytics, 'find', error);
-    }
-  });
+    console.log(chalk.blue('Page found:'));
+    console.log(`Title: ${chalk.green(pageInfo.title)}`);
+    console.log(`ID: ${chalk.green(pageInfo.id)}`);
+    console.log(`Space: ${chalk.green(pageInfo.space.name)} (${pageInfo.space.key})`);
+    console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${pageInfo.url}`)}`)}`);
+
+    analytics.track('find', true);
+  }));
 
 // Attachments command
 program
@@ -659,115 +570,108 @@ program
   .option('-d, --download', 'Download matching attachments')
   .option('--dest <directory>', 'Directory to save downloads (default: current directory)', '.')
   .option('-f, --format <format>', 'Output format (text, json)', 'text')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      const client = new ConfluenceClient(config);
-      const maxResults = options.limit ? parseInt(options.limit, 10) : null;
-      const pattern = options.pattern ? options.pattern.trim() : null;
+  .action(withClient('attachments', async ({ client, analytics }, pageId, options) => {
+    const maxResults = options.limit ? parseInt(options.limit, 10) : null;
+    const pattern = options.pattern ? options.pattern.trim() : null;
 
-      if (options.limit && (Number.isNaN(maxResults) || maxResults <= 0)) {
-        throw new Error('Limit must be a positive number.');
+    if (options.limit && (Number.isNaN(maxResults) || maxResults <= 0)) {
+      throw new Error('Limit must be a positive number.');
+    }
+
+    const format = (options.format || 'text').toLowerCase();
+    if (!['text', 'json'].includes(format)) {
+      throw new Error('Format must be one of: text, json');
+    }
+
+    const attachments = await client.getAllAttachments(pageId, { maxResults });
+    const filtered = pattern ? attachments.filter(att => client.matchesPattern(att.title, pattern)) : attachments;
+
+    if (filtered.length === 0) {
+      if (format === 'json') {
+        console.log(JSON.stringify({ attachmentCount: 0, attachments: [] }, null, 2));
+      } else {
+        console.log(chalk.yellow('No attachments found.'));
       }
+      analytics.track('attachments', true);
+      return;
+    }
 
-      const format = (options.format || 'text').toLowerCase();
-      if (!['text', 'json'].includes(format)) {
-        throw new Error('Format must be one of: text, json');
-      }
+    if (format === 'json' && !options.download) {
+      const output = {
+        attachmentCount: filtered.length,
+        attachments: filtered.map(att => ({
+          id: att.id,
+          title: att.title,
+          mediaType: att.mediaType || '',
+          fileSize: att.fileSize,
+          fileSizeFormatted: att.fileSize ? `${Math.max(1, Math.round(att.fileSize / 1024))} KB` : 'unknown size',
+          version: att.version,
+          downloadLink: att.downloadLink
+        }))
+      };
+      console.log(JSON.stringify(output, null, 2));
+    } else if (!options.download) {
+      console.log(chalk.blue(`Found ${filtered.length} attachment${filtered.length === 1 ? '' : 's'}:`));
+      filtered.forEach((att, index) => {
+        const sizeKb = att.fileSize ? `${Math.max(1, Math.round(att.fileSize / 1024))} KB` : 'unknown size';
+        const typeLabel = att.mediaType || 'unknown';
+        console.log(`${index + 1}. ${chalk.green(att.title)} (ID: ${att.id})`);
+        console.log(`   Type: ${chalk.gray(typeLabel)} • Size: ${chalk.gray(sizeKb)} • Version: ${chalk.gray(att.version)}`);
+      });
+    }
 
-      const attachments = await client.getAllAttachments(pageId, { maxResults });
-      const filtered = pattern ? attachments.filter(att => client.matchesPattern(att.title, pattern)) : attachments;
+    if (options.download) {
+      const destDir = path.resolve(options.dest || '.');
+      fs.mkdirSync(destDir, { recursive: true });
 
-      if (filtered.length === 0) {
-        if (format === 'json') {
-          console.log(JSON.stringify({ attachmentCount: 0, attachments: [] }, null, 2));
-        } else {
-          console.log(chalk.yellow('No attachments found.'));
+      const uniquePathFor = (dir, filename) => {
+        const safeFilename = sanitizeFilename(filename);
+        const parsed = path.parse(safeFilename);
+        let attempt = path.join(dir, safeFilename);
+        let counter = 1;
+        while (fs.existsSync(attempt)) {
+          const suffix = ` (${counter})`;
+          const nextName = `${parsed.name}${suffix}${parsed.ext}`;
+          attempt = path.join(dir, nextName);
+          counter += 1;
         }
-        analytics.track('attachments', true);
-        return;
+        return attempt;
+      };
+
+      const writeStream = (stream, targetPath) => new Promise((resolve, reject) => {
+        const writer = fs.createWriteStream(targetPath);
+        stream.pipe(writer);
+        stream.on('error', reject);
+        writer.on('error', reject);
+        writer.on('finish', resolve);
+      });
+
+      const downloadResults = [];
+      for (const attachment of filtered) {
+        const targetPath = uniquePathFor(destDir, attachment.title);
+        const dataStream = await client.downloadAttachment(pageId, attachment);
+        await writeStream(dataStream, targetPath);
+        downloadResults.push({ title: attachment.title, id: attachment.id, savedTo: targetPath });
+        if (format !== 'json') {
+          console.log(`⬇️  ${chalk.green(attachment.title)} -> ${chalk.gray(targetPath)}`);
+        }
       }
 
-      if (format === 'json' && !options.download) {
+      if (format === 'json') {
         const output = {
           attachmentCount: filtered.length,
-          attachments: filtered.map(att => ({
-            id: att.id,
-            title: att.title,
-            mediaType: att.mediaType || '',
-            fileSize: att.fileSize,
-            fileSizeFormatted: att.fileSize ? `${Math.max(1, Math.round(att.fileSize / 1024))} KB` : 'unknown size',
-            version: att.version,
-            downloadLink: att.downloadLink
-          }))
+          downloaded: downloadResults.length,
+          destination: destDir,
+          attachments: downloadResults
         };
         console.log(JSON.stringify(output, null, 2));
-      } else if (!options.download) {
-        console.log(chalk.blue(`Found ${filtered.length} attachment${filtered.length === 1 ? '' : 's'}:`));
-        filtered.forEach((att, index) => {
-          const sizeKb = att.fileSize ? `${Math.max(1, Math.round(att.fileSize / 1024))} KB` : 'unknown size';
-          const typeLabel = att.mediaType || 'unknown';
-          console.log(`${index + 1}. ${chalk.green(att.title)} (ID: ${att.id})`);
-          console.log(`   Type: ${chalk.gray(typeLabel)} • Size: ${chalk.gray(sizeKb)} • Version: ${chalk.gray(att.version)}`);
-        });
+      } else {
+        console.log(chalk.green(`Downloaded ${downloadResults.length} attachment${downloadResults.length === 1 ? '' : 's'} to ${destDir}`));
       }
-
-      if (options.download) {
-        const destDir = path.resolve(options.dest || '.');
-        fs.mkdirSync(destDir, { recursive: true });
-
-        const uniquePathFor = (dir, filename) => {
-          const safeFilename = sanitizeFilename(filename);
-          const parsed = path.parse(safeFilename);
-          let attempt = path.join(dir, safeFilename);
-          let counter = 1;
-          while (fs.existsSync(attempt)) {
-            const suffix = ` (${counter})`;
-            const nextName = `${parsed.name}${suffix}${parsed.ext}`;
-            attempt = path.join(dir, nextName);
-            counter += 1;
-          }
-          return attempt;
-        };
-
-        const writeStream = (stream, targetPath) => new Promise((resolve, reject) => {
-          const writer = fs.createWriteStream(targetPath);
-          stream.pipe(writer);
-          stream.on('error', reject);
-          writer.on('error', reject);
-          writer.on('finish', resolve);
-        });
-
-        const downloadResults = [];
-        for (const attachment of filtered) {
-          const targetPath = uniquePathFor(destDir, attachment.title);
-          const dataStream = await client.downloadAttachment(pageId, attachment);
-          await writeStream(dataStream, targetPath);
-          downloadResults.push({ title: attachment.title, id: attachment.id, savedTo: targetPath });
-          if (format !== 'json') {
-            console.log(`⬇️  ${chalk.green(attachment.title)} -> ${chalk.gray(targetPath)}`);
-          }
-        }
-
-        if (format === 'json') {
-          const output = {
-            attachmentCount: filtered.length,
-            downloaded: downloadResults.length,
-            destination: destDir,
-            attachments: downloadResults
-          };
-          console.log(JSON.stringify(output, null, 2));
-        } else {
-          console.log(chalk.green(`Downloaded ${downloadResults.length} attachment${downloadResults.length === 1 ? '' : 's'} to ${destDir}`));
-        }
-      }
-
-      analytics.track('attachments', true);
-    } catch (error) {
-      handleCommandError(analytics, 'attachments', error);
     }
-  });
+
+    analytics.track('attachments', true);
+  }));
 
 // Attachment upload command
 program
@@ -781,91 +685,73 @@ program
   .option('--comment <comment>', 'Comment for the attachment(s)')
   .option('--replace', 'Replace an existing attachment with the same filename')
   .option('--minor-edit', 'Mark the upload as a minor edit')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      const files = Array.isArray(options.file) ? options.file.filter(Boolean) : [];
-      if (files.length === 0) {
-        throw new Error('At least one --file option is required.');
-      }
-
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
-
-      const resolvedFiles = files.map((filePath) => ({
-        original: filePath,
-        resolved: path.resolve(filePath)
-      }));
-
-      resolvedFiles.forEach((file) => {
-        if (!fs.existsSync(file.resolved)) {
-          throw new Error(`File not found: ${file.original}`);
-        }
-      });
-
-      let uploaded = 0;
-      for (const file of resolvedFiles) {
-        const result = await client.uploadAttachment(pageId, file.resolved, {
-          comment: options.comment,
-          replace: options.replace,
-          minorEdit: options.minorEdit === true ? true : undefined
-        });
-        const attachment = result.results[0];
-        if (attachment) {
-          console.log(`⬆️  ${chalk.green(attachment.title)} (ID: ${attachment.id}, Version: ${attachment.version})`);
-        } else {
-          console.log(`⬆️  ${chalk.green(path.basename(file.resolved))}`);
-        }
-        uploaded += 1;
-      }
-
-      console.log(chalk.green(`Uploaded ${uploaded} attachment${uploaded === 1 ? '' : 's'} to page ${pageId}`));
-      analytics.track('attachment_upload', true);
-    } catch (error) {
-      handleCommandError(analytics, 'attachment_upload', error);
+  .action(withClient('attachment_upload', async ({ client, analytics }, pageId, options) => {
+    const files = Array.isArray(options.file) ? options.file.filter(Boolean) : [];
+    if (files.length === 0) {
+      throw new Error('At least one --file option is required.');
     }
-  });
+
+    const resolvedFiles = files.map((filePath) => ({
+      original: filePath,
+      resolved: path.resolve(filePath)
+    }));
+
+    resolvedFiles.forEach((file) => {
+      if (!fs.existsSync(file.resolved)) {
+        throw new Error(`File not found: ${file.original}`);
+      }
+    });
+
+    let uploaded = 0;
+    for (const file of resolvedFiles) {
+      const result = await client.uploadAttachment(pageId, file.resolved, {
+        comment: options.comment,
+        replace: options.replace,
+        minorEdit: options.minorEdit === true ? true : undefined
+      });
+      const attachment = result.results[0];
+      if (attachment) {
+        console.log(`⬆️  ${chalk.green(attachment.title)} (ID: ${attachment.id}, Version: ${attachment.version})`);
+      } else {
+        console.log(`⬆️  ${chalk.green(path.basename(file.resolved))}`);
+      }
+      uploaded += 1;
+    }
+
+    console.log(chalk.green(`Uploaded ${uploaded} attachment${uploaded === 1 ? '' : 's'} to page ${pageId}`));
+    analytics.track('attachment_upload', true);
+  }, { writable: true }));
 
 // Attachment delete command
 program
   .command('attachment-delete <pageId> <attachmentId>')
   .description('Delete an attachment by ID from a page')
   .option('-y, --yes', 'Skip confirmation prompt')
-  .action(async (pageId, attachmentId, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
-
-      if (!options.yes) {
-        const { confirmed } = await inquirer.prompt([
-          {
-            type: 'confirm',
-            name: 'confirmed',
-            default: false,
-            message: `Delete attachment ${attachmentId} from page ${pageId}?`
-          }
-        ]);
-
-        if (!confirmed) {
-          console.log(chalk.yellow('Cancelled.'));
-          analytics.track('attachment_delete_cancel', true);
-          return;
+  .action(withClient('attachment_delete', async ({ client, analytics }, pageId, attachmentId, options) => {
+    if (!options.yes) {
+      const { confirmed } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirmed',
+          default: false,
+          message: `Delete attachment ${attachmentId} from page ${pageId}?`
         }
+      ]);
+
+      if (!confirmed) {
+        console.log(chalk.yellow('Cancelled.'));
+        analytics.track('attachment_delete_cancel', true);
+        return;
       }
-
-      const result = await client.deleteAttachment(pageId, attachmentId);
-
-      console.log(chalk.green('✅ Attachment deleted successfully!'));
-      console.log(`ID: ${chalk.blue(result.id)}`);
-      console.log(`Page ID: ${chalk.blue(result.pageId)}`);
-      analytics.track('attachment_delete', true);
-    } catch (error) {
-      handleCommandError(analytics, 'attachment_delete', error);
     }
-  });
+
+    const result = await client.deleteAttachment(pageId, attachmentId);
+
+    console.log(chalk.green('✅ Attachment deleted successfully!'));
+    console.log(`ID: ${chalk.blue(result.id)}`);
+    console.log(`Page ID: ${chalk.blue(result.pageId)}`);
+    analytics.track('attachment_delete', true);
+  }, { writable: true }));
 
 // Property list command
 program
@@ -875,100 +761,84 @@ program
   .option('-l, --limit <limit>', 'Maximum number of properties to fetch (default: 25)')
   .option('--start <start>', 'Start index for results (default: 0)', '0')
   .option('--all', 'Fetch all properties (ignores pagination)')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      const client = new ConfluenceClient(config);
-
-      const format = (options.format || 'text').toLowerCase();
-      if (!['text', 'json'].includes(format)) {
-        throw new Error('Format must be one of: text, json');
-      }
-
-      const limit = options.limit ? parseInt(options.limit, 10) : null;
-      if (options.limit && (Number.isNaN(limit) || limit <= 0)) {
-        throw new Error('Limit must be a positive number.');
-      }
-
-      const start = options.start ? parseInt(options.start, 10) : 0;
-      if (options.start && (Number.isNaN(start) || start < 0)) {
-        throw new Error('Start must be a non-negative number.');
-      }
-
-      let properties = [];
-      let nextStart = null;
-
-      if (options.all) {
-        properties = await client.getAllProperties(pageId, {
-          maxResults: limit || null,
-          start
-        });
-      } else {
-        const response = await client.listProperties(pageId, {
-          limit: limit || undefined,
-          start
-        });
-        properties = response.results;
-        nextStart = response.nextStart;
-      }
-
-      if (format === 'json') {
-        const output = { properties };
-        if (!options.all) {
-          output.nextStart = nextStart;
-        }
-        console.log(JSON.stringify(output, null, 2));
-      } else if (properties.length === 0) {
-        console.log(chalk.yellow('No properties found.'));
-      } else {
-        properties.forEach((prop, i) => {
-          const preview = JSON.stringify(prop.value);
-          const truncated = preview.length > 80 ? preview.slice(0, 77) + '...' : preview;
-          console.log(`${chalk.blue(i + 1 + '.')} ${chalk.green(prop.key)} (v${prop.version.number}): ${truncated}`);
-        });
-
-        if (!options.all && nextStart !== null && nextStart !== undefined) {
-          console.log(chalk.gray(`Next start: ${nextStart}`));
-        }
-      }
-      analytics.track('property_list', true);
-    } catch (error) {
-      handleCommandError(analytics, 'property_list', error);
+  .action(withClient('property_list', async ({ client, analytics }, pageId, options) => {
+    const format = (options.format || 'text').toLowerCase();
+    if (!['text', 'json'].includes(format)) {
+      throw new Error('Format must be one of: text, json');
     }
-  });
+
+    const limit = options.limit ? parseInt(options.limit, 10) : null;
+    if (options.limit && (Number.isNaN(limit) || limit <= 0)) {
+      throw new Error('Limit must be a positive number.');
+    }
+
+    const start = options.start ? parseInt(options.start, 10) : 0;
+    if (options.start && (Number.isNaN(start) || start < 0)) {
+      throw new Error('Start must be a non-negative number.');
+    }
+
+    let properties = [];
+    let nextStart = null;
+
+    if (options.all) {
+      properties = await client.getAllProperties(pageId, {
+        maxResults: limit || null,
+        start
+      });
+    } else {
+      const response = await client.listProperties(pageId, {
+        limit: limit || undefined,
+        start
+      });
+      properties = response.results;
+      nextStart = response.nextStart;
+    }
+
+    if (format === 'json') {
+      const output = { properties };
+      if (!options.all) {
+        output.nextStart = nextStart;
+      }
+      console.log(JSON.stringify(output, null, 2));
+    } else if (properties.length === 0) {
+      console.log(chalk.yellow('No properties found.'));
+    } else {
+      properties.forEach((prop, i) => {
+        const preview = JSON.stringify(prop.value);
+        const truncated = preview.length > 80 ? preview.slice(0, 77) + '...' : preview;
+        console.log(`${chalk.blue(i + 1 + '.')} ${chalk.green(prop.key)} (v${prop.version.number}): ${truncated}`);
+      });
+
+      if (!options.all && nextStart !== null && nextStart !== undefined) {
+        console.log(chalk.gray(`Next start: ${nextStart}`));
+      }
+    }
+    analytics.track('property_list', true);
+  }));
 
 // Property get command
 program
   .command('property-get <pageId> <key>')
   .description('Get a content property by key')
   .option('-f, --format <format>', 'Output format (text, json)', 'text')
-  .action(async (pageId, key, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      const client = new ConfluenceClient(config);
-
-      const format = (options.format || 'text').toLowerCase();
-      if (!['text', 'json'].includes(format)) {
-        throw new Error('Format must be one of: text, json');
-      }
-
-      const property = await client.getProperty(pageId, key);
-
-      if (format === 'json') {
-        console.log(JSON.stringify(property, null, 2));
-      } else {
-        console.log(`${chalk.green('Key:')} ${property.key}`);
-        console.log(`${chalk.green('Version:')} ${property.version.number}`);
-        console.log(`${chalk.green('Value:')}`);
-        console.log(JSON.stringify(property.value, null, 2));
-      }
-      analytics.track('property_get', true);
-    } catch (error) {
-      handleCommandError(analytics, 'property_get', error);
+  .action(withClient('property_get', async ({ client, analytics }, pageId, key, options) => {
+    const format = (options.format || 'text').toLowerCase();
+    if (!['text', 'json'].includes(format)) {
+      throw new Error('Format must be one of: text, json');
     }
-  });
+
+    const property = await client.getProperty(pageId, key);
+
+    if (format === 'json') {
+      console.log(JSON.stringify(property, null, 2));
+    } else {
+      console.log(`${chalk.green('Key:')} ${property.key}`);
+      console.log(`${chalk.green('Version:')} ${property.version.number}`);
+      console.log(`${chalk.green('Value:')}`);
+      console.log(JSON.stringify(property.value, null, 2));
+    }
+    analytics.track('property_get', true);
+  }));
 
 // Property set command
 program
@@ -977,94 +847,76 @@ program
   .option('-v, --value <json>', 'Property value as JSON')
   .option('--file <file>', 'Read property value from a JSON file')
   .option('-f, --format <format>', 'Output format (text, json)', 'text')
-  .action(async (pageId, key, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
-
-      if (!options.value && !options.file) {
-        throw new Error('Provide a value with --value or --file.');
-      }
-
-      let value;
-      if (options.file) {
-        const raw = fs.readFileSync(options.file, 'utf-8');
-        try {
-          value = JSON.parse(raw);
-        } catch {
-          throw new Error(`Invalid JSON in file ${options.file}`);
-        }
-      } else {
-        try {
-          value = JSON.parse(options.value);
-        } catch {
-          throw new Error('Invalid JSON in --value');
-        }
-      }
-
-      const format = (options.format || 'text').toLowerCase();
-      if (!['text', 'json'].includes(format)) {
-        throw new Error('Format must be one of: text, json');
-      }
-
-      const result = await client.setProperty(pageId, key, value);
-
-      if (format === 'json') {
-        console.log(JSON.stringify(result, null, 2));
-      } else {
-        console.log(chalk.green('✅ Property set successfully!'));
-        console.log(`${chalk.green('Key:')} ${result.key}`);
-        console.log(`${chalk.green('Version:')} ${result.version.number}`);
-        console.log(`${chalk.green('Value:')}`);
-        console.log(JSON.stringify(result.value, null, 2));
-      }
-      analytics.track('property_set', true);
-    } catch (error) {
-      handleCommandError(analytics, 'property_set', error);
+  .action(withClient('property_set', async ({ client, analytics }, pageId, key, options) => {
+    if (!options.value && !options.file) {
+      throw new Error('Provide a value with --value or --file.');
     }
-  });
+
+    let value;
+    if (options.file) {
+      const raw = fs.readFileSync(options.file, 'utf-8');
+      try {
+        value = JSON.parse(raw);
+      } catch {
+        throw new Error(`Invalid JSON in file ${options.file}`);
+      }
+    } else {
+      try {
+        value = JSON.parse(options.value);
+      } catch {
+        throw new Error('Invalid JSON in --value');
+      }
+    }
+
+    const format = (options.format || 'text').toLowerCase();
+    if (!['text', 'json'].includes(format)) {
+      throw new Error('Format must be one of: text, json');
+    }
+
+    const result = await client.setProperty(pageId, key, value);
+
+    if (format === 'json') {
+      console.log(JSON.stringify(result, null, 2));
+    } else {
+      console.log(chalk.green('✅ Property set successfully!'));
+      console.log(`${chalk.green('Key:')} ${result.key}`);
+      console.log(`${chalk.green('Version:')} ${result.version.number}`);
+      console.log(`${chalk.green('Value:')}`);
+      console.log(JSON.stringify(result.value, null, 2));
+    }
+    analytics.track('property_set', true);
+  }, { writable: true }));
 
 // Property delete command
 program
   .command('property-delete <pageId> <key>')
   .description('Delete a content property by key')
   .option('-y, --yes', 'Skip confirmation prompt')
-  .action(async (pageId, key, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
-
-      if (!options.yes) {
-        const { confirmed } = await inquirer.prompt([
-          {
-            type: 'confirm',
-            name: 'confirmed',
-            default: false,
-            message: `Delete property "${key}" from page ${pageId}?`
-          }
-        ]);
-
-        if (!confirmed) {
-          console.log(chalk.yellow('Cancelled.'));
-          analytics.track('property_delete_cancel', true);
-          return;
+  .action(withClient('property_delete', async ({ client, analytics }, pageId, key, options) => {
+    if (!options.yes) {
+      const { confirmed } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirmed',
+          default: false,
+          message: `Delete property "${key}" from page ${pageId}?`
         }
+      ]);
+
+      if (!confirmed) {
+        console.log(chalk.yellow('Cancelled.'));
+        analytics.track('property_delete_cancel', true);
+        return;
       }
-
-      const result = await client.deleteProperty(pageId, key);
-
-      console.log(chalk.green('✅ Property deleted successfully!'));
-      console.log(`${chalk.green('Key:')} ${chalk.blue(result.key)}`);
-      console.log(`${chalk.green('Page ID:')} ${chalk.blue(result.pageId)}`);
-      analytics.track('property_delete', true);
-    } catch (error) {
-      handleCommandError(analytics, 'property_delete', error);
     }
-  });
+
+    const result = await client.deleteProperty(pageId, key);
+
+    console.log(chalk.green('✅ Property deleted successfully!'));
+    console.log(`${chalk.green('Key:')} ${chalk.blue(result.key)}`);
+    console.log(`${chalk.green('Page ID:')} ${chalk.blue(result.pageId)}`);
+    analytics.track('property_delete', true);
+  }, { writable: true }));
 
 // Comments command
 program
@@ -1076,144 +928,136 @@ program
   .option('--location <location>', 'Filter by location (inline, footer, resolved). Comma-separated')
   .option('--depth <depth>', 'Comment depth ("" for root only, "all")')
   .option('--all', 'Fetch all comments (ignores pagination)')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      const client = new ConfluenceClient(config);
-
-      const format = (options.format || 'text').toLowerCase();
-      if (!['text', 'markdown', 'json'].includes(format)) {
-        throw new Error('Format must be one of: text, markdown, json');
-      }
-
-      const limit = options.limit ? parseInt(options.limit, 10) : null;
-      if (options.limit && (Number.isNaN(limit) || limit <= 0)) {
-        throw new Error('Limit must be a positive number.');
-      }
-
-      const start = options.start ? parseInt(options.start, 10) : 0;
-      if (options.start && (Number.isNaN(start) || start < 0)) {
-        throw new Error('Start must be a non-negative number.');
-      }
-
-      const locationValues = parseLocationOptions(options.location);
-      const invalidLocations = locationValues.filter(value => !['inline', 'footer', 'resolved'].includes(value));
-      if (invalidLocations.length > 0) {
-        throw new Error(`Invalid location value(s): ${invalidLocations.join(', ')}`);
-      }
-      const locationParam = locationValues.length === 0
-        ? null
-        : (locationValues.length === 1 ? locationValues[0] : locationValues);
-
-      let comments = [];
-      let nextStart = null;
-
-      if (options.all) {
-        comments = await client.getAllComments(pageId, {
-          maxResults: limit || null,
-          start,
-          location: locationParam,
-          depth: options.depth
-        });
-      } else {
-        const response = await client.listComments(pageId, {
-          limit: limit || undefined,
-          start,
-          location: locationParam,
-          depth: options.depth
-        });
-        comments = response.results;
-        nextStart = response.nextStart;
-      }
-
-      if (comments.length === 0) {
-        console.log(chalk.yellow('No comments found.'));
-        analytics.track('comments', true);
-        return;
-      }
-
-      if (format === 'json') {
-        const resolvedPageId = await client.extractPageId(pageId);
-        const output = {
-          pageId: resolvedPageId,
-          commentCount: comments.length,
-          comments: comments.map(comment => ({
-            ...comment,
-            bodyStorage: comment.body,
-            bodyText: client.formatCommentBody(comment.body, 'text')
-          }))
-        };
-        if (!options.all) {
-          output.nextStart = nextStart;
-        }
-        console.log(JSON.stringify(output, null, 2));
-        analytics.track('comments', true);
-        return;
-      }
-
-      const commentTree = buildCommentTree(comments);
-      console.log(chalk.blue(`Found ${comments.length} comment${comments.length === 1 ? '' : 's'}:`));
-
-      const renderComments = (nodes, path = []) => {
-        nodes.forEach((comment, index) => {
-          const currentPath = [...path, index + 1];
-          const level = currentPath.length - 1;
-          const indent = '  '.repeat(level);
-          const branchGlyph = level > 0 ? (index === nodes.length - 1 ? '└─ ' : '├─ ') : '';
-          const headerPrefix = `${indent}${chalk.dim(branchGlyph)}`;
-          const bodyIndent = level === 0
-            ? '   '
-            : `${indent}${' '.repeat(branchGlyph.length)}`;
-
-          const isReply = Boolean(comment.parentId);
-          const location = comment.location || 'unknown';
-          const author = comment.author?.displayName || 'Unknown';
-          const createdAt = comment.createdAt || 'unknown date';
-          const metaParts = [`Created: ${createdAt}`];
-          if (comment.status) metaParts.push(`Status: ${comment.status}`);
-          if (comment.version) metaParts.push(`Version: ${comment.version}`);
-          if (!isReply && comment.resolution) metaParts.push(`Resolution: ${comment.resolution}`);
-
-          const label = isReply ? chalk.gray('[reply]') : chalk.cyan(`[${location}]`);
-          console.log(`${headerPrefix}${currentPath.join('.')}. ${chalk.green(author)} ${chalk.gray(`(ID: ${comment.id})`)} ${label}`);
-          console.log(chalk.dim(`${bodyIndent}${metaParts.join(' • ')}`));
-
-          if (!isReply) {
-            const inlineProps = comment.inlineProperties || {};
-            const selectionText = inlineProps.selection || inlineProps.originalSelection;
-            if (selectionText) {
-              const selectionLabel = inlineProps.selection ? 'Highlight' : 'Highlight (original)';
-              console.log(chalk.dim(`${bodyIndent}${selectionLabel}: ${selectionText}`));
-            }
-            if (inlineProps.markerRef) {
-              console.log(chalk.dim(`${bodyIndent}Marker ref: ${inlineProps.markerRef}`));
-            }
-          }
-
-          const body = client.formatCommentBody(comment.body, format);
-          if (body) {
-            console.log(`${bodyIndent}${chalk.yellowBright('Body:')}`);
-            console.log(formatBodyBlock(body, `${bodyIndent}  `));
-          }
-
-          if (comment.children && comment.children.length > 0) {
-            renderComments(comment.children, currentPath);
-          }
-        });
-      };
-
-      renderComments(commentTree);
-
-      if (!options.all && nextStart !== null && nextStart !== undefined) {
-        console.log(chalk.gray(`Next start: ${nextStart}`));
-      }
-
-      analytics.track('comments', true);
-    } catch (error) {
-      handleCommandError(analytics, 'comments', error);
+  .action(withClient('comments', async ({ client, analytics }, pageId, options) => {
+    const format = (options.format || 'text').toLowerCase();
+    if (!['text', 'markdown', 'json'].includes(format)) {
+      throw new Error('Format must be one of: text, markdown, json');
     }
-  });
+
+    const limit = options.limit ? parseInt(options.limit, 10) : null;
+    if (options.limit && (Number.isNaN(limit) || limit <= 0)) {
+      throw new Error('Limit must be a positive number.');
+    }
+
+    const start = options.start ? parseInt(options.start, 10) : 0;
+    if (options.start && (Number.isNaN(start) || start < 0)) {
+      throw new Error('Start must be a non-negative number.');
+    }
+
+    const locationValues = parseLocationOptions(options.location);
+    const invalidLocations = locationValues.filter(value => !['inline', 'footer', 'resolved'].includes(value));
+    if (invalidLocations.length > 0) {
+      throw new Error(`Invalid location value(s): ${invalidLocations.join(', ')}`);
+    }
+    const locationParam = locationValues.length === 0
+      ? null
+      : (locationValues.length === 1 ? locationValues[0] : locationValues);
+
+    let comments = [];
+    let nextStart = null;
+
+    if (options.all) {
+      comments = await client.getAllComments(pageId, {
+        maxResults: limit || null,
+        start,
+        location: locationParam,
+        depth: options.depth
+      });
+    } else {
+      const response = await client.listComments(pageId, {
+        limit: limit || undefined,
+        start,
+        location: locationParam,
+        depth: options.depth
+      });
+      comments = response.results;
+      nextStart = response.nextStart;
+    }
+
+    if (comments.length === 0) {
+      console.log(chalk.yellow('No comments found.'));
+      analytics.track('comments', true);
+      return;
+    }
+
+    if (format === 'json') {
+      const resolvedPageId = await client.extractPageId(pageId);
+      const output = {
+        pageId: resolvedPageId,
+        commentCount: comments.length,
+        comments: comments.map(comment => ({
+          ...comment,
+          bodyStorage: comment.body,
+          bodyText: client.formatCommentBody(comment.body, 'text')
+        }))
+      };
+      if (!options.all) {
+        output.nextStart = nextStart;
+      }
+      console.log(JSON.stringify(output, null, 2));
+      analytics.track('comments', true);
+      return;
+    }
+
+    const commentTree = buildCommentTree(comments);
+    console.log(chalk.blue(`Found ${comments.length} comment${comments.length === 1 ? '' : 's'}:`));
+
+    const renderComments = (nodes, path = []) => {
+      nodes.forEach((comment, index) => {
+        const currentPath = [...path, index + 1];
+        const level = currentPath.length - 1;
+        const indent = '  '.repeat(level);
+        const branchGlyph = level > 0 ? (index === nodes.length - 1 ? '└─ ' : '├─ ') : '';
+        const headerPrefix = `${indent}${chalk.dim(branchGlyph)}`;
+        const bodyIndent = level === 0
+          ? '   '
+          : `${indent}${' '.repeat(branchGlyph.length)}`;
+
+        const isReply = Boolean(comment.parentId);
+        const location = comment.location || 'unknown';
+        const author = comment.author?.displayName || 'Unknown';
+        const createdAt = comment.createdAt || 'unknown date';
+        const metaParts = [`Created: ${createdAt}`];
+        if (comment.status) metaParts.push(`Status: ${comment.status}`);
+        if (comment.version) metaParts.push(`Version: ${comment.version}`);
+        if (!isReply && comment.resolution) metaParts.push(`Resolution: ${comment.resolution}`);
+
+        const label = isReply ? chalk.gray('[reply]') : chalk.cyan(`[${location}]`);
+        console.log(`${headerPrefix}${currentPath.join('.')}. ${chalk.green(author)} ${chalk.gray(`(ID: ${comment.id})`)} ${label}`);
+        console.log(chalk.dim(`${bodyIndent}${metaParts.join(' • ')}`));
+
+        if (!isReply) {
+          const inlineProps = comment.inlineProperties || {};
+          const selectionText = inlineProps.selection || inlineProps.originalSelection;
+          if (selectionText) {
+            const selectionLabel = inlineProps.selection ? 'Highlight' : 'Highlight (original)';
+            console.log(chalk.dim(`${bodyIndent}${selectionLabel}: ${selectionText}`));
+          }
+          if (inlineProps.markerRef) {
+            console.log(chalk.dim(`${bodyIndent}Marker ref: ${inlineProps.markerRef}`));
+          }
+        }
+
+        const body = client.formatCommentBody(comment.body, format);
+        if (body) {
+          console.log(`${bodyIndent}${chalk.yellowBright('Body:')}`);
+          console.log(formatBodyBlock(body, `${bodyIndent}  `));
+        }
+
+        if (comment.children && comment.children.length > 0) {
+          renderComments(comment.children, currentPath);
+        }
+      });
+    };
+
+    renderComments(commentTree);
+
+    if (!options.all && nextStart !== null && nextStart !== undefined) {
+      console.log(chalk.gray(`Next start: ${nextStart}`));
+    }
+
+    analytics.track('comments', true);
+  }));
 
 // Comment creation command
 program
@@ -1343,39 +1187,30 @@ program
   .command('comment-delete <commentId>')
   .description('Delete a comment by ID')
   .option('-y, --yes', 'Skip confirmation prompt')
-  .action(async (commentId, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
-
-      if (!options.yes) {
-        const { confirmed } = await inquirer.prompt([
-          {
-            type: 'confirm',
-            name: 'confirmed',
-            default: false,
-            message: `Delete comment ${commentId}?`
-          }
-        ]);
-
-        if (!confirmed) {
-          console.log(chalk.yellow('Cancelled.'));
-          analytics.track('comment_delete_cancel', true);
-          return;
+  .action(withClient('comment_delete', async ({ client, analytics }, commentId, options) => {
+    if (!options.yes) {
+      const { confirmed } = await inquirer.prompt([
+        {
+          type: 'confirm',
+          name: 'confirmed',
+          default: false,
+          message: `Delete comment ${commentId}?`
         }
+      ]);
+
+      if (!confirmed) {
+        console.log(chalk.yellow('Cancelled.'));
+        analytics.track('comment_delete_cancel', true);
+        return;
       }
-
-      const result = await client.deleteComment(commentId);
-
-      console.log(chalk.green('✅ Comment deleted successfully!'));
-      console.log(`ID: ${chalk.blue(result.id)}`);
-      analytics.track('comment_delete', true);
-    } catch (error) {
-      handleCommandError(analytics, 'comment_delete', error);
     }
-  });
+
+    const result = await client.deleteComment(commentId);
+
+    console.log(chalk.green('✅ Comment deleted successfully!'));
+    console.log(`ID: ${chalk.blue(result.id)}`);
+    analytics.track('comment_delete', true);
+  }, { writable: true }));
 
 // Export page content with attachments
 program
@@ -1394,91 +1229,83 @@ program
   .option('--delay-ms <ms>', 'Delay between page exports in ms (default: 100)', parseInt)
   .option('--dry-run', 'Preview pages without writing files')
   .option('--overwrite', 'Overwrite existing export directory (replaces content, removes stale files)')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      const client = new ConfluenceClient(config);
-
-      if (options.recursive) {
-        await exportRecursive(client, fs, path, pageId, options);
-        analytics.track('export', true);
-        return;
-      }
-
-      const format = (options.format || 'markdown').toLowerCase();
-      const formatExt = { markdown: 'md', html: 'html', text: 'txt' };
-      const contentExt = formatExt[format] || 'txt';
-
-      const pageInfo = await client.getPageInfo(pageId);
-      const content = await client.readPage(
-        pageId,
-        format,
-        options.referencedOnly ? { extractReferencedAttachments: true } : {}
-      );
-      const referencedAttachments = options.referencedOnly
-        ? (client._referencedAttachments || new Set())
-        : null;
-
-      const baseDir = path.resolve(options.dest || '.');
-      const folderName = sanitizeTitle(pageInfo.title || 'page');
-      const exportDir = path.join(baseDir, folderName);
-      if (options.overwrite && fs.existsSync(exportDir)) {
-        if (!isExportDirectory(fs, path, exportDir)) {
-          throw new Error(`Refusing to overwrite "${exportDir}" - it was not created by confluence-cli (missing ${EXPORT_MARKER}).`);
-        }
-        fs.rmSync(exportDir, { recursive: true, force: true });
-      }
-      fs.mkdirSync(exportDir, { recursive: true });
-
-      const contentFile = options.file || `page.${contentExt}`;
-      const contentPath = path.join(exportDir, contentFile);
-      fs.writeFileSync(contentPath, content);
-      writeExportMarker(fs, path, exportDir, { pageId, title: pageInfo.title });
-
-      console.log(chalk.green('✅ Page exported'));
-      console.log(`Title: ${chalk.blue(pageInfo.title)}`);
-      console.log(`Content: ${chalk.gray(contentPath)}`);
-
-      if (!options.skipAttachments) {
-        const pattern = options.pattern ? options.pattern.trim() : null;
-        const allAttachments = await client.getAllAttachments(pageId);
-        
-        let filtered;
-        if (pattern) {
-          filtered = allAttachments.filter(att => client.matchesPattern(att.title, pattern));
-        } else if (options.referencedOnly) {
-          filtered = allAttachments.filter(att => referencedAttachments?.has(att.title));
-        } else {
-          filtered = allAttachments;
-        }
-
-        if (filtered.length === 0) {
-          console.log(chalk.yellow('No attachments to download.'));
-        } else {
-          const attachmentsDirName = options.attachmentsDir || 'attachments';
-          const attachmentsDir = path.join(exportDir, attachmentsDirName);
-          fs.mkdirSync(attachmentsDir, { recursive: true });
-
-          let downloaded = 0;
-          for (const attachment of filtered) {
-            const targetPath = uniquePathFor(fs, path, attachmentsDir, attachment.title);
-            // Pass the full attachment object so downloadAttachment can use downloadLink directly
-            const dataStream = await client.downloadAttachment(pageId, attachment);
-            await writeStream(fs, dataStream, targetPath);
-            downloaded += 1;
-            console.log(`⬇️  ${chalk.green(attachment.title)} -> ${chalk.gray(targetPath)}`);
-          }
-
-          console.log(chalk.green(`Downloaded ${downloaded} attachment${downloaded === 1 ? '' : 's'} to ${attachmentsDir}`));
-        }
-      }
-
+  .action(withClient('export', async ({ client, analytics }, pageId, options) => {
+    if (options.recursive) {
+      await exportRecursive(client, fs, path, pageId, options);
       analytics.track('export', true);
-    } catch (error) {
-      handleCommandError(analytics, 'export', error);
+      return;
     }
-  });
+
+    const format = (options.format || 'markdown').toLowerCase();
+    const formatExt = { markdown: 'md', html: 'html', text: 'txt' };
+    const contentExt = formatExt[format] || 'txt';
+
+    const pageInfo = await client.getPageInfo(pageId);
+    const content = await client.readPage(
+      pageId,
+      format,
+      options.referencedOnly ? { extractReferencedAttachments: true } : {}
+    );
+    const referencedAttachments = options.referencedOnly
+      ? (client._referencedAttachments || new Set())
+      : null;
+
+    const baseDir = path.resolve(options.dest || '.');
+    const folderName = sanitizeTitle(pageInfo.title || 'page');
+    const exportDir = path.join(baseDir, folderName);
+    if (options.overwrite && fs.existsSync(exportDir)) {
+      if (!isExportDirectory(fs, path, exportDir)) {
+        throw new Error(`Refusing to overwrite "${exportDir}" - it was not created by confluence-cli (missing ${EXPORT_MARKER}).`);
+      }
+      fs.rmSync(exportDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(exportDir, { recursive: true });
+
+    const contentFile = options.file || `page.${contentExt}`;
+    const contentPath = path.join(exportDir, contentFile);
+    fs.writeFileSync(contentPath, content);
+    writeExportMarker(fs, path, exportDir, { pageId, title: pageInfo.title });
+
+    console.log(chalk.green('✅ Page exported'));
+    console.log(`Title: ${chalk.blue(pageInfo.title)}`);
+    console.log(`Content: ${chalk.gray(contentPath)}`);
+
+    if (!options.skipAttachments) {
+      const pattern = options.pattern ? options.pattern.trim() : null;
+      const allAttachments = await client.getAllAttachments(pageId);
+
+      let filtered;
+      if (pattern) {
+        filtered = allAttachments.filter(att => client.matchesPattern(att.title, pattern));
+      } else if (options.referencedOnly) {
+        filtered = allAttachments.filter(att => referencedAttachments?.has(att.title));
+      } else {
+        filtered = allAttachments;
+      }
+
+      if (filtered.length === 0) {
+        console.log(chalk.yellow('No attachments to download.'));
+      } else {
+        const attachmentsDirName = options.attachmentsDir || 'attachments';
+        const attachmentsDir = path.join(exportDir, attachmentsDirName);
+        fs.mkdirSync(attachmentsDir, { recursive: true });
+
+        let downloaded = 0;
+        for (const attachment of filtered) {
+          const targetPath = uniquePathFor(fs, path, attachmentsDir, attachment.title);
+          // Pass the full attachment object so downloadAttachment can use downloadLink directly
+          const dataStream = await client.downloadAttachment(pageId, attachment);
+          await writeStream(fs, dataStream, targetPath);
+          downloaded += 1;
+          console.log(`⬇️  ${chalk.green(attachment.title)} -> ${chalk.gray(targetPath)}`);
+        }
+
+        console.log(chalk.green(`Downloaded ${downloaded} attachment${downloaded === 1 ? '' : 's'} to ${attachmentsDir}`));
+      }
+    }
+
+    analytics.track('export', true);
+  }));
 
 const EXPORT_MARKER = '.confluence-export.json';
 
@@ -1774,115 +1601,106 @@ program
   .option('-n, --dry-run', 'Preview operations without creating pages')
   .option('--fail-on-error', 'Exit with non-zero code if any page fails')
   .option('-q, --quiet', 'Suppress progress output')
-  .action(async (sourcePageId, targetParentId, newTitle, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
+  .action(withClient('copy_tree', async ({ client, analytics }, sourcePageId, targetParentId, newTitle, options) => {
+    // Parse numeric flags with safe fallbacks
+    const parsedDepth = parseInt(options.maxDepth, 10);
+    const maxDepth = Number.isNaN(parsedDepth) ? 10 : parsedDepth;
+    const parsedDelay = parseInt(options.delayMs, 10);
+    const delayMs = Number.isNaN(parsedDelay) ? 100 : parsedDelay;
+    const copySuffix = options.copySuffix ?? ' (Copy)';
 
-      // Parse numeric flags with safe fallbacks
-      const parsedDepth = parseInt(options.maxDepth, 10);
-      const maxDepth = Number.isNaN(parsedDepth) ? 10 : parsedDepth;
-      const parsedDelay = parseInt(options.delayMs, 10);
-      const delayMs = Number.isNaN(parsedDelay) ? 100 : parsedDelay;
-      const copySuffix = options.copySuffix ?? ' (Copy)';
+    console.log(chalk.blue('🚀 Starting page tree copy...'));
+    console.log(`Source: ${sourcePageId}`);
+    console.log(`Target parent: ${targetParentId}`);
+    if (newTitle) console.log(`New root title: ${newTitle}`);
+    console.log(`Max depth: ${maxDepth}`);
+    console.log(`Delay: ${delayMs} ms`);
+    if (copySuffix) console.log(`Root suffix: ${copySuffix}`);
+    console.log('');
 
-      console.log(chalk.blue('🚀 Starting page tree copy...'));
-      console.log(`Source: ${sourcePageId}`);
-      console.log(`Target parent: ${targetParentId}`);
-      if (newTitle) console.log(`New root title: ${newTitle}`);
-      console.log(`Max depth: ${maxDepth}`);
-      console.log(`Delay: ${delayMs} ms`);
-      if (copySuffix) console.log(`Root suffix: ${copySuffix}`);
-      console.log('');
-
-      // Parse exclude patterns
-      let excludePatterns = [];
-      if (options.exclude) {
-        excludePatterns = options.exclude.split(',').map(p => p.trim()).filter(Boolean);
-        if (excludePatterns.length > 0) {
-          console.log(chalk.yellow(`Exclude patterns: ${excludePatterns.join(', ')}`));
-        }
+    // Parse exclude patterns
+    let excludePatterns = [];
+    if (options.exclude) {
+      excludePatterns = options.exclude.split(',').map(p => p.trim()).filter(Boolean);
+      if (excludePatterns.length > 0) {
+        console.log(chalk.yellow(`Exclude patterns: ${excludePatterns.join(', ')}`));
       }
-
-      // Progress callback
-      const onProgress = (message) => {
-        console.log(message);
-      };
-
-      // Dry-run: compute plan without creating anything
-      if (options.dryRun) {
-        const info = await client.getPageInfo(sourcePageId);
-        const rootTitle = newTitle || `${info.title}${copySuffix}`;
-        const descendants = await client.getAllDescendantPages(sourcePageId, maxDepth);
-        const filtered = descendants.filter(p => !client.shouldExcludePage(p.title, excludePatterns));
-        console.log(chalk.yellow('Dry run: no changes will be made.'));
-        console.log(`Would create root: ${chalk.blue(rootTitle)} (under parent ${targetParentId})`);
-        console.log(`Would create ${filtered.length} child page(s)`);
-        // Show a preview list (first 50)
-        const tree = client.buildPageTree(filtered, sourcePageId);
-        const lines = [];
-        const walk = (nodes, depth = 0) => {
-          for (const n of nodes) {
-            if (lines.length >= 50) return; // limit output
-            lines.push(`${'  '.repeat(depth)}- ${n.title}`);
-            if (n.children && n.children.length) walk(n.children, depth + 1);
-          }
-        };
-        walk(tree);
-        if (lines.length) {
-          console.log('Planned children:');
-          lines.forEach(l => console.log(l));
-          if (filtered.length > lines.length) {
-            console.log(`...and ${filtered.length - lines.length} more`);
-          }
-        }
-        analytics.track('copy_tree_dry_run', true);
-        return;
-      }
-
-      // Copy the page tree
-      const result = await client.copyPageTree(
-        sourcePageId,
-        targetParentId,
-        newTitle,
-        {
-          maxDepth,
-          excludePatterns,
-          onProgress: options.quiet ? null : onProgress,
-          quiet: options.quiet,
-          delayMs,
-          copySuffix
-        }
-      );
-
-      console.log('');
-      console.log(chalk.green('✅ Page tree copy completed'));
-      console.log(`Root page: ${chalk.blue(result.rootPage.title)} (ID: ${result.rootPage.id})`);
-      console.log(`Total copied pages: ${chalk.blue(result.totalCopied)}`);
-      if (result.failures?.length) {
-        console.log(chalk.yellow(`Failures: ${result.failures.length}`));
-        result.failures.slice(0, 10).forEach(f => {
-          const reason = f.status ? `${f.status}` : '';
-          console.log(` - ${f.title} (ID: ${f.id})${reason ? `: ${reason}` : ''}`);
-        });
-        if (result.failures.length > 10) {
-          console.log(` - ...and ${result.failures.length - 10} more`);
-        }
-      }
-      console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result.rootPage._links.webui}`)}`)}`);
-      if (options.failOnError && result.failures?.length) {
-        analytics.track('copy_tree', false);
-        console.error(chalk.red('Completed with failures and --fail-on-error is set.'));
-        process.exit(1);
-      }
-      
-      analytics.track('copy_tree', true);
-    } catch (error) {
-      handleCommandError(analytics, 'copy_tree', error);
     }
-  });
+
+    // Progress callback
+    const onProgress = (message) => {
+      console.log(message);
+    };
+
+    // Dry-run: compute plan without creating anything
+    if (options.dryRun) {
+      const info = await client.getPageInfo(sourcePageId);
+      const rootTitle = newTitle || `${info.title}${copySuffix}`;
+      const descendants = await client.getAllDescendantPages(sourcePageId, maxDepth);
+      const filtered = descendants.filter(p => !client.shouldExcludePage(p.title, excludePatterns));
+      console.log(chalk.yellow('Dry run: no changes will be made.'));
+      console.log(`Would create root: ${chalk.blue(rootTitle)} (under parent ${targetParentId})`);
+      console.log(`Would create ${filtered.length} child page(s)`);
+      // Show a preview list (first 50)
+      const tree = client.buildPageTree(filtered, sourcePageId);
+      const lines = [];
+      const walk = (nodes, depth = 0) => {
+        for (const n of nodes) {
+          if (lines.length >= 50) return; // limit output
+          lines.push(`${'  '.repeat(depth)}- ${n.title}`);
+          if (n.children && n.children.length) walk(n.children, depth + 1);
+        }
+      };
+      walk(tree);
+      if (lines.length) {
+        console.log('Planned children:');
+        lines.forEach(l => console.log(l));
+        if (filtered.length > lines.length) {
+          console.log(`...and ${filtered.length - lines.length} more`);
+        }
+      }
+      analytics.track('copy_tree_dry_run', true);
+      return;
+    }
+
+    // Copy the page tree
+    const result = await client.copyPageTree(
+      sourcePageId,
+      targetParentId,
+      newTitle,
+      {
+        maxDepth,
+        excludePatterns,
+        onProgress: options.quiet ? null : onProgress,
+        quiet: options.quiet,
+        delayMs,
+        copySuffix
+      }
+    );
+
+    console.log('');
+    console.log(chalk.green('✅ Page tree copy completed'));
+    console.log(`Root page: ${chalk.blue(result.rootPage.title)} (ID: ${result.rootPage.id})`);
+    console.log(`Total copied pages: ${chalk.blue(result.totalCopied)}`);
+    if (result.failures?.length) {
+      console.log(chalk.yellow(`Failures: ${result.failures.length}`));
+      result.failures.slice(0, 10).forEach(f => {
+        const reason = f.status ? `${f.status}` : '';
+        console.log(` - ${f.title} (ID: ${f.id})${reason ? `: ${reason}` : ''}`);
+      });
+      if (result.failures.length > 10) {
+        console.log(` - ...and ${result.failures.length - 10} more`);
+      }
+    }
+    console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result.rootPage._links.webui}`)}`)}`);
+    if (options.failOnError && result.failures?.length) {
+      analytics.track('copy_tree', false);
+      console.error(chalk.red('Completed with failures and --fail-on-error is set.'));
+      process.exit(1);
+    }
+
+    analytics.track('copy_tree', true);
+  }, { writable: true }));
 
 // List children command
 program
@@ -1893,116 +1711,109 @@ program
   .option('--format <format>', 'Output format (list, tree, json)', 'list')
   .option('--show-url', 'Show page URLs', false)
   .option('--show-id', 'Show page IDs', false)
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    try {
-      const config = getConfig(getProfileName());
-      const client = new ConfluenceClient(config);
-      const format = (options.format || 'list').toLowerCase();
-      
-      // Extract page ID from URL if needed
-      const resolvedPageId = await client.extractPageId(pageId);
-      
-      // Get children
-      let children;
-      if (options.recursive) {
-        const maxDepth = parseInt(options.maxDepth) || 10;
-        children = await client.getAllDescendantPages(
-          resolvedPageId,
-          maxDepth,
-          { includeAncestors: format === 'json' }
-        );
-      } else {
-        children = await client.getChildPages(resolvedPageId);
-      }
-      
-      if (children.length === 0) {
-        if (format === 'json') {
-          console.log(JSON.stringify({
-            pageId: String(resolvedPageId),
-            childCount: 0,
-            children: []
-          }, null, 2));
-        } else {
-          console.log(chalk.yellow('No child pages found.'));
-        }
-        analytics.track('children', true);
-        return;
-      }
-      
-      if (format === 'json') {
-        // JSON output
-        const output = {
-          pageId: String(resolvedPageId),
-          childCount: children.length,
-          children: children.map(page => {
-            const record = {
-              id: page.id,
-              title: page.title,
-              type: page.type,
-              status: page.status,
-              spaceKey: page.spaceKey || page.space?.key || null,
-              parentId: page.parentId || String(resolvedPageId),
-              version: page.version ?? null,
-              url: page.url || null
-            };
+  .action(withClient('children', async ({ client, config, analytics }, pageId, options) => {
+    const format = (options.format || 'list').toLowerCase();
 
-            if (options.recursive && page.depth !== undefined) {
-              record.depth = page.depth;
-            }
+    // Extract page ID from URL if needed
+    const resolvedPageId = await client.extractPageId(pageId);
 
-            if (options.recursive && Array.isArray(page.ancestors) && page.ancestors.length > 0) {
-              record.ancestors = page.ancestors;
-            }
-
-            return record;
-          })
-        };
-        console.log(JSON.stringify(output, null, 2));
-      } else if (format === 'tree' && options.recursive) {
-        // Tree format (only for recursive mode)
-        const pageInfo = await client.getPageInfo(resolvedPageId);
-        console.log(chalk.blue(`📁 ${pageInfo.title}`));
-        
-        // Build tree structure
-        const tree = buildTree(children, resolvedPageId);
-        printTree(tree, client, config, options, 1);
-        
-        console.log('');
-        console.log(chalk.gray(`Total: ${children.length} child page${children.length === 1 ? '' : 's'}`));
-      } else {
-        // List format (default)
-        console.log(chalk.blue('Child pages:'));
-        console.log('');
-        
-        children.forEach((page, index) => {
-          let output = `${index + 1}. ${chalk.green(page.title)}`;
-          
-          if (options.showId) {
-            output += ` ${chalk.gray(`(ID: ${page.id})`)}`;
-          }
-          
-          if (options.showUrl) {
-            const url = `${client.buildUrl(`${client.webUrlPrefix}/spaces/${page.space?.key}/pages/${page.id}`)}`;
-            output += `\n   ${chalk.gray(url)}`;
-          }
-          
-          if (options.recursive && page.parentId && page.parentId !== resolvedPageId) {
-            output += ` ${chalk.dim('(nested)')}`;
-          }
-          
-          console.log(output);
-        });
-        
-        console.log('');
-        console.log(chalk.gray(`Total: ${children.length} child page${children.length === 1 ? '' : 's'}`));
-      }
-      
-      analytics.track('children', true);
-    } catch (error) {
-      handleCommandError(analytics, 'children', error);
+    // Get children
+    let children;
+    if (options.recursive) {
+      const maxDepth = parseInt(options.maxDepth) || 10;
+      children = await client.getAllDescendantPages(
+        resolvedPageId,
+        maxDepth,
+        { includeAncestors: format === 'json' }
+      );
+    } else {
+      children = await client.getChildPages(resolvedPageId);
     }
-  });
+
+    if (children.length === 0) {
+      if (format === 'json') {
+        console.log(JSON.stringify({
+          pageId: String(resolvedPageId),
+          childCount: 0,
+          children: []
+        }, null, 2));
+      } else {
+        console.log(chalk.yellow('No child pages found.'));
+      }
+      analytics.track('children', true);
+      return;
+    }
+
+    if (format === 'json') {
+      // JSON output
+      const output = {
+        pageId: String(resolvedPageId),
+        childCount: children.length,
+        children: children.map(page => {
+          const record = {
+            id: page.id,
+            title: page.title,
+            type: page.type,
+            status: page.status,
+            spaceKey: page.spaceKey || page.space?.key || null,
+            parentId: page.parentId || String(resolvedPageId),
+            version: page.version ?? null,
+            url: page.url || null
+          };
+
+          if (options.recursive && page.depth !== undefined) {
+            record.depth = page.depth;
+          }
+
+          if (options.recursive && Array.isArray(page.ancestors) && page.ancestors.length > 0) {
+            record.ancestors = page.ancestors;
+          }
+
+          return record;
+        })
+      };
+      console.log(JSON.stringify(output, null, 2));
+    } else if (format === 'tree' && options.recursive) {
+      // Tree format (only for recursive mode)
+      const pageInfo = await client.getPageInfo(resolvedPageId);
+      console.log(chalk.blue(`📁 ${pageInfo.title}`));
+
+      // Build tree structure
+      const tree = buildTree(children, resolvedPageId);
+      printTree(tree, client, config, options, 1);
+
+      console.log('');
+      console.log(chalk.gray(`Total: ${children.length} child page${children.length === 1 ? '' : 's'}`));
+    } else {
+      // List format (default)
+      console.log(chalk.blue('Child pages:'));
+      console.log('');
+
+      children.forEach((page, index) => {
+        let output = `${index + 1}. ${chalk.green(page.title)}`;
+
+        if (options.showId) {
+          output += ` ${chalk.gray(`(ID: ${page.id})`)}`;
+        }
+
+        if (options.showUrl) {
+          const url = `${client.buildUrl(`${client.webUrlPrefix}/spaces/${page.space?.key}/pages/${page.id}`)}`;
+          output += `\n   ${chalk.gray(url)}`;
+        }
+
+        if (options.recursive && page.parentId && page.parentId !== resolvedPageId) {
+          output += ` ${chalk.dim('(nested)')}`;
+        }
+
+        console.log(output);
+      });
+
+      console.log('');
+      console.log(chalk.gray(`Total: ${children.length} child page${children.length === 1 ? '' : 's'}`));
+    }
+
+    analytics.track('children', true);
+  }));
 
 // Helper function to build tree structure
 function buildTree(pages, rootId) {
@@ -2238,6 +2049,7 @@ module.exports = {
     assertValidType,
     assertNoBodyForFolder,
     handleCommandError,
+    withClient,
   },
 };
 
