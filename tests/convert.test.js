@@ -95,6 +95,19 @@ describe('convert command', () => {
     expect(output).toContain('<strong>bold</strong>');
   });
 
+  test('html to markdown preserves fenced code blocks with language', () => {
+    // Multi-line <pre><code class="language-*"> is the discriminating case
+    // between htmlToMarkdown and storageToMarkdown: the former emits a
+    // fenced block with the language tag, the latter collapses the body
+    // into inline `code` and drops the language. This test fails if the
+    // html → markdown path is ever routed back through storageToMarkdown.
+    const html = '<p><strong>bold</strong></p>\n<pre><code class="language-js">const x = 1;\nconst y = 2;</code></pre>';
+    const inputFile = writeInput('input.html', html);
+    const output = run(['convert', '--input-file', inputFile, '--input-format', 'html', '--output-format', 'markdown']);
+    expect(output).toContain('**bold**');
+    expect(output).toMatch(/```js\nconst x = 1;\nconst y = 2;\n```/);
+  });
+
   test('storage to text', () => {
     const inputFile = writeInput('input.xml', '<h1>Title</h1><p>Content</p>');
     const output = run(['convert', '--input-file', inputFile, '--input-format', 'storage', '--output-format', 'text']);
