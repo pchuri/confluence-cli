@@ -2200,7 +2200,7 @@ program
         const { convert: htmlToText } = require('html-to-text');
         output = htmlToText(input, { wordwrap: 130 });
       } else if (options.inputFormat === 'html' && options.outputFormat === 'markdown') {
-        output = converter.storageToMarkdown(input);
+        output = converter.htmlToMarkdown(input);
       } else if (options.inputFormat === 'markdown' && options.outputFormat === 'text') {
         const html = converter.markdown.render(input);
         const { convert: htmlToText } = require('html-to-text');

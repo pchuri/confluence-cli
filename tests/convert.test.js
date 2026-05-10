@@ -95,6 +95,13 @@ describe('convert command', () => {
     expect(output).toContain('<strong>bold</strong>');
   });
 
+  test('html to markdown', () => {
+    const inputFile = writeInput('input.html', '<p><strong>bold</strong> and <em>italic</em></p>');
+    const output = run(['convert', '--input-file', inputFile, '--input-format', 'html', '--output-format', 'markdown']);
+    expect(output).toContain('**bold**');
+    expect(output).toContain('*italic*');
+  });
+
   test('storage to text', () => {
     const inputFile = writeInput('input.xml', '<h1>Title</h1><p>Content</p>');
     const output = run(['convert', '--input-file', inputFile, '--input-format', 'storage', '--output-format', 'text']);
