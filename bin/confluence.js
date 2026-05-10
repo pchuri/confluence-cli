@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+const fs = require('fs');
+const path = require('path');
 const { program } = require('commander');
 const chalk = require('chalk');
 const inquirer = require('inquirer');
@@ -195,8 +197,6 @@ program
   .option('--dest <directory>', 'Target directory', './.claude/skills/confluence')
   .option('-y, --yes', 'Skip confirmation prompt')
   .action(async (options) => {
-    const fs = require('fs');
-    const path = require('path');
 
     const skillSrc = path.join(__dirname, '..', 'plugins', 'confluence', 'skills', 'confluence', 'SKILL.md');
 
@@ -255,7 +255,6 @@ program
       let content = '';
 
       if (options.file) {
-        const fs = require('fs');
         if (!fs.existsSync(options.file)) {
           throw new Error(`File not found: ${options.file}`);
         }
@@ -308,7 +307,6 @@ program
       let content = '';
 
       if (options.file) {
-        const fs = require('fs');
         if (!fs.existsSync(options.file)) {
           throw new Error(`File not found: ${options.file}`);
         }
@@ -362,7 +360,6 @@ program
       let content = null; // Use null to indicate no content change
       
       if (options.file) {
-        const fs = require('fs');
         if (!fs.existsSync(options.file)) {
           throw new Error(`File not found: ${options.file}`);
         }
@@ -615,7 +612,6 @@ program
       console.log('');
       
       if (options.output) {
-        const fs = require('fs');
         fs.writeFileSync(options.output, pageData.content);
         console.log(chalk.green(`✅ Content saved to: ${options.output}`));
         console.log(chalk.yellow('💡 Edit the file and use "confluence update" to save changes'));
@@ -718,8 +714,6 @@ program
       }
 
       if (options.download) {
-        const fs = require('fs');
-        const path = require('path');
         const destDir = path.resolve(options.dest || '.');
         fs.mkdirSync(destDir, { recursive: true });
 
@@ -795,8 +789,6 @@ program
         throw new Error('At least one --file option is required.');
       }
 
-      const fs = require('fs');
-      const path = require('path');
       const config = getConfig(getProfileName());
       assertWritable(config);
       const client = new ConfluenceClient(config);
@@ -998,7 +990,6 @@ program
 
       let value;
       if (options.file) {
-        const fs = require('fs');
         const raw = fs.readFileSync(options.file, 'utf-8');
         try {
           value = JSON.parse(raw);
@@ -1248,7 +1239,6 @@ program
       let content = '';
 
       if (options.file) {
-        const fs = require('fs');
         if (!fs.existsSync(options.file)) {
           throw new Error(`File not found: ${options.file}`);
         }
@@ -1409,8 +1399,6 @@ program
     try {
       const config = getConfig(getProfileName());
       const client = new ConfluenceClient(config);
-      const fs = require('fs');
-      const path = require('path');
 
       if (options.recursive) {
         await exportRecursive(client, fs, path, pageId, options);
@@ -1512,7 +1500,6 @@ function sanitizeFilename(filename) {
   if (!filename || typeof filename !== 'string') {
     return 'unnamed';
   }
-  const path = require('path');
   const stripped = path.basename(filename.replace(/\\/g, '/'));
   const cleaned = stripped
     // eslint-disable-next-line no-control-regex
@@ -2186,7 +2173,6 @@ program
         process.exit(1);
       }
 
-      const fs = require('fs');
       let input;
       if (options.inputFile) {
         input = fs.readFileSync(options.inputFile, 'utf-8');
