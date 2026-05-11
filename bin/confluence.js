@@ -38,16 +38,21 @@ function assertNoBodyForFolder(type, options) {
   }
 }
 
-function handleCommandError(analytics, commandName, error) {
+function handleCommandError(analytics, commandName, error, onExtra = null) {
   analytics.track(commandName, false);
   console.error(chalk.red('Error:'), error.message);
+  if (onExtra) {
+    try { onExtra(error); } catch { /* keep error path robust if hint code throws */ }
+  }
   process.exit(1);
 }
 
 // Wraps a command action with the standard analytics + client + error pipeline.
 // The handler still calls analytics.track(name, true) on success so it can opt
 // into alternative tracking keys (e.g. *_cancel, *_dry_run).
-function withClient(commandName, handler, { writable = false } = {}) {
+// `onError(error, ...actionArgs)` runs between the "Error:" log line and
+// process.exit, for commands that need to print extra diagnostics.
+function withClient(commandName, handler, { writable = false, onError = null } = {}) {
   return async (...actionArgs) => {
     const analytics = new Analytics();
     try {
@@ -56,7 +61,8 @@ function withClient(commandName, handler, { writable = false } = {}) {
       const client = new ConfluenceClient(config);
       await handler({ client, config, analytics }, ...actionArgs);
     } catch (error) {
-      handleCommandError(analytics, commandName, error);
+      const extra = onError ? (err) => onError(err, ...actionArgs) : null;
+      handleCommandError(analytics, commandName, error, extra);
     }
   };
 }
@@ -1072,96 +1078,89 @@ program
   .option('--inline-original-selection <text>', 'Original inline selection text')
   .option('--inline-marker-ref <ref>', 'Inline marker reference (optional)')
   .option('--inline-properties <json>', 'Inline properties JSON (advanced)')
-  .action(async (pageId, options) => {
-    const analytics = new Analytics();
-    let location = null;
-    try {
-      const config = getConfig(getProfileName());
-      assertWritable(config);
-      const client = new ConfluenceClient(config);
+  .action(withClient('comment_create', async ({ client, analytics }, pageId, options) => {
+    let content = '';
 
-      let content = '';
+    if (options.file) {
+      if (!fs.existsSync(options.file)) {
+        throw new Error(`File not found: ${options.file}`);
+      }
+      content = fs.readFileSync(options.file, 'utf8');
+    } else if (options.content) {
+      content = options.content;
+    } else {
+      throw new Error('Either --file or --content option is required');
+    }
 
-      if (options.file) {
-        if (!fs.existsSync(options.file)) {
-          throw new Error(`File not found: ${options.file}`);
+    const location = (options.location || 'footer').toLowerCase();
+    if (!['inline', 'footer'].includes(location)) {
+      throw new Error('Location must be either "inline" or "footer".');
+    }
+
+    let inlineProperties = {};
+    if (options.inlineProperties) {
+      try {
+        const parsed = JSON.parse(options.inlineProperties);
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+          throw new Error('Inline properties must be a JSON object.');
         }
-        content = fs.readFileSync(options.file, 'utf8');
-      } else if (options.content) {
-        content = options.content;
-      } else {
-        throw new Error('Either --file or --content option is required');
+        inlineProperties = { ...parsed };
+      } catch (error) {
+        throw new Error(`Invalid --inline-properties JSON: ${error.message}`);
       }
+    }
 
-      location = (options.location || 'footer').toLowerCase();
-      if (!['inline', 'footer'].includes(location)) {
-        throw new Error('Location must be either "inline" or "footer".');
+    if (options.inlineSelection) {
+      inlineProperties.selection = options.inlineSelection;
+    }
+    if (options.inlineOriginalSelection) {
+      inlineProperties.originalSelection = options.inlineOriginalSelection;
+    }
+    if (options.inlineMarkerRef) {
+      inlineProperties.markerRef = options.inlineMarkerRef;
+    }
+
+    if (Object.keys(inlineProperties).length > 0 && location !== 'inline') {
+      throw new Error('Inline properties can only be used with --location inline.');
+    }
+
+    const parentId = options.parent;
+
+    if (location === 'inline') {
+      const hasSelection = inlineProperties.selection || inlineProperties.originalSelection;
+      if (!hasSelection && !parentId) {
+        throw new Error('Inline comments require --inline-selection or --inline-original-selection when starting a new inline thread.');
       }
-
-      let inlineProperties = {};
-      if (options.inlineProperties) {
-        try {
-          const parsed = JSON.parse(options.inlineProperties);
-          if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-            throw new Error('Inline properties must be a JSON object.');
-          }
-          inlineProperties = { ...parsed };
-        } catch (error) {
-          throw new Error(`Invalid --inline-properties JSON: ${error.message}`);
+      if (hasSelection) {
+        if (!inlineProperties.originalSelection && inlineProperties.selection) {
+          inlineProperties.originalSelection = inlineProperties.selection;
         }
-      }
-
-      if (options.inlineSelection) {
-        inlineProperties.selection = options.inlineSelection;
-      }
-      if (options.inlineOriginalSelection) {
-        inlineProperties.originalSelection = options.inlineOriginalSelection;
-      }
-      if (options.inlineMarkerRef) {
-        inlineProperties.markerRef = options.inlineMarkerRef;
-      }
-
-      if (Object.keys(inlineProperties).length > 0 && location !== 'inline') {
-        throw new Error('Inline properties can only be used with --location inline.');
-      }
-
-      const parentId = options.parent;
-
-      if (location === 'inline') {
-        const hasSelection = inlineProperties.selection || inlineProperties.originalSelection;
-        if (!hasSelection && !parentId) {
-          throw new Error('Inline comments require --inline-selection or --inline-original-selection when starting a new inline thread.');
-        }
-        if (hasSelection) {
-          if (!inlineProperties.originalSelection && inlineProperties.selection) {
-            inlineProperties.originalSelection = inlineProperties.selection;
-          }
-          if (!inlineProperties.markerRef) {
-            inlineProperties.markerRef = `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-          }
+        if (!inlineProperties.markerRef) {
+          inlineProperties.markerRef = `comment-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
         }
       }
+    }
 
-      const result = await client.createComment(pageId, content, options.format, {
-        parentId,
-        location,
-        inlineProperties: location === 'inline' ? inlineProperties : null
-      });
+    const result = await client.createComment(pageId, content, options.format, {
+      parentId,
+      location,
+      inlineProperties: location === 'inline' ? inlineProperties : null
+    });
 
-      console.log(chalk.green('✅ Comment created successfully!'));
-      console.log(`ID: ${chalk.blue(result.id)}`);
-      if (result.container?.id) {
-        console.log(`Page ID: ${chalk.blue(result.container.id)}`);
-      }
-      if (result._links?.webui) {
-        const url = client.toAbsoluteUrl(result._links.webui);
-        console.log(`URL: ${chalk.gray(url)}`);
-      }
+    console.log(chalk.green('✅ Comment created successfully!'));
+    console.log(`ID: ${chalk.blue(result.id)}`);
+    if (result.container?.id) {
+      console.log(`Page ID: ${chalk.blue(result.container.id)}`);
+    }
+    if (result._links?.webui) {
+      const url = client.toAbsoluteUrl(result._links.webui);
+      console.log(`URL: ${chalk.gray(url)}`);
+    }
 
-      analytics.track('comment_create', true);
-    } catch (error) {
-      analytics.track('comment_create', false);
-      console.error(chalk.red('Error:'), error.message);
+    analytics.track('comment_create', true);
+  }, {
+    writable: true,
+    onError: (error, _pageId, options) => {
       if (error.response?.data) {
         const detail = typeof error.response.data === 'string'
           ? error.response.data
@@ -1174,13 +1173,13 @@ program
         .filter(Boolean);
       const needsInlineMeta = ['matchIndex', 'lastFetchTime', 'serializedHighlights']
         .every((key) => errorKeys.includes(key));
+      const location = (options?.location || 'footer').toLowerCase();
       if (location === 'inline' && needsInlineMeta) {
         console.error(chalk.yellow('Inline comment creation requires editor highlight metadata (matchIndex, lastFetchTime, serializedHighlights).'));
         console.error(chalk.yellow('Try replying to an existing inline comment or use footer comments instead.'));
       }
-      process.exit(1);
     }
-  });
+  }));
 
 // Comment delete command
 program
