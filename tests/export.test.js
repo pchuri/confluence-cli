@@ -1,17 +1,14 @@
 const path = require('path');
 
-// Require the CLI module (guarded by require.main check, won't parse argv)
 const {
-  _test: {
-    EXPORT_MARKER,
-    writeExportMarker,
-    isExportDirectory,
-    uniquePathFor,
-    exportRecursive,
-    sanitizeTitle,
-    sanitizeFilename,
-  },
-} = require('../bin/confluence.js');
+  EXPORT_MARKER,
+  writeExportMarker,
+  isExportDirectory,
+  uniquePathFor,
+  exportRecursive,
+  sanitizeTitle,
+  sanitizeFilename,
+} = require('../bin/commands/export.js');
 
 // ---------------------------------------------------------------------------
 // Helpers: in-memory fs mock
