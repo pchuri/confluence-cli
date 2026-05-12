@@ -1501,6 +1501,34 @@ describe('ConfluenceClient', () => {
       expect(requestData.body).toBeUndefined();
       mock.restore();
     });
+
+    test('createPage with format="html" routes through htmlToConfluenceStorage', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onPost('/content').reply(200, { id: '444' });
+      const spy = jest.spyOn(client, 'htmlToConfluenceStorage');
+
+      await client.createPage('T', 'TEST', '<p>x</p>', 'html');
+
+      expect(spy).toHaveBeenCalledWith('<p>x</p>');
+      const body = JSON.parse(mock.history.post[0].data).body.storage;
+      expect(body.representation).toBe('storage');
+      expect(body.value).toBe('<p>x</p>');
+
+      spy.mockRestore();
+      mock.restore();
+    });
+
+    test('createChildPage with format="html" routes through htmlToConfluenceStorage', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onPost('/content').reply(200, { id: '555' });
+      const spy = jest.spyOn(client, 'htmlToConfluenceStorage');
+
+      await client.createChildPage('T', 'TEST', '100', '<p>x</p>', 'html');
+
+      expect(spy).toHaveBeenCalledWith('<p>x</p>');
+      spy.mockRestore();
+      mock.restore();
+    });
   });
 
   describe('deletePage', () => {
