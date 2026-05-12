@@ -47,6 +47,15 @@ function handleCommandError(analytics, commandName, error, onExtra = null) {
   process.exit(1);
 }
 
+async function readStdin() {
+  process.stdin.setEncoding('utf8');
+  let data = '';
+  for await (const chunk of process.stdin) {
+    data += chunk;
+  }
+  return data;
+}
+
 // Wraps a command action with the standard analytics + client + error pipeline.
 // The handler still calls analytics.track(name, true) on success so it can opt
 // into alternative tracking keys (e.g. *_cancel, *_dry_run).
@@ -1987,7 +1996,11 @@ program
       if (options.inputFile) {
         input = fs.readFileSync(options.inputFile, 'utf-8');
       } else {
-        input = fs.readFileSync(process.stdin.fd, 'utf-8');
+        if (process.stdin.isTTY) {
+          console.error(chalk.red('Error: No input provided. Use --input-file <path> or pipe content via stdin.'));
+          process.exit(1);
+        }
+        input = await readStdin();
       }
 
       const converter = ConfluenceClient.createLocalConverter();

@@ -73,6 +73,24 @@ describe('convert command', () => {
     expect(output).toContain('World');
   });
 
+  test('reads input from stdin when --input-file is omitted', () => {
+    const output = run(
+      ['convert', '--input-format', 'markdown', '--output-format', 'storage'],
+      '# Piped\n\nbody\n'
+    );
+    expect(output).toContain('<h1>');
+    expect(output).toContain('Piped');
+    expect(output).toContain('body');
+  });
+
+  test('handles empty stdin without hanging or crashing', () => {
+    const output = run(
+      ['convert', '--input-format', 'markdown', '--output-format', 'storage'],
+      ''
+    );
+    expect(output).toBe('');
+  });
+
   test('markdown to storage via files', () => {
     const inputFile = writeInput('input.md', '# Test\n\nParagraph\n');
     const outputFile = path.join(tmpDir, 'output.xml');
