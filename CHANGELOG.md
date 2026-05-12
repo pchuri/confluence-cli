@@ -1,3 +1,10 @@
+## [2.6.3](https://github.com/pchuri/confluence-cli/compare/v2.6.2...v2.6.3) (2026-05-12)
+
+
+### Bug Fixes
+
+* **convert:** read stdin as a stream and guard against TTY-only invocations ([#184](https://github.com/pchuri/confluence-cli/issues/184)) ([fda2860](https://github.com/pchuri/confluence-cli/commit/fda2860517870ec7245364809a4520c4d94d0113))
+
 ## [2.6.2](https://github.com/pchuri/confluence-cli/compare/v2.6.1...v2.6.2) (2026-05-12)
 
 
