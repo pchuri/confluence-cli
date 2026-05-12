@@ -1,3 +1,10 @@
+## [2.6.2](https://github.com/pchuri/confluence-cli/compare/v2.6.1...v2.6.2) (2026-05-12)
+
+
+### Bug Fixes
+
+* **client:** route createPage/createChildPage html through htmlToConfluenceStorage ([#183](https://github.com/pchuri/confluence-cli/issues/183)) ([6946cd7](https://github.com/pchuri/confluence-cli/commit/6946cd76e8c90b51b23cd3459284fab5d9317624))
+
 ## [2.6.1](https://github.com/pchuri/confluence-cli/compare/v2.6.0...v2.6.1) (2026-05-10)
 
 
