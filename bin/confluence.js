@@ -76,6 +76,20 @@ function withClient(commandName, handler, { writable = false, onError = null } =
   };
 }
 
+// Same analytics + error pipeline as withClient, but without loading config or
+// constructing a ConfluenceClient. For commands that work entirely locally
+// (convert, stats, …).
+function withLocal(commandName, handler) {
+  return async (...actionArgs) => {
+    const analytics = new Analytics();
+    try {
+      await handler({ analytics }, ...actionArgs);
+    } catch (error) {
+      handleCommandError(analytics, commandName, error);
+    }
+  };
+}
+
 program
   .name('confluence')
   .description('CLI tool for Atlassian Confluence')
@@ -187,15 +201,9 @@ program
 program
   .command('stats')
   .description('Show usage statistics')
-  .action(async () => {
-    try {
-      const analytics = new Analytics();
-      analytics.showStats();
-    } catch (error) {
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
-    }
-  });
+  .action(withLocal('stats', async ({ analytics }) => {
+    analytics.showStats();
+  }));
 
 // Install skill command
 program
@@ -1968,82 +1976,77 @@ program
   .option('-o, --output-file <file>', 'Output file path (writes to stdout if omitted)')
   .option('--input-format <format>', `Input format (${VALID_INPUT_FORMATS.join(', ')})`)
   .option('--output-format <format>', `Output format (${VALID_OUTPUT_FORMATS.join(', ')})`)
-  .action(async (options) => {
-    const analytics = new Analytics();
-    try {
-      if (!options.inputFormat) {
-        console.error(chalk.red('Error: --input-format is required.'));
-        process.exit(1);
-      }
-      if (!options.outputFormat) {
-        console.error(chalk.red('Error: --output-format is required.'));
-        process.exit(1);
-      }
-      if (!VALID_INPUT_FORMATS.includes(options.inputFormat)) {
-        console.error(chalk.red(`Error: Invalid input format "${options.inputFormat}". Valid: ${VALID_INPUT_FORMATS.join(', ')}`));
-        process.exit(1);
-      }
-      if (!VALID_OUTPUT_FORMATS.includes(options.outputFormat)) {
-        console.error(chalk.red(`Error: Invalid output format "${options.outputFormat}". Valid: ${VALID_OUTPUT_FORMATS.join(', ')}`));
-        process.exit(1);
-      }
-      if (options.inputFormat === options.outputFormat) {
-        console.error(chalk.red('Error: Input and output formats must be different.'));
-        process.exit(1);
-      }
-
-      let input;
-      if (options.inputFile) {
-        input = fs.readFileSync(options.inputFile, 'utf-8');
-      } else {
-        if (process.stdin.isTTY) {
-          console.error(chalk.red('Error: No input provided. Use --input-file <path> or pipe content via stdin.'));
-          process.exit(1);
-        }
-        input = await readStdin();
-      }
-
-      const converter = ConfluenceClient.createLocalConverter();
-      let output;
-
-      if (options.inputFormat === 'markdown' && options.outputFormat === 'storage') {
-        output = converter.markdownToStorage(input);
-      } else if (options.inputFormat === 'markdown' && options.outputFormat === 'html') {
-        output = converter.markdown.render(input);
-      } else if (options.inputFormat === 'html' && options.outputFormat === 'storage') {
-        output = converter.htmlToConfluenceStorage(input);
-      } else if (options.inputFormat === 'storage' && options.outputFormat === 'markdown') {
-        output = converter.storageToMarkdown(input);
-      } else if (options.inputFormat === 'storage' && options.outputFormat === 'text') {
-        const { convert: htmlToText } = require('html-to-text');
-        output = htmlToText(input, { wordwrap: 130 });
-      } else if (options.inputFormat === 'storage' && options.outputFormat === 'html') {
-        output = input; // storage format is already HTML-based
-      } else if (options.inputFormat === 'html' && options.outputFormat === 'text') {
-        const { convert: htmlToText } = require('html-to-text');
-        output = htmlToText(input, { wordwrap: 130 });
-      } else if (options.inputFormat === 'html' && options.outputFormat === 'markdown') {
-        output = converter.htmlToMarkdown(input);
-      } else if (options.inputFormat === 'markdown' && options.outputFormat === 'text') {
-        const html = converter.markdown.render(input);
-        const { convert: htmlToText } = require('html-to-text');
-        output = htmlToText(html, { wordwrap: 130 });
-      } else {
-        console.error(chalk.red(`Error: Conversion from "${options.inputFormat}" to "${options.outputFormat}" is not supported.`));
-        process.exit(1);
-      }
-
-      if (options.outputFile) {
-        fs.writeFileSync(options.outputFile, output, 'utf-8');
-        console.error(chalk.green(`Converted ${options.inputFormat} → ${options.outputFormat}: ${options.outputFile}`));
-      } else {
-        process.stdout.write(output);
-      }
-      analytics.track('convert', true);
-    } catch (error) {
-      handleCommandError(analytics, 'convert', error);
+  .action(withLocal('convert', async ({ analytics }, options) => {
+    if (!options.inputFormat) {
+      console.error(chalk.red('Error: --input-format is required.'));
+      process.exit(1);
     }
-  });
+    if (!options.outputFormat) {
+      console.error(chalk.red('Error: --output-format is required.'));
+      process.exit(1);
+    }
+    if (!VALID_INPUT_FORMATS.includes(options.inputFormat)) {
+      console.error(chalk.red(`Error: Invalid input format "${options.inputFormat}". Valid: ${VALID_INPUT_FORMATS.join(', ')}`));
+      process.exit(1);
+    }
+    if (!VALID_OUTPUT_FORMATS.includes(options.outputFormat)) {
+      console.error(chalk.red(`Error: Invalid output format "${options.outputFormat}". Valid: ${VALID_OUTPUT_FORMATS.join(', ')}`));
+      process.exit(1);
+    }
+    if (options.inputFormat === options.outputFormat) {
+      console.error(chalk.red('Error: Input and output formats must be different.'));
+      process.exit(1);
+    }
+
+    let input;
+    if (options.inputFile) {
+      input = fs.readFileSync(options.inputFile, 'utf-8');
+    } else {
+      if (process.stdin.isTTY) {
+        console.error(chalk.red('Error: No input provided. Use --input-file <path> or pipe content via stdin.'));
+        process.exit(1);
+      }
+      input = await readStdin();
+    }
+
+    const converter = ConfluenceClient.createLocalConverter();
+    let output;
+
+    if (options.inputFormat === 'markdown' && options.outputFormat === 'storage') {
+      output = converter.markdownToStorage(input);
+    } else if (options.inputFormat === 'markdown' && options.outputFormat === 'html') {
+      output = converter.markdown.render(input);
+    } else if (options.inputFormat === 'html' && options.outputFormat === 'storage') {
+      output = converter.htmlToConfluenceStorage(input);
+    } else if (options.inputFormat === 'storage' && options.outputFormat === 'markdown') {
+      output = converter.storageToMarkdown(input);
+    } else if (options.inputFormat === 'storage' && options.outputFormat === 'text') {
+      const { convert: htmlToText } = require('html-to-text');
+      output = htmlToText(input, { wordwrap: 130 });
+    } else if (options.inputFormat === 'storage' && options.outputFormat === 'html') {
+      output = input; // storage format is already HTML-based
+    } else if (options.inputFormat === 'html' && options.outputFormat === 'text') {
+      const { convert: htmlToText } = require('html-to-text');
+      output = htmlToText(input, { wordwrap: 130 });
+    } else if (options.inputFormat === 'html' && options.outputFormat === 'markdown') {
+      output = converter.htmlToMarkdown(input);
+    } else if (options.inputFormat === 'markdown' && options.outputFormat === 'text') {
+      const html = converter.markdown.render(input);
+      const { convert: htmlToText } = require('html-to-text');
+      output = htmlToText(html, { wordwrap: 130 });
+    } else {
+      console.error(chalk.red(`Error: Conversion from "${options.inputFormat}" to "${options.outputFormat}" is not supported.`));
+      process.exit(1);
+    }
+
+    if (options.outputFile) {
+      fs.writeFileSync(options.outputFile, output, 'utf-8');
+      console.error(chalk.green(`Converted ${options.inputFormat} → ${options.outputFormat}: ${options.outputFile}`));
+    } else {
+      process.stdout.write(output);
+    }
+    analytics.track('convert', true);
+  }));
 
 // Exported for testing
 module.exports = {
@@ -2062,6 +2065,7 @@ module.exports = {
     assertNoBodyForFolder,
     handleCommandError,
     withClient,
+    withLocal,
   },
 };
 
