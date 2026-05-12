@@ -17,7 +17,7 @@ const { getConfig } = require('../lib/config');
 const ConfluenceClient = require('../lib/confluence-client');
 const Analytics = require('../lib/analytics');
 
-const { _test: { withClient } } = require('../bin/confluence');
+const { _test: { withClient, withLocal } } = require('../bin/confluence');
 
 describe('withClient wrapper', () => {
   let trackSpy;
@@ -128,6 +128,56 @@ describe('withClient wrapper', () => {
     await expect(action('PAGE-1', {})).rejects.toThrow('process.exit called');
     expect(handler).not.toHaveBeenCalled();
     expect(trackSpy).toHaveBeenCalledWith('read', false);
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+});
+
+describe('withLocal wrapper', () => {
+  let trackSpy;
+  let exitSpy;
+  let errorSpy;
+
+  beforeEach(() => {
+    trackSpy = jest.spyOn(Analytics.prototype, 'track').mockImplementation(() => {});
+    exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+    errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    ConfluenceClient.mockClear();
+  });
+
+  afterEach(() => {
+    trackSpy.mockRestore();
+    exitSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  test('invokes handler with { analytics } and forwards action args; never builds a client', async () => {
+    const handler = jest.fn().mockResolvedValue();
+    const action = withLocal('convert', handler);
+
+    await action({ inputFormat: 'markdown' });
+
+    expect(handler).toHaveBeenCalledTimes(1);
+    const [ctx, options] = handler.mock.calls[0];
+    expect(ctx).toEqual({ analytics: expect.anything() });
+    expect(ctx.client).toBeUndefined();
+    expect(ctx.config).toBeUndefined();
+    expect(options).toEqual({ inputFormat: 'markdown' });
+    expect(ConfluenceClient).not.toHaveBeenCalled();
+    expect(exitSpy).not.toHaveBeenCalled();
+  });
+
+  test('handler throw tracks failure, logs Error message, and exits 1', async () => {
+    const handler = jest.fn().mockRejectedValue(new Error('boom'));
+    const action = withLocal('convert', handler);
+
+    await expect(action({})).rejects.toThrow('process.exit called');
+    expect(trackSpy).toHaveBeenCalledWith('convert', false);
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('Error:'),
+      'boom'
+    );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 });
