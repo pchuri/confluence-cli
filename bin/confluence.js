@@ -6,9 +6,10 @@ const { program } = require('commander');
 const chalk = require('chalk');
 const inquirer = require('inquirer');
 const ConfluenceClient = require('../lib/confluence-client');
-const { getConfig, initConfig, listProfiles, setActiveProfile, deleteProfile, isValidProfileName } = require('../lib/config');
+const { getConfig, initConfig } = require('../lib/config');
 const Analytics = require('../lib/analytics');
 const pkg = require('../package.json');
+const registerProfileCommands = require('./commands/profile');
 
 function assertWritable(config) {
   if (config.readOnly) {
@@ -1885,85 +1886,7 @@ function printTree(nodes, client, config, options, depth = 1) {
   });
 }
 
-// Profile management commands
-const profileCmd = program
-  .command('profile')
-  .description('Manage configuration profiles');
-
-profileCmd
-  .command('list')
-  .description('List all configuration profiles')
-  .action(() => {
-    const { profiles } = listProfiles();
-    if (profiles.length === 0) {
-      console.log(chalk.yellow('No profiles configured. Run "confluence init" to create one.'));
-      return;
-    }
-    console.log(chalk.blue('Configuration profiles:\n'));
-    profiles.forEach(p => {
-      const marker = p.active ? chalk.green(' (active)') : '';
-      const readOnlyBadge = p.readOnly ? chalk.red(' [read-only]') : '';
-      console.log(`  ${p.active ? chalk.green('*') : ' '} ${chalk.cyan(p.name)}${marker}${readOnlyBadge} - ${chalk.gray(p.domain)}`);
-    });
-  });
-
-profileCmd
-  .command('use <name>')
-  .description('Set the active configuration profile')
-  .action((name) => {
-    try {
-      setActiveProfile(name);
-      console.log(chalk.green(`Switched to profile "${name}"`));
-    } catch (error) {
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
-    }
-  });
-
-profileCmd
-  .command('add <name>')
-  .description('Add a new configuration profile interactively')
-  .option('-d, --domain <domain>', 'Confluence domain')
-  .option('--protocol <protocol>', 'Protocol (http or https)')
-  .option('-p, --api-path <path>', 'REST API path')
-  .option('-a, --auth-type <type>', 'Authentication type (basic, bearer, mtls, or cookie)')
-  .option('-e, --email <email>', 'Email or username for basic auth')
-  .option('-t, --token <token>', 'API token')
-  .option('-c, --cookie <cookie>', 'Cookie for Enterprise SSO authentication (e.g., "JSESSIONID=...")')
-  .option('--tls-ca-cert <path>', 'CA certificate for mTLS connections')
-  .option('--tls-client-cert <path>', 'Client certificate for mTLS connections')
-  .option('--tls-client-key <path>', 'Client private key for mTLS connections')
-  .option('--read-only', 'Set profile to read-only mode (blocks write operations)')
-  .action(async (name, options) => {
-    if (!isValidProfileName(name)) {
-      console.error(chalk.red('Invalid profile name. Use only letters, numbers, hyphens, and underscores.'));
-      process.exit(1);
-    }
-    await initConfig({ ...options, profile: name });
-  });
-
-profileCmd
-  .command('remove <name>')
-  .description('Remove a configuration profile')
-  .action(async (name) => {
-    try {
-      const { confirmed } = await inquirer.prompt([{
-        type: 'confirm',
-        name: 'confirmed',
-        message: `Delete profile "${name}"?`,
-        default: false
-      }]);
-      if (!confirmed) {
-        console.log(chalk.yellow('Cancelled.'));
-        return;
-      }
-      deleteProfile(name);
-      console.log(chalk.green(`Profile "${name}" removed.`));
-    } catch (error) {
-      console.error(chalk.red('Error:'), error.message);
-      process.exit(1);
-    }
-  });
+registerProfileCommands(program, { withLocal });
 
 // Convert command (local format conversion, no server connection required)
 const VALID_INPUT_FORMATS = ['markdown', 'storage', 'html'];
