@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const chalk = require('chalk');
+const { sanitizeFilename } = require('../../lib/file-utils');
 
 const EXPORT_MARKER = '.confluence-export.json';
 
@@ -16,19 +17,6 @@ function writeExportMarker(fs, path, exportDir, meta) {
 
 function isExportDirectory(fs, path, dir) {
   return fs.existsSync(path.join(dir, EXPORT_MARKER));
-}
-
-function sanitizeFilename(filename) {
-  if (!filename || typeof filename !== 'string') {
-    return 'unnamed';
-  }
-  const stripped = path.basename(filename.replace(/\\/g, '/'));
-  const cleaned = stripped
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\\/:*?"<>|\x00-\x1f]/g, '_')
-    .replace(/^\.+/, '')
-    .trim();
-  return cleaned || 'unnamed';
 }
 
 function uniquePathFor(fs, path, dir, filename) {
@@ -342,7 +330,6 @@ module.exports = registerExportCommand;
 module.exports.EXPORT_MARKER = EXPORT_MARKER;
 module.exports.writeExportMarker = writeExportMarker;
 module.exports.isExportDirectory = isExportDirectory;
-module.exports.sanitizeFilename = sanitizeFilename;
 module.exports.uniquePathFor = uniquePathFor;
 module.exports.writeStream = writeStream;
 module.exports.sanitizeTitle = sanitizeTitle;
