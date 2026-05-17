@@ -7,8 +7,8 @@ const {
   uniquePathFor,
   exportRecursive,
   sanitizeTitle,
-  sanitizeFilename,
 } = require('../bin/commands/export.js');
+const { sanitizeFilename } = require('../lib/file-utils');
 
 // ---------------------------------------------------------------------------
 // Helpers: in-memory fs mock
