@@ -16,6 +16,16 @@ describe('CLI entry point', () => {
     ).trim();
     expect(output).toMatch(/^\d+\.\d+\.\d+$/);
   });
+
+  test('search --help documents start pagination option', () => {
+    const output = execFileSync(
+      process.execPath,
+      [path.resolve(__dirname, '../bin/index.js'), 'search', '--help'],
+      { encoding: 'utf8' }
+    );
+    expect(output).toContain('--start <start>');
+    expect(output).toContain('Start index for results');
+  });
 });
 
 describe('create/create-child --type validation', () => {

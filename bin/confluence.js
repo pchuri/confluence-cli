@@ -166,9 +166,15 @@ program
   .command('search <query>')
   .description('Search for Confluence pages')
   .option('-l, --limit <limit>', 'Limit number of results', '10')
+  .option('--start <start>', 'Start index for results', '0')
   .option('--cql', 'Pass query as raw CQL instead of text search')
   .action(withClient('search', async ({ client, analytics }, query, options) => {
-    const results = await client.search(query, parseInt(options.limit), options.cql);
+    const start = parseInt(options.start, 10);
+    if (Number.isNaN(start) || start < 0) {
+      throw new Error('Start must be a non-negative number.');
+    }
+
+    const results = await client.search(query, parseInt(options.limit), options.cql, start);
 
     if (results.length === 0) {
       console.log(chalk.yellow('No results found.'));
@@ -178,7 +184,7 @@ program
 
     console.log(chalk.blue(`Found ${results.length} results:`));
     results.forEach((result, index) => {
-      console.log(`${index + 1}. ${chalk.green(result.title)} (ID: ${result.id})`);
+      console.log(`${start + index + 1}. ${chalk.green(result.title)} (ID: ${result.id})`);
       if (result.excerpt) {
         console.log(`   ${chalk.gray(result.excerpt)}`);
       }
