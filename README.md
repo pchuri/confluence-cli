@@ -369,6 +369,9 @@ confluence search "search term"
 
 # Limit results
 confluence search "search term" --limit 5
+
+# Paginate results
+confluence search "search term" --limit 5 --start 5
 ```
 
 ### List or Download Attachments
@@ -697,7 +700,7 @@ confluence stats
 | `init` | Initialize CLI configuration | `--read-only` |
 | `read <pageId_or_url>` | Read page content | `--format <html\|text\|storage\|markdown>` |
 | `info <pageId_or_url>` | Get page information | `--format <text\|json>` |
-| `search <query>` | Search for pages | `--limit <number>` |
+| `search <query>` | Search for pages | `--limit <number>`, `--start <number>` |
 | `spaces` | List available spaces | `--limit <number>`, `--all` |
 | `find <title>` | Find a page by its title | `--space <spaceKey>` |
 | `children <pageId>` | List child pages of a page | `--recursive`, `--max-depth <number>`, `--format <list\|tree\|json>`, `--show-url`, `--show-id` |

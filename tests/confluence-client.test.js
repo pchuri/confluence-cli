@@ -1134,6 +1134,18 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('should respect start parameter', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/search').reply((config) => {
+        expect(config.params.start).toBe(20);
+        return [200, { results: [] }];
+      });
+
+      await client.search('test', 10, false, 20);
+
+      mock.restore();
+    });
+
     test('should escape backslashes before double quotes', async () => {
       const mock = new MockAdapter(client.client);
       mock.onGet('/search').reply((config) => {
