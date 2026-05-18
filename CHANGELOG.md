@@ -1,3 +1,10 @@
+# [2.7.0](https://github.com/pchuri/confluence-cli/compare/v2.6.3...v2.7.0) (2026-05-18)
+
+
+### Features
+
+* **search:** add start offset pagination ([#188](https://github.com/pchuri/confluence-cli/issues/188)) ([f8c73bd](https://github.com/pchuri/confluence-cli/commit/f8c73bd24cc93cc0c9fa1327f9474f445ea89875))
+
 ## [2.6.3](https://github.com/pchuri/confluence-cli/compare/v2.6.2...v2.6.3) (2026-05-12)
 
 
