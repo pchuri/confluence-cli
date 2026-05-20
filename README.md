@@ -164,6 +164,14 @@ confluence --profile sso init \
   --cookie "JSESSIONID=abc123; XSRF-TOKEN=xyz789"
 ```
 
+**Reverse-proxy / no-auth profile** (credentials injected upstream):
+```bash
+confluence --profile proxy init \
+  --domain "confluence.internal" \
+  --api-path "/rest/api" \
+  --auth-type "none"
+```
+
 **Hybrid mode** (some fields provided, rest via prompts):
 ```bash
 # Domain and token provided, will prompt for auth method and email
@@ -176,7 +184,7 @@ confluence init --email "user@example.com" --token "your-api-token"
 **Available flags:**
 - `-d, --domain <domain>` - Confluence domain (e.g., `company.atlassian.net`)
 - `-p, --api-path <path>` - REST API path (e.g., `/wiki/rest/api`)
-- `-a, --auth-type <type>` - Authentication type: `basic`, `bearer`, `mtls`, or `cookie`
+- `-a, --auth-type <type>` - Authentication type: `basic`, `bearer`, `mtls`, `cookie`, or `none`
 - `-e, --email <email>` - Email or username for basic authentication
 - `-t, --token <token>` - API token or password
 - `-c, --cookie <cookie>` - Cookie for Enterprise SSO authentication (e.g., `"JSESSIONID=..."`)
@@ -215,6 +223,13 @@ export CONFLUENCE_DOMAIN="confluence.company.com"
 export CONFLUENCE_API_PATH="/rest/api"
 export CONFLUENCE_AUTH_TYPE="cookie"
 export CONFLUENCE_COOKIE="JSESSIONID=abc123xyz..."
+```
+
+**Reverse-proxy / no-auth environment variables**:
+```bash
+export CONFLUENCE_DOMAIN="confluence.internal"
+export CONFLUENCE_API_PATH="/rest/api"
+export CONFLUENCE_AUTH_TYPE="none"
 ```
 
 **Scoped API token** (recommended for agents):
@@ -320,6 +335,8 @@ For **read-only** usage, select at minimum: `read:confluence-content.all`, `read
 **mTLS-protected Confluence APIs:** Some self-hosted or reverse-proxied deployments authenticate at the TLS layer with a client certificate instead of sending an application-level token. In these environments, configure `authType=mtls` and provide certificate paths via CLI flags or environment variables. No `Authorization` header will be sent in mTLS mode.
 
 **Enterprise SSO with Cookie Authentication:** For Confluence instances behind Enterprise SSO (SAML, OAuth, Okta, etc.) where API tokens or Basic/Bearer auth are not available, you can authenticate using session cookies. After logging in through your browser, extract the session cookie (typically `JSESSIONID` or similar) from your browser's dev tools and configure it via the `--cookie` flag or `CONFLUENCE_COOKIE` environment variable. The cookie is sent in the `Cookie` header instead of an `Authorization` header. Note that session cookies typically expire, so you'll need to refresh them periodically. For security, prefer `CONFLUENCE_COOKIE` env var or interactive prompt over `--cookie` flag since command-line arguments may be visible in shell history and process listings.
+
+**Reverse-proxy injected authentication:** For deployments where a local reverse proxy injects credentials on the wire (e.g. SPNEGO/Kerberos, mTLS terminated at the proxy edge, or header injection), set `authType=none`. In this mode the CLI sends no `Authorization` or `Cookie` header — authentication is entirely the proxy's responsibility. Point `CONFLUENCE_DOMAIN` at the proxy and ensure no credentials are configured on the CLI side.
 
 ## Usage
 

@@ -281,6 +281,27 @@ describe('getConfig env var aliases', () => {
       logSpy.mockRestore();
     }
   });
+
+  test('CONFLUENCE_AUTH_TYPE=none with just a domain resolves with no credentials', () => {
+    process.env.CONFLUENCE_DOMAIN = 'confluence.internal';
+    process.env.CONFLUENCE_AUTH_TYPE = 'none';
+
+    const config = getConfig();
+    expect(config.authType).toBe('none');
+    expect(config.domain).toBe('confluence.internal');
+    expect(config.token).toBeUndefined();
+    expect(config.email).toBeUndefined();
+    expect(config.cookie).toBeUndefined();
+    expect(config.mtls).toBeUndefined();
+  });
+
+  test('CONFLUENCE_AUTH_TYPE=NONE (uppercase) normalizes to none', () => {
+    process.env.CONFLUENCE_DOMAIN = 'confluence.internal';
+    process.env.CONFLUENCE_AUTH_TYPE = 'NONE';
+
+    const config = getConfig();
+    expect(config.authType).toBe('none');
+  });
 });
 
 describe('initConfig CLI option validation', () => {
