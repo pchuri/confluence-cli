@@ -114,7 +114,7 @@ program
   .option('-d, --domain <domain>', 'Confluence domain')
   .option('--protocol <protocol>', 'Protocol (http or https)')
   .option('-p, --api-path <path>', 'REST API path')
-  .option('-a, --auth-type <type>', 'Authentication type (basic, bearer, mtls, or cookie)')
+  .option('-a, --auth-type <type>', 'Authentication type (basic, bearer, mtls, cookie, or none)')
   .option('-e, --email <email>', 'Email or username for basic auth')
   .option('-t, --token <token>', 'API token')
   .option('-c, --cookie <cookie>', 'Cookie for Enterprise SSO authentication (e.g., "JSESSIONID=...")')

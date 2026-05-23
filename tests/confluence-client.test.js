@@ -323,6 +323,28 @@ describe('ConfluenceClient', () => {
 
       expect(cookieClient.client.defaults.headers.Cookie).toBe('JSESSIONID=abc; XSRF-TOKEN=xyz');
     });
+
+    test('sends no Authorization or Cookie header when authType is none', () => {
+      const noneClient = new ConfluenceClient({
+        domain: 'confluence.internal',
+        authType: 'none',
+        apiPath: '/rest/api'
+      });
+
+      expect(noneClient.authType).toBe('none');
+      expect(noneClient.client.defaults.headers.Authorization).toBeUndefined();
+      expect(noneClient.client.defaults.headers.Cookie).toBeUndefined();
+    });
+
+    test('buildAuthHeader returns null for none auth', () => {
+      const noneClient = new ConfluenceClient({
+        domain: 'confluence.internal',
+        authType: 'none'
+      });
+
+      expect(noneClient.buildAuthHeader()).toBeNull();
+      expect(noneClient.buildAuthHeaders()).toEqual({});
+    });
   });
 
   describe('401 error handling (cookie auth)', () => {
@@ -338,6 +360,21 @@ describe('ConfluenceClient', () => {
 
       await expect(cookieClient.readPage('123')).rejects.toThrow(/cookie is valid and not expired/);
       await expect(cookieClient.readPage('123')).rejects.toThrow(/Enterprise SSO/);
+      mock.restore();
+    });
+  });
+
+  describe('401 error handling (none auth)', () => {
+    test('provides reverse-proxy hint for none auth', async () => {
+      const noneClient = new ConfluenceClient({
+        domain: 'confluence.internal',
+        authType: 'none',
+        apiPath: '/rest/api'
+      });
+      const mock = new MockAdapter(noneClient.client);
+      mock.onGet(/\/content\/123/).reply(401);
+
+      await expect(noneClient.readPage('123')).rejects.toThrow(/reverse proxy/);
       mock.restore();
     });
   });
