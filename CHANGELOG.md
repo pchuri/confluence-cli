@@ -1,3 +1,10 @@
+# [2.8.0](https://github.com/pchuri/confluence-cli/compare/v2.7.0...v2.8.0) (2026-05-23)
+
+
+### Features
+
+* **auth:** add 'none' auth type for reverse-proxy injected credentials ([#190](https://github.com/pchuri/confluence-cli/issues/190)) ([21a03bd](https://github.com/pchuri/confluence-cli/commit/21a03bd9fd11dc000c793f22254c2414e7939f22))
+
 # [2.7.0](https://github.com/pchuri/confluence-cli/compare/v2.6.3...v2.7.0) (2026-05-18)
 
 
