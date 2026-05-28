@@ -1,3 +1,10 @@
+# [2.9.0](https://github.com/pchuri/confluence-cli/compare/v2.8.0...v2.9.0) (2026-05-28)
+
+
+### Features
+
+* add `api` command for arbitrary authenticated requests ([#189](https://github.com/pchuri/confluence-cli/issues/189)) ([4852b77](https://github.com/pchuri/confluence-cli/commit/4852b77c31d87cfd1e7c5ff836bbcfadb007d27c)), closes [#186](https://github.com/pchuri/confluence-cli/issues/186) [#184](https://github.com/pchuri/confluence-cli/issues/184)
+
 # [2.8.0](https://github.com/pchuri/confluence-cli/compare/v2.7.0...v2.8.0) (2026-05-23)
 
 
