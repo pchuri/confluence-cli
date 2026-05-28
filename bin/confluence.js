@@ -15,6 +15,8 @@ const registerAttachmentCommands = require('./commands/attachments');
 const registerPropertyCommands = require('./commands/properties');
 const registerCommentCommands = require('./commands/comment');
 const registerExportCommand = require('./commands/export');
+const registerApiCommand = require('./commands/api');
+const { readStdin } = require('../lib/stdin-utils');
 
 function assertWritable(config) {
   if (config.readOnly) {
@@ -51,15 +53,6 @@ function handleCommandError(analytics, commandName, error, onExtra = null) {
     try { onExtra(error); } catch { /* keep error path robust if hint code throws */ }
   }
   process.exit(1);
-}
-
-async function readStdin() {
-  process.stdin.setEncoding('utf8');
-  let data = '';
-  for await (const chunk of process.stdin) {
-    data += chunk;
-  }
-  return data;
 }
 
 // Wraps a command action with the standard analytics + client + error pipeline.
@@ -487,6 +480,8 @@ registerPropertyCommands(program, { withClient });
 registerCommentCommands(program, { withClient });
 
 registerExportCommand(program, { withClient });
+
+registerApiCommand(program, { getProfileName, readStdin });
 
 // Copy page tree command
 program

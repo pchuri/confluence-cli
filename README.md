@@ -18,6 +18,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - 🛠️ **Edit workflow** - Export page content for editing and re-import
 - 🔀 **Profiles** - Manage multiple Confluence instances with named configuration profiles
 - 🔒 **Read-only mode** - Profile-level write protection for safe AI agent usage
+- 🌐 **Raw API requests** - Make arbitrary authenticated requests to any Confluence endpoint (like `gh api`)
 - 🔄 **Format conversion** - Convert between Markdown, HTML, Storage, and text formats locally (no server required)
 - 🔧 **Easy setup** - Simple configuration with environment variables or interactive setup
 
@@ -705,6 +706,56 @@ When read-only mode is active, any write command (`create`, `create-child`, `upd
 
 `confluence profile list` shows a `[read-only]` badge next to protected profiles.
 
+### Raw API Requests
+
+Make arbitrary authenticated requests to any Confluence REST endpoint, modeled after `gh api`. Useful for endpoints the CLI hasn't wrapped yet (labels, restrictions, groups, audit, v2 API, …) without falling back to `curl`.
+
+**Endpoint resolution:**
+
+- **Relative path** (no leading slash) → resolved against the configured `apiPath` (the default for most calls).
+- **Absolute path** (leading `/`) → bypasses `apiPath`; resolved against the host. On Confluence Cloud, `apiPath` is typically `/wiki/rest/api`, so absolute endpoints must include the `/wiki` prefix.
+- **Full URL** (`https://…`) → used as-is.
+
+```bash
+# List labels on a page (relative — uses apiPath)
+confluence api content/123456789/label
+
+# Same call written as an absolute path on Confluence Cloud
+confluence api /wiki/rest/api/content/123456789/label
+
+# Add a label to a page (relative form)
+confluence api content/123456789/label --input - <<< '[{"name":"reviewed"}]'
+
+# Remove a label from a page
+confluence api content/123456789/label/reviewed -X DELETE
+
+# View page restrictions
+confluence api content/123456789/restriction
+
+# List groups
+confluence api group
+
+# Check long-running task status
+confluence api longtask/123
+
+# Query the v2 API (absolute path required, since v2 lives outside apiPath)
+confluence api /wiki/api/v2/pages -f spaceKey=DEV -f limit=10 -X GET
+
+# Filter response with jq
+confluence api group --jq '.results[].name'
+
+# Include response status and headers
+confluence api audit -i
+
+# Read request body from a file
+confluence api content/123456789/restriction --input ./restrictions.json
+
+# Suppress success output (useful in scripts that only care about exit code)
+confluence api content/123456789/label --input - --silent <<< '[{"name":"approved"}]'
+```
+
+Read-only profiles block write methods (`POST`, `PUT`, `PATCH`, `DELETE`) while allowing `GET` and `HEAD`. `--jq` requires `jq` to be installed and available in `PATH`.
+
 ### View Usage Statistics
 ```bash
 confluence stats
@@ -746,6 +797,7 @@ confluence stats
 | `profile use <name>` | Set the active configuration profile | |
 | `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol`, `--read-only` |
 | `profile remove <name>` | Remove a configuration profile | |
+| `api <endpoint>` | Make an authenticated API request (relative path uses apiPath; absolute path bypasses it) | `-X, --method <method>`, `-f, --field <key=value>`, `-H, --header <key:value>`, `--input <file>`, `--jq <expression>`, `-i, --include`, `--silent` |
 | `convert` | Convert between content formats locally (no server required) | `--input-file <path>`, `--output-file <path>`, `--input-format <markdown\|storage\|html>`, `--output-format <markdown\|storage\|html\|text>` |
 | `stats` | View your usage statistics | |
 
@@ -793,6 +845,9 @@ confluence stats
 confluence profile list
 confluence profile use staging
 confluence --profile staging spaces
+
+# List labels on a page via the raw API (jq filter)
+confluence api content/123456789/label --jq '.[].name'
 
 # Convert markdown to Confluence storage format (no server required)
 confluence convert --input-file doc.md --input-format markdown --output-format storage

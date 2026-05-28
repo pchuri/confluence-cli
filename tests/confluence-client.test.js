@@ -2566,4 +2566,158 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
   });
+
+  describe('rawRequest', () => {
+    test('GET with relative endpoint', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, { id: '123', title: 'Test' });
+
+      const result = await client.rawRequest('GET', 'content/123');
+      expect(result.status).toBe(200);
+      expect(result.data).toEqual({ id: '123', title: 'Test' });
+
+      mock.restore();
+    });
+
+    test('GET with query params', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content').reply(config => {
+        expect(config.params).toEqual({ spaceKey: 'DEV', limit: '10' });
+        return [200, { results: [] }];
+      });
+
+      const result = await client.rawRequest('GET', 'content', {
+        params: { spaceKey: 'DEV', limit: '10' },
+      });
+      expect(result.status).toBe(200);
+
+      mock.restore();
+    });
+
+    test('POST with JSON body', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onPost('/content').reply(config => {
+        expect(JSON.parse(config.data)).toEqual({ title: 'New Page', type: 'page' });
+        return [200, { id: '456' }];
+      });
+
+      const result = await client.rawRequest('POST', 'content', {
+        data: { title: 'New Page', type: 'page' },
+      });
+      expect(result.status).toBe(200);
+      expect(result.data).toEqual({ id: '456' });
+
+      mock.restore();
+    });
+
+    test('absolute path bypasses apiPath', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('https://test.atlassian.net/wiki/api/v2/pages').reply(200, { results: [] });
+
+      const result = await client.rawRequest('GET', '/wiki/api/v2/pages');
+      expect(result.status).toBe(200);
+
+      mock.restore();
+    });
+
+    test('full URL used as-is', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('https://other.example.com/api/data').reply(200, { ok: true });
+
+      const result = await client.rawRequest('GET', 'https://other.example.com/api/data');
+      expect(result.status).toBe(200);
+      expect(result.data).toEqual({ ok: true });
+
+      mock.restore();
+    });
+
+    test('custom headers sent alongside auth headers', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content').reply(config => {
+        expect(config.headers['X-Custom']).toBe('value');
+        expect(config.headers.Authorization).toBeDefined();
+        return [200, {}];
+      });
+
+      await client.rawRequest('GET', 'content', {
+        headers: { 'X-Custom': 'value' },
+      });
+
+      mock.restore();
+    });
+
+    test('PUT method', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onPut('/content/123').reply(200, { updated: true });
+
+      const result = await client.rawRequest('PUT', 'content/123', {
+        data: { title: 'Updated' },
+      });
+      expect(result.status).toBe(200);
+
+      mock.restore();
+    });
+
+    test('DELETE method', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onDelete('/content/123').reply(204);
+
+      const result = await client.rawRequest('DELETE', 'content/123');
+      expect(result.status).toBe(204);
+
+      mock.restore();
+    });
+
+    test('HTTP error propagation', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/999').reply(404, { message: 'Not found' });
+
+      await expect(client.rawRequest('GET', 'content/999')).rejects.toThrow();
+
+      mock.restore();
+    });
+
+    test('auth headers preserved with basic auth', async () => {
+      const basicClient = new ConfluenceClient({
+        domain: 'test.atlassian.net',
+        token: 'test-token',
+        email: 'user@example.com',
+        authType: 'basic',
+      });
+      const mock = new MockAdapter(basicClient.client);
+      mock.onGet('/content').reply(config => {
+        expect(config.headers.Authorization).toMatch(/^Basic /);
+        return [200, {}];
+      });
+
+      await basicClient.rawRequest('GET', 'content');
+
+      mock.restore();
+    });
+
+    test('auth headers preserved with bearer token', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content').reply(config => {
+        expect(config.headers.Authorization).toBe('Bearer test-token');
+        return [200, {}];
+      });
+
+      await client.rawRequest('GET', 'content');
+
+      mock.restore();
+    });
+
+    test('returns status, headers, and data', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content').reply(200, { items: [] }, { 'x-request-id': 'abc123' });
+
+      const result = await client.rawRequest('GET', 'content');
+      expect(result).toHaveProperty('status', 200);
+      expect(result).toHaveProperty('headers');
+      expect(result).toHaveProperty('data');
+      expect(result.headers['x-request-id']).toBe('abc123');
+
+      mock.restore();
+    });
+  });
 });
