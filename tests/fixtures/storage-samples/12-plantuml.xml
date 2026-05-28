@@ -1,0 +1,9 @@
+<p>PlantUML diagram:</p>
+<ac:structured-macro ac:name="plantuml"><ac:plain-text-body><![CDATA[@startuml
+Alice -> Bob: Authentication Request
+Bob --> Alice: Authentication Response
+@enduml]]></ac:plain-text-body></ac:structured-macro>
+<p>Diagram with backticks:</p>
+<ac:structured-macro ac:name="plantuml"><ac:plain-text-body><![CDATA[@startuml
+:``Main Process``;
+@enduml]]></ac:plain-text-body></ac:structured-macro>

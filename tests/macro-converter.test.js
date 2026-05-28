@@ -1206,6 +1206,21 @@ describe('MacroConverter storageToMarkdown fenced code preserves indentation', (
     expect(converter.storageToMarkdown(storage)).toBe('```mermaid\ngraph TD\n    A --> B\n    A --> C\n```');
   });
 
+  test('plantuml macro basic conversion', () => {
+    const storage = '<ac:structured-macro ac:name="plantuml"><ac:plain-text-body><![CDATA[@startuml\nAlice -> Bob: Hello\nBob --> Alice: Hi\n@enduml]]></ac:plain-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('```plantuml\n@startuml\nAlice -> Bob: Hello\nBob --> Alice: Hi\n@enduml\n```');
+  });
+
+  test('plantuml macro with backticks in content uses adequate fence', () => {
+    const storage = '<ac:structured-macro ac:name="plantuml"><ac:plain-text-body><![CDATA[@startuml\n:``Main Process``;\n@enduml]]></ac:plain-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('```plantuml\n@startuml\n:``Main Process``;\n@enduml\n```');
+  });
+
+  test('plantuml macro with surrounding content is separated by blank lines', () => {
+    const storage = '<p>Before</p><ac:structured-macro ac:name="plantuml"><ac:plain-text-body><![CDATA[@startuml\nA -> B\n@enduml]]></ac:plain-text-body></ac:structured-macro><p>After</p>';
+    expect(converter.storageToMarkdown(storage)).toBe('Before\n\n```plantuml\n@startuml\nA -> B\n@enduml\n```\n\nAfter');
+  });
+
   test('non-fence content still has leading whitespace stripped', () => {
     const storage = '<p>    hello world</p>';
     expect(converter.storageToMarkdown(storage)).toBe('hello world');
@@ -1260,6 +1275,11 @@ describe('MacroConverter storageToMarkdown dynamic fence sizing', () => {
   test('mermaid payload containing ``` uses a 4-backtick fence', () => {
     const storage = '<ac:structured-macro ac:name="mermaid-macro"><ac:plain-text-body><![CDATA[graph TD\n    A["literal ```"] --> B]]></ac:plain-text-body></ac:structured-macro>';
     expect(converter.storageToMarkdown(storage)).toBe('````mermaid\ngraph TD\n    A["literal ```"] --> B\n````');
+  });
+
+  test('plantuml payload containing ``` uses a 4-backtick fence', () => {
+    const storage = '<ac:structured-macro ac:name="plantuml"><ac:plain-text-body><![CDATA[@startuml\n:```Main Process```;\n@enduml]]></ac:plain-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('````plantuml\n@startuml\n:```Main Process```;\n@enduml\n````');
   });
 
   test('prose with mid-line ``` before a code macro does not steal fence boundary', () => {
