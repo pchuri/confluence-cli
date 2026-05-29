@@ -1,3 +1,10 @@
+# [2.10.0](https://github.com/pchuri/confluence-cli/compare/v2.9.0...v2.10.0) (2026-05-29)
+
+
+### Features
+
+* add plantuml macro support to markdown conversion ([#192](https://github.com/pchuri/confluence-cli/issues/192)) ([f1538db](https://github.com/pchuri/confluence-cli/commit/f1538dbd7c1e4023d5752ae02c6c7291c34322c1))
+
 # [2.9.0](https://github.com/pchuri/confluence-cli/compare/v2.8.0...v2.9.0) (2026-05-28)
 
 
