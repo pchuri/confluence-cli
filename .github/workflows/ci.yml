@@ -71,7 +71,7 @@ jobs:
 
     - name: Semantic Release
       id: semantic
-      uses: cycjimmy/semantic-release-action@v3
+      uses: cycjimmy/semantic-release-action@v5
       with:
         extra_plugins: |
           @semantic-release/exec
