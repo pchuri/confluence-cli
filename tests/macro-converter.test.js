@@ -1369,6 +1369,32 @@ console.log("test");
   });
 });
 
+describe('MacroConverter markdownToStorage plantuml code blocks', () => {
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('basic plantuml fenced code block produces plantuml macro', () => {
+    const result = converter.markdownToStorage('```plantuml\n@startuml\nA -> B\n@enduml\n```');
+    expect(result).toContain('<ac:structured-macro ac:name="plantuml">');
+    expect(result).toContain('<![CDATA[@startuml\nA -> B\n@enduml]]>');
+    expect(result).not.toContain('ac:parameter ac:name="language"');
+  });
+
+  test('plantuml block surrounded by content is separated correctly', () => {
+    const result = converter.markdownToStorage('Before\n\n```plantuml\nA -> B\n```\n\nAfter');
+    expect(result).toContain('<ac:structured-macro ac:name="plantuml">');
+    expect(result).toContain('<![CDATA[A -> B]]>');
+    expect(result).toContain('Before');
+    expect(result).toContain('After');
+  });
+
+  test('other languages still produce code macro with language param', () => {
+    const result = converter.markdownToStorage('```python\nx = 1\n```');
+    expect(result).toContain('<ac:structured-macro ac:name="code">');
+    expect(result).toContain('<ac:parameter ac:name="language">python</ac:parameter>');
+    expect(result).not.toContain('ac:name="plantuml"');
+  });
+});
+
 describe('markdown with HTML blocks', () => {
   const converter = new MacroConverter({ isCloud: true });
 
