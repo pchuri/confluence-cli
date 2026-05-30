@@ -1,3 +1,15 @@
+# [2.11.0](https://github.com/pchuri/confluence-cli/compare/v2.10.0...v2.11.0) (2026-05-30)
+
+
+### Bug Fixes
+
+* **deps:** bump axios to ~1.16.1 to address high-severity advisories ([#194](https://github.com/pchuri/confluence-cli/issues/194)) ([2be46b2](https://github.com/pchuri/confluence-cli/commit/2be46b256061c8d4069c7d7117d51ddc8da488ac))
+
+
+### Features
+
+* convert markdown plantuml fences to confluence plantuml macro ([#193](https://github.com/pchuri/confluence-cli/issues/193)) ([c88f9dd](https://github.com/pchuri/confluence-cli/commit/c88f9ddffb1edcedc6cd8be2c86e6a6758d4920c))
+
 # [2.10.0](https://github.com/pchuri/confluence-cli/compare/v2.9.0...v2.10.0) (2026-05-29)
 
 
