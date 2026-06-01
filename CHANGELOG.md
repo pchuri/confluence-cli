@@ -1,3 +1,10 @@
+## [2.11.1](https://github.com/pchuri/confluence-cli/compare/v2.11.0...v2.11.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* **config:** prevent init crash when existing config lacks a profiles key ([#197](https://github.com/pchuri/confluence-cli/issues/197)) ([cd235d7](https://github.com/pchuri/confluence-cli/commit/cd235d741dd3fa6c20f6b1345421e9c2f1ffe0e3))
+
 # [2.11.0](https://github.com/pchuri/confluence-cli/compare/v2.10.0...v2.11.0) (2026-05-30)
 
 
