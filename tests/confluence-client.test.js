@@ -2,6 +2,7 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const FormData = require('form-data');
+const axios = require('axios');
 const ConfluenceClient = require('../lib/confluence-client');
 const MockAdapter = require('axios-mock-adapter');
 
@@ -2329,8 +2330,13 @@ describe('ConfluenceClient', () => {
         ).rejects.toThrow(/Refusing to send credentials to "http:\/\/test\.atlassian\.net"/);
       });
 
-      test('downloadAttachment refuses when the API returns a foreign-origin _links.download', async () => {
-        const mock = new MockAdapter(client.client);
+      test('downloadAttachment refuses when the API returns a foreign-origin _links.download (Server)', async () => {
+        const serverClient = new ConfluenceClient({
+          domain: 'confluence.example.com',
+          token: 'pat',
+          authType: 'bearer'
+        });
+        const mock = new MockAdapter(serverClient.client);
         mock.onGet('/content/123/child/attachment').reply(200, {
           results: [{
             id: '777',
@@ -2339,10 +2345,53 @@ describe('ConfluenceClient', () => {
           }]
         });
 
-        await expect(client.downloadAttachment('123', '777'))
+        await expect(serverClient.downloadAttachment('123', '777'))
           .rejects.toThrow(/Refusing to send credentials to "https:\/\/evil\.example"/);
 
         mock.restore();
+      });
+
+      test('downloadAttachment uses the REST download endpoint on Cloud (attachment object)', async () => {
+        const mock = new MockAdapter(client.client);
+        mock.onGet('/content/123/child/attachment/att456/download').reply(200, 'BINARY');
+
+        const data = await client.downloadAttachment('123', {
+          id: 'att456',
+          title: 'diagram.png',
+          downloadLink: 'https://test.atlassian.net/wiki/download/attachments/123/diagram.png'
+        });
+
+        expect(data).toBe('BINARY');
+        mock.restore();
+      });
+
+      test('downloadAttachment uses the REST download endpoint on Cloud (attachment id)', async () => {
+        const mock = new MockAdapter(client.client);
+        mock.onGet('/content/123/child/attachment/777/download').reply(200, 'PNGDATA');
+
+        const data = await client.downloadAttachment('123', '777');
+
+        expect(data).toBe('PNGDATA');
+        mock.restore();
+      });
+
+      test('downloadAttachment uses the servlet download link on Server', async () => {
+        const serverClient = new ConfluenceClient({
+          domain: 'confluence.example.com',
+          token: 'pat',
+          authType: 'bearer'
+        });
+        const axiosMock = new MockAdapter(axios);
+        axiosMock.onGet('https://confluence.example.com/download/attachments/123/diagram.png').reply(200, 'SERVERBYTES');
+
+        const data = await serverClient.downloadAttachment('123', {
+          id: '777',
+          title: 'diagram.png',
+          downloadLink: 'https://confluence.example.com/download/attachments/123/diagram.png'
+        });
+
+        expect(data).toBe('SERVERBYTES');
+        axiosMock.restore();
       });
     });
   });
