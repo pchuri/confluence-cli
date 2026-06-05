@@ -1,3 +1,10 @@
+## [2.11.2](https://github.com/pchuri/confluence-cli/compare/v2.11.1...v2.11.2) (2026-06-05)
+
+
+### Bug Fixes
+
+* **attachments:** use REST download endpoint on Cloud to fix 401 ([#199](https://github.com/pchuri/confluence-cli/issues/199)) ([ceea6e8](https://github.com/pchuri/confluence-cli/commit/ceea6e876f99f66f7e822da052491d741095b12c)), closes [#198](https://github.com/pchuri/confluence-cli/issues/198) [#80](https://github.com/pchuri/confluence-cli/issues/80)
+
 ## [2.11.1](https://github.com/pchuri/confluence-cli/compare/v2.11.0...v2.11.1) (2026-06-01)
 
 
