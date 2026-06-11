@@ -93,6 +93,21 @@ describe('withClient wrapper', () => {
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 
+  test('API response body is logged when no custom error handler is provided', async () => {
+    const error = new Error('Request failed with status code 400');
+    error.response = { data: { message: 'Storage body is invalid' } };
+    const handler = jest.fn().mockRejectedValue(error);
+    const action = withClient('create', handler, { writable: true });
+
+    await expect(action('title', 'KEY', {})).rejects.toThrow('process.exit called');
+
+    expect(errorSpy).toHaveBeenCalledWith(
+      expect.stringContaining('API response:'),
+      JSON.stringify({ message: 'Storage body is invalid' }, null, 2)
+    );
+    expect(exitSpy).toHaveBeenCalledWith(1);
+  });
+
   test('onError receives error + forwarded action args and runs before exit', async () => {
     const onError = jest.fn();
     const handler = jest.fn().mockRejectedValue(new Error('api fail'));
