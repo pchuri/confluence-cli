@@ -46,9 +46,27 @@ function assertNoBodyForFolder(type, options) {
   }
 }
 
+function formatApiErrorBody(data) {
+  if (data === undefined || data === null || data === '') {
+    return null;
+  }
+  if (typeof data === 'string') {
+    return data;
+  }
+  try {
+    return JSON.stringify(data, null, 2);
+  } catch {
+    return String(data);
+  }
+}
+
 function handleCommandError(analytics, commandName, error, onExtra = null) {
   analytics.track(commandName, false);
   console.error(chalk.red('Error:'), error.message);
+  const apiDetail = formatApiErrorBody(error.response?.data);
+  if (apiDetail && !onExtra) {
+    console.error(chalk.red('API response:'), apiDetail);
+  }
   if (onExtra) {
     try { onExtra(error); } catch { /* keep error path robust if hint code throws */ }
   }
@@ -258,7 +276,7 @@ program
   .description('Create a new Confluence page or folder')
   .option('-f, --file <file>', 'Read content from file')
   .option('-c, --content <content>', 'Page content as string')
-  .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
+  .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
   .option('--type <type>', 'Content type (page, folder)', 'page')
   .action(withClient('create', async ({ client, analytics }, title, spaceKey, options) => {
     assertNonEmpty(title, 'title');
@@ -297,7 +315,7 @@ program
   .description('Create a new Confluence page or folder as a child of another page')
   .option('-f, --file <file>', 'Read content from file')
   .option('-c, --content <content>', 'Page content as string')
-  .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
+  .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
   .option('--type <type>', 'Content type (page, folder)', 'page')
   .action(withClient('create_child', async ({ client, analytics }, title, parentId, options) => {
     assertNonEmpty(title, 'title');
@@ -342,7 +360,7 @@ program
   .option('-t, --title <title>', 'New page title (optional)')
   .option('-f, --file <file>', 'Read content from file')
   .option('-c, --content <content>', 'Page content as string')
-  .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
+  .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
   .action(withClient('update', async ({ client, analytics }, pageId, options) => {
     // Check if at least one option is provided
     if (!options.title && !options.file && !options.content) {
@@ -855,6 +873,7 @@ module.exports = {
     assertNonEmpty,
     assertValidType,
     assertNoBodyForFolder,
+    formatApiErrorBody,
     handleCommandError,
     withClient,
     withLocal,

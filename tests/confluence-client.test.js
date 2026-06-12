@@ -1521,6 +1521,37 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('createPage with format="auto" converts plain text to storage', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onPost('/content').reply(200, { id: '112' });
+      const spy = jest.spyOn(client, 'markdownToStorage').mockReturnValue('<p>Hello</p>');
+
+      await client.createPage('Test', 'TEST', 'Hello', 'auto');
+
+      expect(spy).toHaveBeenCalledWith('Hello');
+      const body = JSON.parse(mock.history.post[0].data).body.storage;
+      expect(body.value).toBe('<p>Hello</p>');
+      expect(body.representation).toBe('storage');
+
+      spy.mockRestore();
+      mock.restore();
+    });
+
+    test('createPage with format="auto" preserves markup-like storage content', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onPost('/content').reply(200, { id: '113' });
+      const spy = jest.spyOn(client, 'markdownToStorage');
+
+      await client.createPage('Test', 'TEST', '<p>Hello</p>', 'auto');
+
+      expect(spy).not.toHaveBeenCalled();
+      const body = JSON.parse(mock.history.post[0].data).body.storage;
+      expect(body.value).toBe('<p>Hello</p>');
+
+      spy.mockRestore();
+      mock.restore();
+    });
+
     test('createPage should support type "folder" without body', async () => {
       const mock = new MockAdapter(client.client);
       mock.onPost('/content').reply(200, {
@@ -1578,6 +1609,48 @@ describe('ConfluenceClient', () => {
       expect(spy).toHaveBeenCalledWith('<p>x</p>');
       spy.mockRestore();
       mock.restore();
+    });
+
+    test('updatePage with format="auto" converts plain text to storage', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        id: '123',
+        title: 'Old',
+        body: { storage: { value: '<p>Old</p>' } },
+        version: { number: 2 },
+        space: { key: 'TEST' }
+      });
+      mock.onPut('/content/123').reply(200, { id: '123' });
+      const spy = jest.spyOn(client, 'markdownToStorage').mockReturnValue('<p>New</p>');
+
+      await client.updatePage('123', null, 'New', 'auto');
+
+      expect(spy).toHaveBeenCalledWith('New');
+      const body = JSON.parse(mock.history.put[0].data).body.storage;
+      expect(body.value).toBe('<p>New</p>');
+
+      spy.mockRestore();
+      mock.restore();
+    });
+
+    test('createComment with format="auto" converts plain text to storage', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onPost('/content').reply(200, { id: 'c1' });
+      const spy = jest.spyOn(client, 'markdownToStorage').mockReturnValue('<p>Looks good</p>');
+
+      await client.createComment('123', 'Looks good', 'auto');
+
+      expect(spy).toHaveBeenCalledWith('Looks good');
+      const body = JSON.parse(mock.history.post[0].data).body.storage;
+      expect(body.value).toBe('<p>Looks good</p>');
+
+      spy.mockRestore();
+      mock.restore();
+    });
+
+    test('invalid write format throws a helpful error', () => {
+      expect(() => client.toStorageContent('Hello', 'wiki'))
+        .toThrow('Invalid content format "wiki". Valid: auto, storage, html, markdown');
     });
   });
 

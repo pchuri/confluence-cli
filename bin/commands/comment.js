@@ -191,7 +191,7 @@ function registerCommentCommands(program, { withClient }) {
     .description('Create a comment on a page by ID or URL (footer or inline)')
     .option('-f, --file <file>', 'Read content from file')
     .option('-c, --content <content>', 'Comment content as string')
-    .option('--format <format>', 'Content format (storage, html, markdown)', 'storage')
+    .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
     .option('--parent <commentId>', 'Reply to a comment by ID')
     .option('--location <location>', 'Comment location (inline or footer)', 'footer')
     .option('--inline-selection <text>', 'Inline selection text')
