@@ -1,3 +1,10 @@
+# [2.12.0](https://github.com/pchuri/confluence-cli/compare/v2.11.2...v2.12.0) (2026-06-12)
+
+
+### Features
+
+* add --format auto option for write commands ([#200](https://github.com/pchuri/confluence-cli/issues/200)) ([89059c6](https://github.com/pchuri/confluence-cli/commit/89059c6187c089813f002cb9b0513822c4d363a1))
+
 ## [2.11.2](https://github.com/pchuri/confluence-cli/compare/v2.11.1...v2.11.2) (2026-06-05)
 
 
