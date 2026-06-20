@@ -5,13 +5,13 @@ function registerVersionCommands(program, { withClient }) {
   program
     .command('versions <pageId>')
     .description('List historical versions of a Confluence page')
-    .option('--format <format>', 'Output format: text or json (default: text)', 'text')
-    .action(withClient('versions', async ({ client, analytics }, pageId, options) => {
+    .option('--format <format>', 'Output format: text (default). "json" is deprecated — use --json', 'text')
+    .action(withClient('versions', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
       const resolvedId = String(await client.extractPageId(pageId));
       const versions = await client.listVersions(resolvedId);
 
-      if (options.format === 'json') {
-        console.log(JSON.stringify({ pageId: resolvedId, versions }, null, 2));
+      if (wantsJson(options)) {
+        emitJson({ pageId: resolvedId, versions });
       } else {
         const max = versions.length ? Math.max(...versions.map(v => v.number)) : 0;
         console.log(chalk.blue(`Versions for page ${resolvedId} (${versions.length} total):`));

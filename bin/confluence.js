@@ -17,6 +17,7 @@ const registerCommentCommands = require('./commands/comment');
 const registerExportCommand = require('./commands/export');
 const registerApiCommand = require('./commands/api');
 const { readStdin } = require('../lib/stdin-utils');
+const { emitJson, jsonRequested } = require('../lib/output');
 
 function assertWritable(config) {
   if (config.readOnly) {
@@ -85,7 +86,7 @@ function withClient(commandName, handler, { writable = false, onError = null } =
       const config = getConfig(getProfileName());
       if (writable) assertWritable(config);
       const client = new ConfluenceClient(config);
-      await handler({ client, config, analytics }, ...actionArgs);
+      await handler({ client, config, analytics, emitJson, wantsJson }, ...actionArgs);
     } catch (error) {
       const extra = onError ? (err) => onError(err, ...actionArgs) : null;
       handleCommandError(analytics, commandName, error, extra);
@@ -111,12 +112,38 @@ program
   .name('confluence')
   .description('CLI tool for Atlassian Confluence')
   .version(pkg.version)
-  .option('--profile <name>', 'Use a specific configuration profile');
+  .option('--profile <name>', 'Use a specific configuration profile')
+  .option('--json', 'Output raw JSON to stdout (for scripting / piping to jq)');
 
 // Helper: resolve profile name from global --profile flag
 function getProfileName() {
   return program.opts().profile || undefined;
 }
+
+// Helper: resolve JSON output mode from the global --json flag, falling back to
+// the deprecated per-command "--format json" (which warns once on stderr).
+function wantsJson(options) {
+  return jsonRequested(program.opts().json, options);
+}
+
+// Commands that honor the global --json flag. Passing --json to anything else is
+// a usage error — fail loud instead of silently emitting human-readable output.
+const JSON_COMMANDS = new Set([
+  'info', 'search', 'spaces', 'find', 'children',
+  'versions', 'comments', 'attachments',
+  'property-list', 'property-get', 'property-set',
+  'api', // already emits raw JSON
+]);
+
+program.hook('preAction', (thisCommand, actionCommand) => {
+  if (program.opts().json && !JSON_COMMANDS.has(actionCommand.name())) {
+    console.error(chalk.red(
+      `Error: --json is not supported by "${actionCommand.name()}". ` +
+      `Supported commands: ${[...JSON_COMMANDS].join(', ')}.`
+    ));
+    process.exit(1);
+  }
+});
 
 // Init command
 program
@@ -153,12 +180,12 @@ program
 program
   .command('info <pageId>')
   .description('Get information about a Confluence page')
-  .option('-f, --format <format>', 'Output format (text, json)', 'text')
-  .action(withClient('info', async ({ client, analytics }, pageId, options) => {
+  .option('-f, --format <format>', 'Output format (text). "json" is deprecated — use --json', 'text')
+  .action(withClient('info', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
     const info = await client.getPageInfo(pageId);
 
-    if ((options.format || 'text').toLowerCase() === 'json') {
-      console.log(JSON.stringify(info, null, 2));
+    if (wantsJson(options)) {
+      emitJson(info);
     } else {
       console.log(chalk.blue('Page Information:'));
       console.log(`Title: ${chalk.green(info.title)}`);
@@ -179,13 +206,19 @@ program
   .option('-l, --limit <limit>', 'Limit number of results', '10')
   .option('--start <start>', 'Start index for results', '0')
   .option('--cql', 'Pass query as raw CQL instead of text search')
-  .action(withClient('search', async ({ client, analytics }, query, options) => {
+  .action(withClient('search', async ({ client, analytics, wantsJson, emitJson }, query, options) => {
     const start = parseInt(options.start, 10);
     if (Number.isNaN(start) || start < 0) {
       throw new Error('Start must be a non-negative number.');
     }
 
     const results = await client.search(query, parseInt(options.limit), options.cql, start);
+
+    if (wantsJson(options)) {
+      emitJson({ query, start, resultCount: results.length, results });
+      analytics.track('search', true);
+      return;
+    }
 
     if (results.length === 0) {
       console.log(chalk.yellow('No results found.'));
@@ -209,9 +242,15 @@ program
   .description('List Confluence spaces')
   .option('-l, --limit <limit>', 'Maximum total spaces to return across paginated requests', '500')
   .option('--all', 'Fetch every space, paginating through all results (overrides --limit)')
-  .action(withClient('spaces', async ({ client, analytics }, options) => {
+  .action(withClient('spaces', async ({ client, analytics, wantsJson, emitJson }, options) => {
     const maxResults = options.all ? null : parseInt(options.limit);
     const spaces = await client.getSpaces(maxResults);
+
+    if (wantsJson(options)) {
+      emitJson({ spaceCount: spaces.length, spaces });
+      analytics.track('spaces', true);
+      return;
+    }
 
     console.log(chalk.blue(`Available spaces (${spaces.length}):`));
     spaces.forEach(space => {
@@ -479,8 +518,14 @@ program
   .command('find <title>')
   .description('Find a page by title')
   .option('-s, --space <spaceKey>', 'Limit search to specific space')
-  .action(withClient('find', async ({ client, analytics }, title, options) => {
+  .action(withClient('find', async ({ client, analytics, wantsJson, emitJson }, title, options) => {
     const pageInfo = await client.findPageByTitle(title, options.space);
+
+    if (wantsJson(options)) {
+      emitJson(pageInfo);
+      analytics.track('find', true);
+      return;
+    }
 
     console.log(chalk.blue('Page found:'));
     console.log(`Title: ${chalk.green(pageInfo.title)}`);
@@ -619,11 +664,12 @@ program
   .description('List child pages of a Confluence page')
   .option('-r, --recursive', 'List all descendants recursively', false)
   .option('--max-depth <number>', 'Maximum depth for recursive listing', '10')
-  .option('--format <format>', 'Output format (list, tree, json)', 'list')
+  .option('--format <format>', 'Output format (list, tree). "json" is deprecated — use --json', 'list')
   .option('--show-url', 'Show page URLs', false)
   .option('--show-id', 'Show page IDs', false)
-  .action(withClient('children', async ({ client, config, analytics }, pageId, options) => {
+  .action(withClient('children', async ({ client, config, analytics, wantsJson, emitJson }, pageId, options) => {
     const format = (options.format || 'list').toLowerCase();
+    const jsonMode = wantsJson(options);
 
     // Extract page ID from URL if needed
     const resolvedPageId = await client.extractPageId(pageId);
@@ -635,19 +681,19 @@ program
       children = await client.getAllDescendantPages(
         resolvedPageId,
         maxDepth,
-        { includeAncestors: format === 'json' }
+        { includeAncestors: jsonMode }
       );
     } else {
       children = await client.getChildPages(resolvedPageId);
     }
 
     if (children.length === 0) {
-      if (format === 'json') {
-        console.log(JSON.stringify({
+      if (jsonMode) {
+        emitJson({
           pageId: String(resolvedPageId),
           childCount: 0,
           children: []
-        }, null, 2));
+        });
       } else {
         console.log(chalk.yellow('No child pages found.'));
       }
@@ -655,7 +701,7 @@ program
       return;
     }
 
-    if (format === 'json') {
+    if (jsonMode) {
       // JSON output
       const output = {
         pageId: String(resolvedPageId),
@@ -683,7 +729,7 @@ program
           return record;
         })
       };
-      console.log(JSON.stringify(output, null, 2));
+      emitJson(output);
     } else if (format === 'tree' && options.recursive) {
       // Tree format (only for recursive mode)
       const pageInfo = await client.getPageInfo(resolvedPageId);

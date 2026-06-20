@@ -49,17 +49,18 @@ function registerCommentCommands(program, { withClient }) {
   program
     .command('comments <pageId>')
     .description('List comments for a page by ID or URL')
-    .option('-f, --format <format>', 'Output format (text, markdown, json)', 'text')
+    .option('-f, --format <format>', 'Output format (text, markdown). "json" is deprecated — use --json', 'text')
     .option('-l, --limit <limit>', 'Maximum number of comments to fetch (default: 25)')
     .option('--start <start>', 'Start index for results (default: 0)', '0')
     .option('--location <location>', 'Filter by location (inline, footer, resolved). Comma-separated')
     .option('--depth <depth>', 'Comment depth ("" for root only, "all")')
     .option('--all', 'Fetch all comments (ignores pagination)')
-    .action(withClient('comments', async ({ client, analytics }, pageId, options) => {
+    .action(withClient('comments', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
       const format = (options.format || 'text').toLowerCase();
       if (!['text', 'markdown', 'json'].includes(format)) {
         throw new Error('Format must be one of: text, markdown, json');
       }
+      const jsonMode = wantsJson(options);
 
       const limit = options.limit ? parseInt(options.limit, 10) : null;
       if (options.limit && (Number.isNaN(limit) || limit <= 0)) {
@@ -102,12 +103,21 @@ function registerCommentCommands(program, { withClient }) {
       }
 
       if (comments.length === 0) {
-        console.log(chalk.yellow('No comments found.'));
+        if (jsonMode) {
+          const resolvedPageId = await client.extractPageId(pageId);
+          const output = { pageId: resolvedPageId, commentCount: 0, comments: [] };
+          if (!options.all) {
+            output.nextStart = nextStart;
+          }
+          emitJson(output);
+        } else {
+          console.log(chalk.yellow('No comments found.'));
+        }
         analytics.track('comments', true);
         return;
       }
 
-      if (format === 'json') {
+      if (jsonMode) {
         const resolvedPageId = await client.extractPageId(pageId);
         const output = {
           pageId: resolvedPageId,
@@ -121,7 +131,7 @@ function registerCommentCommands(program, { withClient }) {
         if (!options.all) {
           output.nextStart = nextStart;
         }
-        console.log(JSON.stringify(output, null, 2));
+        emitJson(output);
         analytics.track('comments', true);
         return;
       }
