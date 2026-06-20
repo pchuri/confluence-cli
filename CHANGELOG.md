@@ -1,3 +1,10 @@
+# [2.13.0](https://github.com/pchuri/confluence-cli/compare/v2.12.0...v2.13.0) (2026-06-20)
+
+
+### Features
+
+* add global --json flag and deprecate per-command --format json ([#204](https://github.com/pchuri/confluence-cli/issues/204)) ([ee523ee](https://github.com/pchuri/confluence-cli/commit/ee523eeaa5c1acb0ebb309bcf890dfba320aff36)), closes [#203](https://github.com/pchuri/confluence-cli/issues/203)
+
 # [2.12.0](https://github.com/pchuri/confluence-cli/compare/v2.11.2...v2.12.0) (2026-06-12)
 
 
