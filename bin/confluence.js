@@ -129,10 +129,16 @@ function wantsJson(options) {
 // Commands that honor the global --json flag. Passing --json to anything else is
 // a usage error — fail loud instead of silently emitting human-readable output.
 const JSON_COMMANDS = new Set([
+  // read / query
   'info', 'search', 'spaces', 'find', 'children',
   'versions', 'comments', 'attachments',
   'property-list', 'property-get', 'property-set',
   'api', // already emits raw JSON
+  // mutations
+  'create', 'create-child', 'update', 'move', 'delete', 'copy-tree',
+  'comment', 'comment-delete', 'property-delete',
+  'attachment-upload', 'attachment-delete',
+  'version-delete', 'versions-purge',
 ]);
 
 program.hook('preAction', (thisCommand, actionCommand) => {
@@ -317,7 +323,7 @@ program
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
   .option('--type <type>', 'Content type (page, folder)', 'page')
-  .action(withClient('create', async ({ client, analytics }, title, spaceKey, options) => {
+  .action(withClient('create', async ({ client, analytics, wantsJson, emitJson }, title, spaceKey, options) => {
     assertNonEmpty(title, 'title');
     assertNonEmpty(spaceKey, 'spaceKey');
     assertValidType(options.type);
@@ -338,6 +344,18 @@ program
 
     const result = await client.createPage(title, spaceKey, content, options.format, options.type);
 
+    if (wantsJson()) {
+      emitJson({
+        id: result.id,
+        title: result.title,
+        type: options.type,
+        spaceKey: result.space.key,
+        url: client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`),
+      });
+      analytics.track('create', true);
+      return;
+    }
+
     const label = options.type === 'folder' ? 'Folder' : 'Page';
     console.log(chalk.green(`✅ ${label} created successfully!`));
     console.log(`Title: ${chalk.blue(result.title)}`);
@@ -356,7 +374,7 @@ program
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
   .option('--type <type>', 'Content type (page, folder)', 'page')
-  .action(withClient('create_child', async ({ client, analytics }, title, parentId, options) => {
+  .action(withClient('create_child', async ({ client, analytics, wantsJson, emitJson }, title, parentId, options) => {
     assertNonEmpty(title, 'title');
     assertNonEmpty(parentId, 'parentId');
     assertValidType(options.type);
@@ -381,6 +399,19 @@ program
 
     const result = await client.createChildPage(title, spaceKey, parentId, content, options.format, options.type);
 
+    if (wantsJson()) {
+      emitJson({
+        id: result.id,
+        title: result.title,
+        type: options.type,
+        parentId,
+        spaceKey: result.space.key,
+        url: client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`),
+      });
+      analytics.track('create_child', true);
+      return;
+    }
+
     const label = options.type === 'folder' ? 'Folder' : 'Child page';
     console.log(chalk.green(`✅ ${label} created successfully!`));
     console.log(`Title: ${chalk.blue(result.title)}`);
@@ -400,7 +431,7 @@ program
   .option('-f, --file <file>', 'Read content from file')
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
-  .action(withClient('update', async ({ client, analytics }, pageId, options) => {
+  .action(withClient('update', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
     // Check if at least one option is provided
     if (!options.title && !options.file && !options.content) {
       throw new Error('At least one of --title, --file, or --content must be provided.');
@@ -423,6 +454,17 @@ program
 
     const result = await client.updatePage(pageId, options.title, content, options.format);
 
+    if (wantsJson()) {
+      emitJson({
+        id: result.id,
+        title: result.title,
+        version: result.version.number,
+        url: client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`),
+      });
+      analytics.track('update', true);
+      return;
+    }
+
     console.log(chalk.green('✅ Page updated successfully!'));
     console.log(`Title: ${chalk.blue(result.title)}`);
     console.log(`ID: ${chalk.blue(result.id)}`);
@@ -437,8 +479,20 @@ program
   .command('move <pageId_or_url> <newParentId_or_url>')
   .description('Move a page to a new parent location (within same space)')
   .option('-t, --title <title>', 'New page title (optional)')
-  .action(withClient('move', async ({ client, analytics }, pageId, newParentId, options) => {
+  .action(withClient('move', async ({ client, analytics, wantsJson, emitJson }, pageId, newParentId, options) => {
     const result = await client.movePage(pageId, newParentId, options.title);
+
+    if (wantsJson()) {
+      emitJson({
+        id: result.id,
+        title: result.title,
+        newParentId,
+        version: result.version.number,
+        url: client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`),
+      });
+      analytics.track('move', true);
+      return;
+    }
 
     console.log(chalk.green('✅ Page moved successfully!'));
     console.log(`Title: ${chalk.blue(result.title)}`);
@@ -455,10 +509,14 @@ program
   .command('delete <pageIdOrUrl>')
   .description('Delete a Confluence page by ID or URL')
   .option('-y, --yes', 'Skip confirmation prompt')
-  .action(withClient('delete', async ({ client, analytics }, pageIdOrUrl, options) => {
+  .action(withClient('delete', async ({ client, analytics, wantsJson, emitJson }, pageIdOrUrl, options) => {
+    const jsonMode = wantsJson();
     const pageInfo = await client.getPageInfo(pageIdOrUrl);
 
     if (!options.yes) {
+      if (jsonMode) {
+        throw new Error('Refusing to delete without confirmation in --json mode. Pass --yes to proceed.');
+      }
       const spaceLabel = pageInfo.space?.key ? ` (${pageInfo.space.key})` : '';
       const { confirmed } = await inquirer.prompt([
         {
@@ -477,6 +535,12 @@ program
     }
 
     const result = await client.deletePage(pageInfo.id);
+
+    if (jsonMode) {
+      emitJson({ id: result.id, title: pageInfo.title, deleted: true });
+      analytics.track('delete', true);
+      return;
+    }
 
     console.log(chalk.green('✅ Page deleted successfully!'));
     console.log(`Title: ${chalk.blue(pageInfo.title)}`);
@@ -557,7 +621,8 @@ program
   .option('-n, --dry-run', 'Preview operations without creating pages')
   .option('--fail-on-error', 'Exit with non-zero code if any page fails')
   .option('-q, --quiet', 'Suppress progress output')
-  .action(withClient('copy_tree', async ({ client, analytics }, sourcePageId, targetParentId, newTitle, options) => {
+  .action(withClient('copy_tree', async ({ client, analytics, wantsJson, emitJson }, sourcePageId, targetParentId, newTitle, options) => {
+    const jsonMode = wantsJson();
     // Parse numeric flags with safe fallbacks
     const parsedDepth = parseInt(options.maxDepth, 10);
     const maxDepth = Number.isNaN(parsedDepth) ? 10 : parsedDepth;
@@ -565,20 +630,22 @@ program
     const delayMs = Number.isNaN(parsedDelay) ? 100 : parsedDelay;
     const copySuffix = options.copySuffix ?? ' (Copy)';
 
-    console.log(chalk.blue('🚀 Starting page tree copy...'));
-    console.log(`Source: ${sourcePageId}`);
-    console.log(`Target parent: ${targetParentId}`);
-    if (newTitle) console.log(`New root title: ${newTitle}`);
-    console.log(`Max depth: ${maxDepth}`);
-    console.log(`Delay: ${delayMs} ms`);
-    if (copySuffix) console.log(`Root suffix: ${copySuffix}`);
-    console.log('');
+    if (!jsonMode) {
+      console.log(chalk.blue('🚀 Starting page tree copy...'));
+      console.log(`Source: ${sourcePageId}`);
+      console.log(`Target parent: ${targetParentId}`);
+      if (newTitle) console.log(`New root title: ${newTitle}`);
+      console.log(`Max depth: ${maxDepth}`);
+      console.log(`Delay: ${delayMs} ms`);
+      if (copySuffix) console.log(`Root suffix: ${copySuffix}`);
+      console.log('');
+    }
 
     // Parse exclude patterns
     let excludePatterns = [];
     if (options.exclude) {
       excludePatterns = options.exclude.split(',').map(p => p.trim()).filter(Boolean);
-      if (excludePatterns.length > 0) {
+      if (excludePatterns.length > 0 && !jsonMode) {
         console.log(chalk.yellow(`Exclude patterns: ${excludePatterns.join(', ')}`));
       }
     }
@@ -594,6 +661,11 @@ program
       const rootTitle = newTitle || `${info.title}${copySuffix}`;
       const descendants = await client.getAllDescendantPages(sourcePageId, maxDepth);
       const filtered = descendants.filter(p => !client.shouldExcludePage(p.title, excludePatterns));
+      if (jsonMode) {
+        emitJson({ dryRun: true, rootTitle, targetParentId, childCount: filtered.length });
+        analytics.track('copy_tree_dry_run', true);
+        return;
+      }
       console.log(chalk.yellow('Dry run: no changes will be made.'));
       console.log(`Would create root: ${chalk.blue(rootTitle)} (under parent ${targetParentId})`);
       console.log(`Would create ${filtered.length} child page(s)`);
@@ -627,12 +699,30 @@ program
       {
         maxDepth,
         excludePatterns,
-        onProgress: options.quiet ? null : onProgress,
+        onProgress: options.quiet || jsonMode ? null : onProgress,
         quiet: options.quiet,
         delayMs,
         copySuffix
       }
     );
+
+    if (jsonMode) {
+      emitJson({
+        rootPage: {
+          id: result.rootPage.id,
+          title: result.rootPage.title,
+          url: client.buildUrl(`${client.webUrlPrefix}${result.rootPage._links.webui}`),
+        },
+        totalCopied: result.totalCopied,
+        failures: result.failures || [],
+      });
+      if (options.failOnError && result.failures?.length) {
+        analytics.track('copy_tree', false);
+        process.exit(1);
+      }
+      analytics.track('copy_tree', true);
+      return;
+    }
 
     console.log('');
     console.log(chalk.green('✅ Page tree copy completed'));
