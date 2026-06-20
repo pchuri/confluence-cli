@@ -6,11 +6,11 @@ function registerPropertyCommands(program, { withClient }) {
   program
     .command('property-list <pageId>')
     .description('List all content properties for a page')
-    .option('-f, --format <format>', 'Output format (text, json)', 'text')
+    .option('-f, --format <format>', 'Output format (text). "json" is deprecated — use --json', 'text')
     .option('-l, --limit <limit>', 'Maximum number of properties to fetch (default: 25)')
     .option('--start <start>', 'Start index for results (default: 0)', '0')
     .option('--all', 'Fetch all properties (ignores pagination)')
-    .action(withClient('property_list', async ({ client, analytics }, pageId, options) => {
+    .action(withClient('property_list', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
       const format = (options.format || 'text').toLowerCase();
       if (!['text', 'json'].includes(format)) {
         throw new Error('Format must be one of: text, json');
@@ -43,12 +43,12 @@ function registerPropertyCommands(program, { withClient }) {
         nextStart = response.nextStart;
       }
 
-      if (format === 'json') {
+      if (wantsJson(options)) {
         const output = { properties };
         if (!options.all) {
           output.nextStart = nextStart;
         }
-        console.log(JSON.stringify(output, null, 2));
+        emitJson(output);
       } else if (properties.length === 0) {
         console.log(chalk.yellow('No properties found.'));
       } else {
@@ -68,8 +68,8 @@ function registerPropertyCommands(program, { withClient }) {
   program
     .command('property-get <pageId> <key>')
     .description('Get a content property by key')
-    .option('-f, --format <format>', 'Output format (text, json)', 'text')
-    .action(withClient('property_get', async ({ client, analytics }, pageId, key, options) => {
+    .option('-f, --format <format>', 'Output format (text). "json" is deprecated — use --json', 'text')
+    .action(withClient('property_get', async ({ client, analytics, wantsJson, emitJson }, pageId, key, options) => {
       const format = (options.format || 'text').toLowerCase();
       if (!['text', 'json'].includes(format)) {
         throw new Error('Format must be one of: text, json');
@@ -77,8 +77,8 @@ function registerPropertyCommands(program, { withClient }) {
 
       const property = await client.getProperty(pageId, key);
 
-      if (format === 'json') {
-        console.log(JSON.stringify(property, null, 2));
+      if (wantsJson(options)) {
+        emitJson(property);
       } else {
         console.log(`${chalk.green('Key:')} ${property.key}`);
         console.log(`${chalk.green('Version:')} ${property.version.number}`);
@@ -93,8 +93,8 @@ function registerPropertyCommands(program, { withClient }) {
     .description('Set a content property (create or update)')
     .option('-v, --value <json>', 'Property value as JSON')
     .option('--file <file>', 'Read property value from a JSON file')
-    .option('-f, --format <format>', 'Output format (text, json)', 'text')
-    .action(withClient('property_set', async ({ client, analytics }, pageId, key, options) => {
+    .option('-f, --format <format>', 'Output format (text). "json" is deprecated — use --json', 'text')
+    .action(withClient('property_set', async ({ client, analytics, wantsJson, emitJson }, pageId, key, options) => {
       if (!options.value && !options.file) {
         throw new Error('Provide a value with --value or --file.');
       }
@@ -122,8 +122,8 @@ function registerPropertyCommands(program, { withClient }) {
 
       const result = await client.setProperty(pageId, key, value);
 
-      if (format === 'json') {
-        console.log(JSON.stringify(result, null, 2));
+      if (wantsJson(options)) {
+        emitJson(result);
       } else {
         console.log(chalk.green('✅ Property set successfully!'));
         console.log(`${chalk.green('Key:')} ${result.key}`);

@@ -341,6 +341,20 @@ For **read-only** usage, select at minimum: `read:confluence-content.all`, `read
 
 ## Usage
 
+### JSON output (for scripting / jq)
+
+Pass the global `--json` flag to make any read command emit raw JSON to stdout, so you can pipe it to tools like `jq`:
+
+```bash
+confluence search "release notes" --json | jq '.results[].title'
+confluence spaces --json | jq -r '.spaces[].key'
+confluence info 123456789 --json | jq '.version'
+```
+
+`--json` works on `info`, `search`, `spaces`, `find`, `children`, `versions`, `comments`, `attachments`, `property-list`, `property-get`, and `property-set`. Passing `--json` to any other command is rejected with an error rather than silently ignored. Human-readable messages and warnings go to stderr, so stdout stays valid JSON.
+
+> **Deprecation:** the per-command `--format json` form is deprecated in favor of the global `--json` flag. It still works but prints a warning to stderr and will be removed in a future major version.
+
 ### Read a Page
 ```bash
 # Read by page ID
@@ -363,7 +377,7 @@ Use `--format storage` when you need Confluence's native storage representation,
 confluence info 123456789
 
 # Emit machine-readable metadata
-confluence info 123456789 --format json
+confluence info 123456789 --json
 ```
 
 Example JSON shape:
@@ -515,10 +529,10 @@ confluence children 123456789 --show-id --show-url
 confluence children 123456789 --recursive --max-depth 3
 
 # Output as JSON for scripting
-confluence children 123456789 --recursive --format json > children.json
+confluence children 123456789 --recursive --json > children.json
 ```
 
-`children --format json` returns structured metadata for each page, including `id`, `title`, `type`, `status`, `spaceKey`, `parentId`, `version`, and `url`. Recursive output also includes `depth`, and when available, `ancestors`.
+`children --json` returns structured metadata for each page, including `id`, `title`, `type`, `status`, `spaceKey`, `parentId`, `version`, and `url`. Recursive output also includes `depth`, and when available, `ancestors`.
 
 Example recursive JSON item:
 ```json
@@ -773,30 +787,30 @@ confluence stats
 |---|---|---|
 | `init` | Initialize CLI configuration | `--read-only` |
 | `read <pageId_or_url>` | Read page content | `--format <html\|text\|storage\|markdown>` |
-| `info <pageId_or_url>` | Get page information | `--format <text\|json>` |
-| `search <query>` | Search for pages | `--limit <number>`, `--start <number>` |
-| `spaces` | List available spaces | `--limit <number>`, `--all` |
-| `find <title>` | Find a page by its title | `--space <spaceKey>` |
-| `children <pageId>` | List child pages of a page | `--recursive`, `--max-depth <number>`, `--format <list\|tree\|json>`, `--show-url`, `--show-id` |
+| `info <pageId_or_url>` | Get page information | `--json` |
+| `search <query>` | Search for pages | `--json`, `--limit <number>`, `--start <number>` |
+| `spaces` | List available spaces | `--json`, `--limit <number>`, `--all` |
+| `find <title>` | Find a page by its title | `--space <spaceKey>`, `--json` |
+| `children <pageId>` | List child pages of a page | `--recursive`, `--max-depth <number>`, `--format <list\|tree>`, `--json`, `--show-url`, `--show-id` |
 | `create <title> <spaceKey>` | Create a new page or folder | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--type <page\|folder>` |
 | `create-child <title> <parentId>` | Create a child page or folder | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--type <page\|folder>` |
 | `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--copy-suffix <text>`, `--dry-run`, `--fail-on-error`, `--quiet` |
 | `update <pageId>` | Update a page's title or content | `--title <string>`, `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>` |
 | `move <pageId_or_url> <newParentId_or_url>` | Move a page to a new parent location | `--title <string>` |
 | `delete <pageId_or_url>` | Delete a page by ID or URL | `--yes` |
-| `versions <pageId_or_url>` | List historical versions of a page | `--format <text\|json>` |
+| `versions <pageId_or_url>` | List historical versions of a page | `--json` |
 | `version-delete <pageId_or_url> <versionNumber>` | Delete a single non-current version of a page | `--yes` |
 | `versions-purge <pageId_or_url>` | Delete every non-current historical version of a page | `--yes`, `--throttle <seconds>` |
 | `edit <pageId>` | Export page content for editing | `--output <file>` |
-| `attachments <pageId_or_url>` | List or download attachments for a page | `--limit <number>`, `--pattern <glob>`, `--download`, `--dest <directory>` |
+| `attachments <pageId_or_url>` | List or download attachments for a page | `--json`, `--limit <number>`, `--pattern <glob>`, `--download`, `--dest <directory>` |
 | `attachment-upload <pageId_or_url>` | Upload attachments to a page | `--file <path>`, `--comment <text>`, `--replace`, `--minor-edit` |
 | `attachment-delete <pageId_or_url> <attachmentId>` | Delete an attachment from a page | `--yes` |
-| `comments <pageId_or_url>` | List comments for a page | `--format <text\|markdown\|json>`, `--limit <number>`, `--start <number>`, `--location <inline\|footer\|resolved>`, `--depth <root\|all>`, `--all` |
+| `comments <pageId_or_url>` | List comments for a page | `--format <text\|markdown>`, `--json`, `--limit <number>`, `--start <number>`, `--location <inline\|footer\|resolved>`, `--depth <root\|all>`, `--all` |
 | `comment <pageId_or_url>` | Create a comment on a page | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--parent <commentId>`, `--location <inline\|footer>`, `--inline-selection <text>`, `--inline-original-selection <text>`, `--inline-marker-ref <ref>`, `--inline-properties <json>` |
 | `comment-delete <commentId>` | Delete a comment by ID | `--yes` |
-| `property-list <pageId_or_url>` | List all content properties for a page | `--format <text\|json>`, `--limit <number>`, `--start <number>`, `--all` |
-| `property-get <pageId_or_url> <key>` | Get a content property by key | `--format <text\|json>` |
-| `property-set <pageId_or_url> <key>` | Set a content property (create or update) | `--value <json>`, `--file <path>`, `--format <text\|json>` |
+| `property-list <pageId_or_url>` | List all content properties for a page | `--json`, `--limit <number>`, `--start <number>`, `--all` |
+| `property-get <pageId_or_url> <key>` | Get a content property by key | `--json` |
+| `property-set <pageId_or_url> <key>` | Set a content property (create or update) | `--value <json>`, `--file <path>`, `--json` |
 | `property-delete <pageId_or_url> <key>` | Delete a content property by key | `--yes` |
 | `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--referenced-only`, `--skip-attachments` |
 | `profile list` | List all configuration profiles | |

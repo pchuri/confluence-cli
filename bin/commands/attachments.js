@@ -12,8 +12,8 @@ function registerAttachmentCommands(program, { withClient }) {
     .option('-p, --pattern <glob>', 'Filter attachments by filename (e.g., "*.png")')
     .option('-d, --download', 'Download matching attachments')
     .option('--dest <directory>', 'Directory to save downloads (default: current directory)', '.')
-    .option('-f, --format <format>', 'Output format (text, json)', 'text')
-    .action(withClient('attachments', async ({ client, analytics }, pageId, options) => {
+    .option('-f, --format <format>', 'Output format (text). "json" is deprecated — use --json', 'text')
+    .action(withClient('attachments', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
       const maxResults = options.limit ? parseInt(options.limit, 10) : null;
       const pattern = options.pattern ? options.pattern.trim() : null;
 
@@ -25,13 +25,14 @@ function registerAttachmentCommands(program, { withClient }) {
       if (!['text', 'json'].includes(format)) {
         throw new Error('Format must be one of: text, json');
       }
+      const jsonMode = wantsJson(options);
 
       const attachments = await client.getAllAttachments(pageId, { maxResults });
       const filtered = pattern ? attachments.filter(att => client.matchesPattern(att.title, pattern)) : attachments;
 
       if (filtered.length === 0) {
-        if (format === 'json') {
-          console.log(JSON.stringify({ attachmentCount: 0, attachments: [] }, null, 2));
+        if (jsonMode) {
+          emitJson({ attachmentCount: 0, attachments: [] });
         } else {
           console.log(chalk.yellow('No attachments found.'));
         }
@@ -39,7 +40,7 @@ function registerAttachmentCommands(program, { withClient }) {
         return;
       }
 
-      if (format === 'json' && !options.download) {
+      if (jsonMode && !options.download) {
         const output = {
           attachmentCount: filtered.length,
           attachments: filtered.map(att => ({
@@ -52,7 +53,7 @@ function registerAttachmentCommands(program, { withClient }) {
             downloadLink: att.downloadLink,
           })),
         };
-        console.log(JSON.stringify(output, null, 2));
+        emitJson(output);
       } else if (!options.download) {
         console.log(chalk.blue(`Found ${filtered.length} attachment${filtered.length === 1 ? '' : 's'}:`));
         filtered.forEach((att, index) => {
@@ -95,19 +96,19 @@ function registerAttachmentCommands(program, { withClient }) {
           const dataStream = await client.downloadAttachment(pageId, attachment);
           await writeStream(dataStream, targetPath);
           downloadResults.push({ title: attachment.title, id: attachment.id, savedTo: targetPath });
-          if (format !== 'json') {
+          if (!jsonMode) {
             console.log(`⬇️  ${chalk.green(attachment.title)} -> ${chalk.gray(targetPath)}`);
           }
         }
 
-        if (format === 'json') {
+        if (jsonMode) {
           const output = {
             attachmentCount: filtered.length,
             downloaded: downloadResults.length,
             destination: destDir,
             attachments: downloadResults,
           };
-          console.log(JSON.stringify(output, null, 2));
+          emitJson(output);
         } else {
           console.log(chalk.green(`Downloaded ${downloadResults.length} attachment${downloadResults.length === 1 ? '' : 's'} to ${destDir}`));
         }
