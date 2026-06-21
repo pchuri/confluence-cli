@@ -718,7 +718,10 @@ program
       });
       if (options.failOnError && result.failures?.length) {
         analytics.track('copy_tree', false);
-        process.exit(1);
+        // Use exitCode (not process.exit) so the JSON write to a pipe flushes
+        // before the process exits — process.exit() can truncate piped stdout.
+        process.exitCode = 1;
+        return;
       }
       analytics.track('copy_tree', true);
       return;
