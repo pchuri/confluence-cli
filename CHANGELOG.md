@@ -1,3 +1,10 @@
+# [2.14.0](https://github.com/pchuri/confluence-cli/compare/v2.13.0...v2.14.0) (2026-06-21)
+
+
+### Features
+
+* add --json output to mutation commands ([#205](https://github.com/pchuri/confluence-cli/issues/205)) ([bccdbd3](https://github.com/pchuri/confluence-cli/commit/bccdbd3b2f995be9bb9ab847dfefae725d953794)), closes [#203](https://github.com/pchuri/confluence-cli/issues/203)
+
 # [2.13.0](https://github.com/pchuri/confluence-cli/compare/v2.12.0...v2.13.0) (2026-06-20)
 
 
