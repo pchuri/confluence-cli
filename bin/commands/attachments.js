@@ -128,7 +128,8 @@ function registerAttachmentCommands(program, { withClient }) {
     .option('--comment <comment>', 'Comment for the attachment(s)')
     .option('--replace', 'Replace an existing attachment with the same filename')
     .option('--minor-edit', 'Mark the upload as a minor edit')
-    .action(withClient('attachment_upload', async ({ client, analytics }, pageId, options) => {
+    .action(withClient('attachment_upload', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
+      const jsonMode = wantsJson();
       const files = Array.isArray(options.file) ? options.file.filter(Boolean) : [];
       if (files.length === 0) {
         throw new Error('At least one --file option is required.');
@@ -145,7 +146,7 @@ function registerAttachmentCommands(program, { withClient }) {
         }
       });
 
-      let uploaded = 0;
+      const uploadedItems = [];
       for (const file of resolvedFiles) {
         const result = await client.uploadAttachment(pageId, file.resolved, {
           comment: options.comment,
@@ -153,15 +154,25 @@ function registerAttachmentCommands(program, { withClient }) {
           minorEdit: options.minorEdit === true ? true : undefined,
         });
         const attachment = result.results[0];
-        if (attachment) {
-          console.log(`⬆️  ${chalk.green(attachment.title)} (ID: ${attachment.id}, Version: ${attachment.version})`);
-        } else {
-          console.log(`⬆️  ${chalk.green(path.basename(file.resolved))}`);
+        uploadedItems.push(attachment
+          ? { id: attachment.id, title: attachment.title, version: attachment.version }
+          : { title: path.basename(file.resolved) });
+        if (!jsonMode) {
+          if (attachment) {
+            console.log(`⬆️  ${chalk.green(attachment.title)} (ID: ${attachment.id}, Version: ${attachment.version})`);
+          } else {
+            console.log(`⬆️  ${chalk.green(path.basename(file.resolved))}`);
+          }
         }
-        uploaded += 1;
       }
 
-      console.log(chalk.green(`Uploaded ${uploaded} attachment${uploaded === 1 ? '' : 's'} to page ${pageId}`));
+      if (jsonMode) {
+        emitJson({ pageId, uploaded: uploadedItems });
+        analytics.track('attachment_upload', true);
+        return;
+      }
+
+      console.log(chalk.green(`Uploaded ${uploadedItems.length} attachment${uploadedItems.length === 1 ? '' : 's'} to page ${pageId}`));
       analytics.track('attachment_upload', true);
     }, { writable: true }));
 
@@ -169,8 +180,12 @@ function registerAttachmentCommands(program, { withClient }) {
     .command('attachment-delete <pageId> <attachmentId>')
     .description('Delete an attachment by ID from a page')
     .option('-y, --yes', 'Skip confirmation prompt')
-    .action(withClient('attachment_delete', async ({ client, analytics }, pageId, attachmentId, options) => {
+    .action(withClient('attachment_delete', async ({ client, analytics, wantsJson, emitJson }, pageId, attachmentId, options) => {
+      const jsonMode = wantsJson();
       if (!options.yes) {
+        if (jsonMode) {
+          throw new Error('Refusing to delete without confirmation in --json mode. Pass --yes to proceed.');
+        }
         const { confirmed } = await inquirer.prompt([
           {
             type: 'confirm',
@@ -188,6 +203,12 @@ function registerAttachmentCommands(program, { withClient }) {
       }
 
       const result = await client.deleteAttachment(pageId, attachmentId);
+
+      if (jsonMode) {
+        emitJson({ id: result.id, pageId: result.pageId, deleted: true });
+        analytics.track('attachment_delete', true);
+        return;
+      }
 
       console.log(chalk.green('✅ Attachment deleted successfully!'));
       console.log(`ID: ${chalk.blue(result.id)}`);

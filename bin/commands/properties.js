@@ -138,8 +138,12 @@ function registerPropertyCommands(program, { withClient }) {
     .command('property-delete <pageId> <key>')
     .description('Delete a content property by key')
     .option('-y, --yes', 'Skip confirmation prompt')
-    .action(withClient('property_delete', async ({ client, analytics }, pageId, key, options) => {
+    .action(withClient('property_delete', async ({ client, analytics, wantsJson, emitJson }, pageId, key, options) => {
+      const jsonMode = wantsJson();
       if (!options.yes) {
+        if (jsonMode) {
+          throw new Error('Refusing to delete without confirmation in --json mode. Pass --yes to proceed.');
+        }
         const { confirmed } = await inquirer.prompt([
           {
             type: 'confirm',
@@ -157,6 +161,12 @@ function registerPropertyCommands(program, { withClient }) {
       }
 
       const result = await client.deleteProperty(pageId, key);
+
+      if (jsonMode) {
+        emitJson({ key: result.key, pageId: result.pageId, deleted: true });
+        analytics.track('property_delete', true);
+        return;
+      }
 
       console.log(chalk.green('✅ Property deleted successfully!'));
       console.log(`${chalk.green('Key:')} ${chalk.blue(result.key)}`);

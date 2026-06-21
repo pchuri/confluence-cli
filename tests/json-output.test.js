@@ -157,4 +157,50 @@ describe('Global --json output flag', () => {
     const output = JSON.parse(logSpy.mock.calls[0][0]);
     expect(output).toMatchObject({ id: '999', title: 'Found' });
   });
+
+  test('create --json emits the created page as JSON', async () => {
+    const { program } = await loadCli({
+      createPage: jest.fn(async () => ({
+        id: '500', title: 'New Page',
+        space: { key: 'ENG', name: 'Engineering' },
+        _links: { webui: '/pages/500' },
+      })),
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['create', 'New Page', 'ENG', '--content', 'hi', '--json']);
+
+    const output = JSON.parse(logSpy.mock.calls[0][0]);
+    expect(output).toMatchObject({ id: '500', title: 'New Page', type: 'page', spaceKey: 'ENG' });
+  });
+
+  test('delete --yes --json emits a deletion confirmation as JSON', async () => {
+    const { program } = await loadCli({
+      getPageInfo: jest.fn(async () => ({ id: '600', title: 'Doomed', space: { key: 'ENG' } })),
+      deletePage: jest.fn(async () => ({ id: '600' })),
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['delete', '600', '--yes', '--json']);
+
+    const output = JSON.parse(logSpy.mock.calls[0][0]);
+    expect(output).toEqual({ id: '600', title: 'Doomed', deleted: true });
+  });
+
+  test('delete --json without --yes refuses instead of prompting', async () => {
+    const deletePage = jest.fn();
+    const { program } = await loadCli({
+      getPageInfo: jest.fn(async () => ({ id: '600', title: 'Doomed' })),
+      deletePage,
+    });
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(runCli(program, ['delete', '600', '--json'])).rejects.toThrow('process.exit called');
+    expect(deletePage).not.toHaveBeenCalled();
+    const msg = errSpy.mock.calls.map(c => `${c[0]} ${c[1] ?? ''}`).find(m => /Refusing to delete/.test(m));
+    expect(msg).toBeDefined();
+  });
 });

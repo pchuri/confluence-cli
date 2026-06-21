@@ -208,7 +208,7 @@ function registerCommentCommands(program, { withClient }) {
     .option('--inline-original-selection <text>', 'Original inline selection text')
     .option('--inline-marker-ref <ref>', 'Inline marker reference (optional)')
     .option('--inline-properties <json>', 'Inline properties JSON (advanced)')
-    .action(withClient('comment_create', async ({ client, analytics }, pageId, options) => {
+    .action(withClient('comment_create', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
       let content = '';
 
       if (options.file) {
@@ -277,6 +277,16 @@ function registerCommentCommands(program, { withClient }) {
         inlineProperties: location === 'inline' ? inlineProperties : null,
       });
 
+      if (wantsJson()) {
+        emitJson({
+          id: result.id,
+          pageId: result.container?.id ?? null,
+          url: result._links?.webui ? client.toAbsoluteUrl(result._links.webui) : null,
+        });
+        analytics.track('comment_create', true);
+        return;
+      }
+
       console.log(chalk.green('✅ Comment created successfully!'));
       console.log(`ID: ${chalk.blue(result.id)}`);
       if (result.container?.id) {
@@ -315,8 +325,12 @@ function registerCommentCommands(program, { withClient }) {
     .command('comment-delete <commentId>')
     .description('Delete a comment by ID')
     .option('-y, --yes', 'Skip confirmation prompt')
-    .action(withClient('comment_delete', async ({ client, analytics }, commentId, options) => {
+    .action(withClient('comment_delete', async ({ client, analytics, wantsJson, emitJson }, commentId, options) => {
+      const jsonMode = wantsJson();
       if (!options.yes) {
+        if (jsonMode) {
+          throw new Error('Refusing to delete without confirmation in --json mode. Pass --yes to proceed.');
+        }
         const { confirmed } = await inquirer.prompt([
           {
             type: 'confirm',
@@ -334,6 +348,12 @@ function registerCommentCommands(program, { withClient }) {
       }
 
       const result = await client.deleteComment(commentId);
+
+      if (jsonMode) {
+        emitJson({ id: result.id, deleted: true });
+        analytics.track('comment_delete', true);
+        return;
+      }
 
       console.log(chalk.green('✅ Comment deleted successfully!'));
       console.log(`ID: ${chalk.blue(result.id)}`);
