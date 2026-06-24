@@ -373,6 +373,8 @@ confluence read "https://your-domain.atlassian.net/wiki/viewpage.action?pageId=1
 
 Use `--format storage` when you need Confluence's native storage representation, especially for macros and other Confluence-specific markup.
 
+Reading requires content with a storage body. Folders and other bodyless content return `Page <id> has no readable body (it may be a folder or an unsupported content type).`; use `confluence info <id>` to inspect their metadata.
+
 ### Get Page Information
 ```bash
 confluence info 123456789
@@ -380,6 +382,8 @@ confluence info 123456789
 # Emit machine-readable metadata
 confluence info 123456789 --json
 ```
+
+`info` can inspect folders and other bodyless content because it only reads metadata.
 
 Example JSON shape:
 ```json
@@ -640,6 +644,8 @@ confluence update 123456789 --file ./updated-content.md --format markdown
 confluence update 123456789 --title "New Title" --content "And new content"
 ```
 
+Title-only updates reuse the target's existing storage body. Folders and other bodyless content cannot be updated this way and return `Page <id> has no readable body (it may be a folder or an unsupported content type).`.
+
 ### Move a Page to New Parent
 
 ```bash
@@ -680,6 +686,8 @@ vim ./page-to-edit.xml
 # 3. Update the page with your changes
 confluence update 123456789 --file ./page-to-edit.xml --format storage
 ```
+
+Only content with a storage body can be exported for editing. Folders and other bodyless content return `Page <id> has no readable body (it may be a folder or an unsupported content type).`.
 
 ### Profile Management
 ```bash
