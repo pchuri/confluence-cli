@@ -735,7 +735,7 @@ Make arbitrary authenticated requests to any Confluence REST endpoint, modeled a
 
 - **Relative path** (no leading slash) → resolved against the configured `apiPath` (the default for most calls).
 - **Absolute path** (leading `/`) → bypasses `apiPath`; resolved against the host. On Confluence Cloud, `apiPath` is typically `/wiki/rest/api`, so absolute endpoints must include the `/wiki` prefix.
-- **Full URL** (`https://…`) → used as-is.
+- **Full URL** (`https://…`) → used as-is, but only when it is **same-origin** with the configured host. A full URL pointing at a different origin (or an `http://` downgrade of an `https` host) is refused, so your credentials are never sent to an unexpected server.
 
 ```bash
 # List labels on a page (relative — uses apiPath)
