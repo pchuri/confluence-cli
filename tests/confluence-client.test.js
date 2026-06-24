@@ -2787,13 +2787,28 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
-    test('full URL used as-is', async () => {
+    test('same-origin full URL used as-is', async () => {
       const mock = new MockAdapter(client.client);
-      mock.onGet('https://other.example.com/api/data').reply(200, { ok: true });
+      mock.onGet('https://test.atlassian.net/wiki/api/v2/pages').reply(200, { ok: true });
 
-      const result = await client.rawRequest('GET', 'https://other.example.com/api/data');
+      const result = await client.rawRequest('GET', 'https://test.atlassian.net/wiki/api/v2/pages');
       expect(result.status).toBe(200);
       expect(result.data).toEqual({ ok: true });
+
+      mock.restore();
+    });
+
+    test('refuses a cross-origin full URL so credentials are not leaked', async () => {
+      const mock = new MockAdapter(client.client);
+      // If the guard ever regresses, this mock would let the (now-leaked)
+      // request succeed; the rejection assertion below is what protects us.
+      mock.onGet('https://other.example.com/api/data').reply(200, { ok: true });
+
+      await expect(
+        client.rawRequest('GET', 'https://other.example.com/api/data')
+      ).rejects.toThrow(/does not match the configured Confluence origin/);
+
+      expect(mock.history.get).toHaveLength(0);
 
       mock.restore();
     });

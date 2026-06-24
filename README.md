@@ -743,7 +743,7 @@ Make arbitrary authenticated requests to any Confluence REST endpoint, modeled a
 
 - **Relative path** (no leading slash) → resolved against the configured `apiPath` (the default for most calls).
 - **Absolute path** (leading `/`) → bypasses `apiPath`; resolved against the host. On Confluence Cloud, `apiPath` is typically `/wiki/rest/api`, so absolute endpoints must include the `/wiki` prefix.
-- **Full URL** (`https://…`) → used as-is.
+- **Full URL** (`https://…`) → used as-is, but only when it is **same-origin** with the configured host. A full URL pointing at a different origin (or an `http://` downgrade of an `https` host) is refused, so your credentials are never sent to an unexpected server.
 
 ```bash
 # List labels on a page (relative — uses apiPath)
@@ -826,7 +826,7 @@ confluence stats
 | `profile use <name>` | Set the active configuration profile | |
 | `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol`, `--read-only` |
 | `profile remove <name>` | Remove a configuration profile | |
-| `api <endpoint>` | Make an authenticated API request (relative path uses apiPath; absolute path bypasses it) | `-X, --method <method>`, `-f, --field <key=value>`, `-H, --header <key:value>`, `--input <file>`, `--jq <expression>`, `-i, --include`, `--silent` |
+| `api <endpoint>` | Make an authenticated API request (relative path uses apiPath; absolute path bypasses it; full URL must be same-origin) | `-X, --method <method>`, `-f, --field <key=value>`, `-H, --header <key:value>`, `--input <file>`, `--jq <expression>`, `-i, --include`, `--silent` |
 | `convert` | Convert between content formats locally (no server required) | `--input-file <path>`, `--output-file <path>`, `--input-format <markdown\|storage\|html>`, `--output-format <markdown\|storage\|html\|text>` |
 | `stats` | View your usage statistics | |
 

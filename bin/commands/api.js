@@ -29,7 +29,9 @@ Endpoint resolution:
   - Absolute path (leading "/")      → bypasses apiPath; resolved against the host.
     On Confluence Cloud, apiPath is typically /wiki/rest/api, so absolute
     endpoints must include the /wiki prefix (e.g. /wiki/rest/api/content/123).
-  - Full URL (https://...)           → used as-is.
+  - Full URL (https://...)           → used as-is, but only when same-origin
+    with the configured host. A cross-origin URL (or an http:// downgrade of an
+    https host) is refused so credentials are not leaked to another server.
 `)
     .action(async (endpoint, options) => {
       const analytics = new Analytics();
