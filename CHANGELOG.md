@@ -1,3 +1,11 @@
+## [2.14.1](https://github.com/pchuri/confluence-cli/compare/v2.14.0...v2.14.1) (2026-06-24)
+
+
+### Bug Fixes
+
+* **api:** prevent cross-origin credential leakage ([#207](https://github.com/pchuri/confluence-cli/issues/207)) ([1d614b2](https://github.com/pchuri/confluence-cli/commit/1d614b2900871cf2ecb646a761c16a689284f8d2))
+* clarify bodyless Confluence content errors ([#206](https://github.com/pchuri/confluence-cli/issues/206)) ([62fee88](https://github.com/pchuri/confluence-cli/commit/62fee88ef0eba2ef09a84545f0d63f433cafad3d))
+
 # [2.14.0](https://github.com/pchuri/confluence-cli/compare/v2.13.0...v2.14.0) (2026-06-21)
 
 
