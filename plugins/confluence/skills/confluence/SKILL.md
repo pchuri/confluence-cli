@@ -627,6 +627,29 @@ confluence profile remove staging
 
 ---
 
+### `api <endpoint>`
+
+Make an authenticated request to a Confluence REST endpoint that the CLI does not wrap directly.
+
+```sh
+confluence api <endpoint> [-X <method>] [-f <key=value>] [-H <key:value>] [--input <file>] [--jq <expression>] [-i] [--silent]
+```
+
+Endpoint resolution:
+- Relative paths use the configured `apiPath`.
+- Absolute paths starting with `/` bypass `apiPath` and resolve against the configured host.
+- Full `http://` or `https://` URLs are allowed only when they are same-origin with the configured host; cross-origin URLs and `http://` downgrades from an `https` profile are refused before credentials are sent.
+
+```sh
+confluence api content/123456789/label
+confluence api /wiki/api/v2/pages -f spaceKey=DEV -f limit=10 -X GET
+confluence api content/123456789/label --jq '.results[].name'
+```
+
+Read-only profiles block write methods (`POST`, `PUT`, `PATCH`, `DELETE`) while allowing `GET` and `HEAD`.
+
+---
+
 ### `stats`
 
 Show local usage statistics.

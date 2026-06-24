@@ -818,7 +818,7 @@ confluence stats
 | `profile use <name>` | Set the active configuration profile | |
 | `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol`, `--read-only` |
 | `profile remove <name>` | Remove a configuration profile | |
-| `api <endpoint>` | Make an authenticated API request (relative path uses apiPath; absolute path bypasses it) | `-X, --method <method>`, `-f, --field <key=value>`, `-H, --header <key:value>`, `--input <file>`, `--jq <expression>`, `-i, --include`, `--silent` |
+| `api <endpoint>` | Make an authenticated API request (relative path uses apiPath; absolute path bypasses it; full URL must be same-origin) | `-X, --method <method>`, `-f, --field <key=value>`, `-H, --header <key:value>`, `--input <file>`, `--jq <expression>`, `-i, --include`, `--silent` |
 | `convert` | Convert between content formats locally (no server required) | `--input-file <path>`, `--output-file <path>`, `--input-format <markdown\|storage\|html>`, `--output-format <markdown\|storage\|html\|text>` |
 | `stats` | View your usage statistics | |
 
