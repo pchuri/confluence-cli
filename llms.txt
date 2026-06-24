@@ -24,6 +24,10 @@ confluence init
 
 This section summarizes recent improvements to align the codebase with its documentation and fix bugs.
 
+### Bodyless Content Error Handling:
+- **Inconsistency:** `confluence info` could inspect folders, but `read`, `edit`, and title-only `update` crashed when Confluence returned content without `body.storage.value`.
+- **Fix:** Added a shared storage-body guard in `lib/confluence-client.js` so these commands fail with `Page <id> has no readable body (it may be a folder or an unsupported content type).`.
+
 ### `update` Command Logic and Documentation:
 - **Inconsistency:** The `README.md` suggested that updating a page's title without changing its content was possible. However, the implementation in `bin/confluence.js` incorrectly threw an error if the `--content` or `--file` flags were not provided, making title-only updates impossible.
 - **Fix:**
