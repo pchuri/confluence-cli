@@ -478,6 +478,51 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    describe('bodyless content (folder) handling', () => {
+      const NO_BODY_MESSAGE = /Page 123 has no readable body \(it may be a folder or an unsupported content type\)\./;
+
+      test('readPage throws a clear error instead of a TypeError', async () => {
+        const mock = new MockAdapter(client.client);
+        mock.onGet('/content/123').reply(200, { id: '123', type: 'folder', body: {} });
+
+        await expect(client.readPage('123', 'markdown')).rejects.toThrow(NO_BODY_MESSAGE);
+        await expect(client.readPage('123', 'markdown')).rejects.not.toThrow(/reading 'value'/);
+
+        mock.restore();
+      });
+
+      test('getPageForEdit throws a clear error instead of a TypeError', async () => {
+        const mock = new MockAdapter(client.client);
+        mock.onGet('/content/123').reply(200, {
+          id: '123',
+          type: 'folder',
+          body: {},
+          version: { number: 1 }
+        });
+
+        await expect(client.getPageForEdit('123')).rejects.toThrow(NO_BODY_MESSAGE);
+
+        mock.restore();
+      });
+
+      test('updatePage reuse-content path throws a clear error instead of a TypeError', async () => {
+        const mock = new MockAdapter(client.client);
+        mock.onGet('/content/123').reply(200, {
+          id: '123',
+          title: 'A folder',
+          type: 'folder',
+          body: {},
+          version: { number: 1 },
+          space: { key: 'ENG' }
+        });
+
+        // content omitted -> reuse-existing-content branch
+        await expect(client.updatePage('123', 'A folder', undefined)).rejects.toThrow(NO_BODY_MESSAGE);
+
+        mock.restore();
+      });
+    });
+
     test('getPageInfo should normalize machine-readable metadata', async () => {
       const mock = new MockAdapter(client.client);
       mock.onGet('/content/123').reply(config => {
