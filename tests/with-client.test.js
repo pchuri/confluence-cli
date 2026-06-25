@@ -5,6 +5,8 @@ jest.mock('../lib/config', () => ({
   setActiveProfile: jest.fn(),
   deleteProfile: jest.fn(),
   isValidProfileName: jest.fn(),
+  getConfigDir: jest.fn(() => '/mock/conf'),
+  getConfigFile: jest.fn(() => '/mock/conf/config.json'),
 }));
 
 jest.mock('../lib/confluence-client', () => {
