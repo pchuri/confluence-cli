@@ -1,3 +1,10 @@
+# [2.15.0](https://github.com/pchuri/confluence-cli/compare/v2.14.1...v2.15.0) (2026-06-26)
+
+
+### Features
+
+* support XDG Base Directory Specification for config location ([#208](https://github.com/pchuri/confluence-cli/issues/208)) ([b8d63fd](https://github.com/pchuri/confluence-cli/commit/b8d63fdadee472c80aa7e2f4314770c6242424c7))
+
 ## [2.14.1](https://github.com/pchuri/confluence-cli/compare/v2.14.0...v2.14.1) (2026-06-24)
 
 
