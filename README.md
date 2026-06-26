@@ -244,6 +244,24 @@ export CONFLUENCE_API_TOKEN="your-scoped-token"
 
 `CONFLUENCE_API_PATH` defaults to `/wiki/rest/api` for Atlassian Cloud domains and `/rest/api` otherwise. Override it when your site lives under a custom reverse proxy or on-premises path. `CONFLUENCE_AUTH_TYPE` defaults to `basic` when an email is present and falls back to `bearer` otherwise. For `mtls`, set `CONFLUENCE_TLS_CLIENT_CERT` and `CONFLUENCE_TLS_CLIENT_KEY`; `CONFLUENCE_TLS_CA_CERT` is optional.
 
+**Config file location:**
+
+confluence-cli supports the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/latest/). The config directory is resolved in this order:
+
+1. `CONFLUENCE_CONFIG_DIR` env var — explicit override (e.g., `/custom/path`)
+2. Legacy `~/.confluence-cli/` — if it already exists (backwards compatibility)
+3. `$XDG_CONFIG_HOME/confluence-cli/` — defaults to `~/.config/confluence-cli/`
+
+New installations go to `~/.config/confluence-cli/` by default. Existing users at `~/.confluence-cli/` are unaffected — the CLI continues to use the legacy location until you move it. To migrate, simply move the directory:
+
+```bash
+mkdir -p ~/.config/confluence-cli
+mv ~/.confluence-cli/* ~/.config/confluence-cli/
+rmdir ~/.confluence-cli
+```
+
+The stats file (`stats.json`) follows the same resolution and lives alongside `config.json` in the same directory.
+
 **Custom domains on Confluence Cloud:**
 
 If your Confluence Cloud instance uses a custom domain (e.g., `wiki.example.org` instead of `*.atlassian.net`), the CLI may misidentify it as a Server/Data Center instance and produce broken link formats. Set `CONFLUENCE_FORCE_CLOUD=true` to override the automatic detection:
@@ -252,7 +270,7 @@ If your Confluence Cloud instance uses a custom domain (e.g., `wiki.example.org`
 export CONFLUENCE_FORCE_CLOUD=true
 ```
 
-Or add `"forceCloud": true` to your profile in `~/.confluence-cli/config.json`:
+Or add `"forceCloud": true` to your profile in the config file (see [Config file location](#config-file-location)):
 
 ```json
 {
@@ -1022,7 +1040,7 @@ Check out our [Contributing Guide](CONTRIBUTING.md) - all contributions are welc
 
 ### 📈 Usage Analytics
 
-confluence-cli tracks command usage statistics **locally** on your machine (`~/.confluence-cli/stats.json`). No data is sent to any external server. This includes:
+confluence-cli tracks command usage statistics **locally** on your machine (in `stats.json` alongside your config file — see [Config file location](#config-file-location) above). No data is sent to any external server. This includes:
 - Command usage counts (success/error)
 
 You can view your stats with `confluence stats`, or disable tracking by setting: `export CONFLUENCE_CLI_ANALYTICS=false`

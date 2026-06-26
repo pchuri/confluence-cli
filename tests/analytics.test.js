@@ -3,6 +3,8 @@ const os = require('os');
 const path = require('path');
 
 const ORIGINAL_ANALYTICS_ENV = process.env.CONFLUENCE_CLI_ANALYTICS;
+const ORIGINAL_XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME;
+const ORIGINAL_CONFLUENCE_CONFIG_DIR = process.env.CONFLUENCE_CONFIG_DIR;
 
 const removeDirRecursive = (dir) => {
   if (!dir || !fs.existsSync(dir)) return;
@@ -32,6 +34,8 @@ describe('Analytics', () => {
     os.homedir = () => tempHome;
 
     delete process.env.CONFLUENCE_CLI_ANALYTICS;
+    delete process.env.XDG_CONFIG_HOME;
+    delete process.env.CONFLUENCE_CONFIG_DIR;
 
     jest.resetModules();
     Analytics = require('../lib/analytics');
@@ -46,12 +50,22 @@ describe('Analytics', () => {
     } else {
       process.env.CONFLUENCE_CLI_ANALYTICS = ORIGINAL_ANALYTICS_ENV;
     }
+    if (ORIGINAL_XDG_CONFIG_HOME === undefined) {
+      delete process.env.XDG_CONFIG_HOME;
+    } else {
+      process.env.XDG_CONFIG_HOME = ORIGINAL_XDG_CONFIG_HOME;
+    }
+    if (ORIGINAL_CONFLUENCE_CONFIG_DIR === undefined) {
+      delete process.env.CONFLUENCE_CONFIG_DIR;
+    } else {
+      process.env.CONFLUENCE_CONFIG_DIR = ORIGINAL_CONFLUENCE_CONFIG_DIR;
+    }
   });
 
   describe('track', () => {
     test('creates the stats directory and file on first run', () => {
       const analytics = new Analytics();
-      const expectedFile = path.join(tempHome, '.confluence-cli', 'stats.json');
+      const expectedFile = path.join(tempHome, '.config', 'confluence-cli', 'stats.json');
 
       analytics.track('create-page');
 
@@ -92,7 +106,7 @@ describe('Analytics', () => {
 
       // Force lastUsed to differ
       const earlier = new Date(Date.now() - 60_000).toISOString();
-      const file = path.join(tempHome, '.confluence-cli', 'stats.json');
+      const file = path.join(tempHome, '.config', 'confluence-cli', 'stats.json');
       const tampered = { ...after1, firstUsed: earlier, lastUsed: earlier };
       fs.writeFileSync(file, JSON.stringify(tampered));
 
@@ -111,11 +125,11 @@ describe('Analytics', () => {
 
       analytics.track('search');
 
-      expect(fs.existsSync(path.join(tempHome, '.confluence-cli', 'stats.json'))).toBe(false);
+      expect(fs.existsSync(path.join(tempHome, '.config', 'confluence-cli', 'stats.json'))).toBe(false);
     });
 
     test('does not throw when the stats file is corrupted JSON', () => {
-      const dir = path.join(tempHome, '.confluence-cli');
+      const dir = path.join(tempHome, '.config', 'confluence-cli');
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, 'stats.json'), '{not valid json');
 
@@ -132,7 +146,7 @@ describe('Analytics', () => {
     });
 
     test('returns null when the stats file contains malformed JSON', () => {
-      const dir = path.join(tempHome, '.confluence-cli');
+      const dir = path.join(tempHome, '.config', 'confluence-cli');
       fs.mkdirSync(dir, { recursive: true });
       fs.writeFileSync(path.join(dir, 'stats.json'), '{broken');
 

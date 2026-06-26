@@ -1,3 +1,5 @@
+const path = require('path');
+
 const { getConfig, initConfig } = require('../lib/config');
 
 // Save and restore all relevant env vars around each test
@@ -419,5 +421,175 @@ describe('initConfig CLI option validation', () => {
     expect(errorSpy).toHaveBeenCalledWith(
       expect.stringMatching(/--auth-type must be/)
     );
+  });
+});
+
+describe('config directory resolution', () => {
+  const HOMEDIR = '/mock/home';
+  const XDG_HOME = '/mock/xdg';
+  const LEGACY_PATH = path.join(HOMEDIR, '.confluence-cli');
+  const XDG_PATH = path.join(HOMEDIR, '.config', 'confluence-cli');
+  const CUSTOM_XDG_PATH = path.join(XDG_HOME, 'confluence-cli');
+  const CUSTOM_PATH = '/custom/confluence-config';
+
+  const DIR_RESOLUTION_ENV_KEYS = [
+    'CONFLUENCE_CONFIG_DIR',
+    'XDG_CONFIG_HOME',
+  ];
+
+  beforeEach(() => {
+    // Clean env vars that affect config dir resolution
+    for (const key of DIR_RESOLUTION_ENV_KEYS) {
+      delete process.env[key];
+    }
+  });
+
+  function getFreshConfig() {
+    jest.resetModules();
+
+    // We must reset the mock before requiring the fresh module
+    jest.doMock('os', () => ({
+      homedir: jest.fn(() => HOMEDIR),
+    }));
+
+    return require('../lib/config');
+  }
+
+  test('fresh install resolves to XDG path', () => {
+    // Neither legacy nor XDG dir exists
+    jest.doMock('fs', () => ({
+      existsSync: jest.fn(() => false),
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      mkdirSync: jest.fn(),
+      chmodSync: jest.fn(),
+    }));
+
+    const { CONFIG_DIR } = getFreshConfig();
+    expect(CONFIG_DIR).toBe(XDG_PATH);
+  });
+
+  test('legacy dir takes precedence when XDG does not exist', () => {
+    // Legacy dir exists, XDG does not
+    jest.doMock('fs', () => ({
+      existsSync: jest.fn((filePath) => filePath === LEGACY_PATH),
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      mkdirSync: jest.fn(),
+      chmodSync: jest.fn(),
+    }));
+
+    const { CONFIG_DIR } = getFreshConfig();
+    expect(CONFIG_DIR).toBe(LEGACY_PATH);
+  });
+
+  test('XDG dir takes precedence when both exist', () => {
+    // Both legacy and XDG dir exist — user has migrated
+    jest.doMock('fs', () => ({
+      existsSync: jest.fn(() => true),
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      mkdirSync: jest.fn(),
+      chmodSync: jest.fn(),
+    }));
+
+    const { CONFIG_DIR } = getFreshConfig();
+    expect(CONFIG_DIR).toBe(XDG_PATH);
+  });
+
+  test('CONFLUENCE_CONFIG_DIR overrides all other paths', () => {
+    process.env.CONFLUENCE_CONFIG_DIR = CUSTOM_PATH;
+
+    // Simulate legacy existing — should be ignored because CONFLUENCE_CONFIG_DIR is set
+    jest.doMock('fs', () => ({
+      existsSync: jest.fn((filePath) => filePath === LEGACY_PATH),
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      mkdirSync: jest.fn(),
+      chmodSync: jest.fn(),
+    }));
+
+    const { CONFIG_DIR } = getFreshConfig();
+    expect(CONFIG_DIR).toBe(CUSTOM_PATH);
+  });
+
+  test('XDG_CONFIG_HOME env var is respected on fresh install', () => {
+    process.env.XDG_CONFIG_HOME = XDG_HOME;
+
+    jest.doMock('fs', () => ({
+      existsSync: jest.fn(() => false),
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      mkdirSync: jest.fn(),
+      chmodSync: jest.fn(),
+    }));
+
+    const { CONFIG_DIR } = getFreshConfig();
+    expect(CONFIG_DIR).toBe(CUSTOM_XDG_PATH);
+  });
+
+  test('XDG_CONFIG_HOME is ignored when legacy dir exists', () => {
+    process.env.XDG_CONFIG_HOME = XDG_HOME;
+
+    // Legacy dir exists, custom XDG does not — legacy wins
+    jest.doMock('fs', () => ({
+      existsSync: jest.fn((filePath) => {
+        if (filePath === LEGACY_PATH) return true;
+        if (filePath === CUSTOM_XDG_PATH) return false;
+        return false;
+      }),
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      mkdirSync: jest.fn(),
+      chmodSync: jest.fn(),
+    }));
+
+    const { CONFIG_DIR } = getFreshConfig();
+    expect(CONFIG_DIR).toBe(LEGACY_PATH);
+  });
+
+  test('getConfigDir is exported and returns the resolved directory', () => {
+    jest.doMock('fs', () => ({
+      existsSync: jest.fn(() => false),
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      mkdirSync: jest.fn(),
+      chmodSync: jest.fn(),
+    }));
+
+    const { getConfigDir } = getFreshConfig();
+    expect(getConfigDir()).toBe(XDG_PATH);
+  });
+
+  test('getConfigFile is exported and returns the resolved file path', () => {
+    jest.doMock('fs', () => ({
+      existsSync: jest.fn(() => false),
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      mkdirSync: jest.fn(),
+      chmodSync: jest.fn(),
+    }));
+
+    const { getConfigFile } = getFreshConfig();
+    expect(getConfigFile()).toBe(path.join(XDG_PATH, 'config.json'));
+  });
+
+  test('_resetConfigDirCache allows re-resolution after env changes', () => {
+    jest.doMock('fs', () => ({
+      existsSync: jest.fn(() => false),
+      readFileSync: jest.fn(),
+      writeFileSync: jest.fn(),
+      mkdirSync: jest.fn(),
+      chmodSync: jest.fn(),
+    }));
+
+    const mod = getFreshConfig();
+    expect(mod.getConfigDir()).toBe(XDG_PATH);
+
+    // Simulate setting CONFLUENCE_CONFIG_DIR after first resolution
+    process.env.CONFLUENCE_CONFIG_DIR = '/new/path';
+    // Without cache reset, it would return the old value
+    mod._resetConfigDirCache();
+    expect(mod.getConfigDir()).toBe('/new/path');
   });
 });
