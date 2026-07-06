@@ -1,3 +1,10 @@
+## [2.15.1](https://github.com/pchuri/confluence-cli/compare/v2.15.0...v2.15.1) (2026-07-06)
+
+
+### Bug Fixes
+
+* **convert:** pass through <br> in markdown so table cells can have line breaks ([#209](https://github.com/pchuri/confluence-cli/issues/209)) ([ae811e4](https://github.com/pchuri/confluence-cli/commit/ae811e4b7d64a3ed294632b1f0a5699b2dc52a60))
+
 # [2.15.0](https://github.com/pchuri/confluence-cli/compare/v2.14.1...v2.15.0) (2026-06-26)
 
 
