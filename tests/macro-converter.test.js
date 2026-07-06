@@ -1048,6 +1048,31 @@ describe('MacroConverter <u>/<sub>/<sup>/<mark> passthrough', () => {
   });
 });
 
+describe('MacroConverter <br> passthrough', () => {
+  // `<br>` is the practical way to get a line break inside a table cell via
+  // markdown, since markdown table grammar allows only inline text per cell.
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('<br> in a table cell passes through instead of being escaped', () => {
+    const md = '| 버전 | 변경 |\n| --- | --- |\n| v1 | 가<br>나<br>다 |';
+    const result = converter.markdownToStorage(md);
+    expect(result).toContain('<td><p>가<br>나<br>다</p></td>');
+    expect(result).not.toContain('&lt;br&gt;');
+  });
+
+  test('<br/> and <br /> variants pass through', () => {
+    const result = converter.markdownToStorage('a<br/>b and c<br />d');
+    expect(result).toContain('a<br>b and c<br>d');
+    expect(result).not.toContain('&lt;br');
+  });
+
+  test('literal <br> inside inline code stays escaped, not passed through', () => {
+    const result = converter.markdownToStorage('`<br>`');
+    expect(result).toContain('&lt;br&gt;');
+    expect(result).not.toMatch(/<br>/);
+  });
+});
+
 describe('MacroConverter storageToMarkdown panel formatting', () => {
   const converter = new MacroConverter({ isCloud: true });
 
