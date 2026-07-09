@@ -1,3 +1,10 @@
+# [2.16.0](https://github.com/pchuri/confluence-cli/compare/v2.15.1...v2.16.0) (2026-07-09)
+
+
+### Features
+
+* support Confluence macro placeholders ([b7deb0d](https://github.com/pchuri/confluence-cli/commit/b7deb0dd667d842140fe4297c8eee914c7c6cfbb)), closes [#210](https://github.com/pchuri/confluence-cli/issues/210) [#211](https://github.com/pchuri/confluence-cli/issues/211)
+
 ## [2.15.1](https://github.com/pchuri/confluence-cli/compare/v2.15.0...v2.15.1) (2026-07-06)
 
 
