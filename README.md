@@ -929,12 +929,26 @@ The reverse direction emits the same `> **INFO**` / `> **WARNING**` / `> **NOTE*
 
 A blockquote without one of these markers stays a **plain blockquote** (`<blockquote>…</blockquote>`) — `> …` is treated as a quotation, not an alert. Use the markers above when you want a callout.
 
-### `**TOC**` — Table of Contents
+### `**TOC**` / `[[_TOC_]]` — Table of Contents
 
-A paragraph containing only `**TOC**` becomes a Confluence Table of Contents macro using the macro's default heading levels:
+A paragraph containing only `**TOC**`, `[[_TOC_]]`, `<!-- _TOC_ -->`, or `<!-- [[_TOC_]] -->` becomes a Confluence Table of Contents macro using the macro's default heading levels:
 
 ```markdown
 **TOC**
+
+[[_TOC_]]
+
+<!-- _TOC_ -->
+```
+
+### `[[_LISTING_]]` — child page listing
+
+A paragraph containing only `[[_LISTING_]]`, `<!-- _LISTING_ -->`, or `<!-- [[_LISTING_]] -->` becomes a Confluence Children Display macro:
+
+```markdown
+[[_LISTING_]]
+
+<!-- _LISTING_ -->
 ```
 
 ### `**ANCHOR: id**` — anchor

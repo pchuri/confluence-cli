@@ -74,8 +74,56 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
   describe('TOC', () => {
     test('**TOC** becomes Table of Contents macro', () => {
       const result = converter.markdownToStorage('**TOC**');
-      expect(result).toContain('<ac:structured-macro ac:name="toc" />');
+      expect(result).toContain('<ac:structured-macro ac:name="toc" ac:schema-version="1" />');
       expect(result).not.toContain('**TOC**');
+    });
+
+    test('[[_TOC_]] becomes Table of Contents macro', () => {
+      const result = converter.markdownToStorage('[[_TOC_]]');
+      expect(result).toContain('<ac:structured-macro ac:name="toc" ac:schema-version="1" />');
+      expect(result).not.toContain('[[_TOC_]]');
+    });
+
+    test('HTML comment TOC placeholders become Table of Contents macro', () => {
+      expect(converter.markdownToStorage('<!-- _TOC_ -->'))
+        .toContain('<ac:structured-macro ac:name="toc" ac:schema-version="1" />');
+      expect(converter.markdownToStorage('<!-- [[_TOC_]] -->'))
+        .toContain('<ac:structured-macro ac:name="toc" ac:schema-version="1" />');
+    });
+  });
+
+  describe('LISTING', () => {
+    test('[[_LISTING_]] becomes Children Display macro', () => {
+      const result = converter.markdownToStorage('[[_LISTING_]]');
+      expect(result).toContain('<ac:structured-macro ac:name="children" ac:schema-version="2" />');
+      expect(result).not.toContain('[[_LISTING_]]');
+    });
+
+    test('HTML comment LISTING placeholders become Children Display macro', () => {
+      expect(converter.markdownToStorage('<!-- _LISTING_ -->'))
+        .toContain('<ac:structured-macro ac:name="children" ac:schema-version="2" />');
+      expect(converter.markdownToStorage('<!-- [[_LISTING_]] -->'))
+        .toContain('<ac:structured-macro ac:name="children" ac:schema-version="2" />');
+    });
+
+    test('macro placeholders inside code stay literal', () => {
+      const inline = converter.markdownToStorage('`[[_TOC_]]`');
+      const fenced = converter.markdownToStorage('```\n<!-- _LISTING_ -->\n```');
+
+      expect(inline).toContain('<code>[[_TOC_]]</code>');
+      expect(inline).not.toContain('ac:name="toc"');
+      expect(fenced).toContain('<!-- _LISTING_ -->');
+      expect(fenced).not.toContain('ac:name="children"');
+    });
+
+    test('macro placeholders inside prose do not become macros', () => {
+      const toc = converter.markdownToStorage('Use [[_TOC_]] as a marker.');
+      const listing = converter.markdownToStorage('Keep <!-- _LISTING_ --> in prose.');
+
+      expect(toc).toContain('<em>TOC</em>');
+      expect(toc).not.toContain('ac:name="toc"');
+      expect(listing).toContain('<em>LISTING</em>');
+      expect(listing).not.toContain('ac:name="children"');
     });
   });
 
@@ -1053,17 +1101,32 @@ describe('MacroConverter <br> passthrough', () => {
   // markdown, since markdown table grammar allows only inline text per cell.
   const converter = new MacroConverter({ isCloud: true });
 
-  test('<br> in a table cell passes through instead of being escaped', () => {
+  test('<br> in a table cell becomes self-closing storage XHTML instead of being escaped', () => {
     const md = '| 버전 | 변경 |\n| --- | --- |\n| v1 | 가<br>나<br>다 |';
     const result = converter.markdownToStorage(md);
-    expect(result).toContain('<td><p>가<br>나<br>다</p></td>');
+    expect(result).toContain('<td><p>가<br />나<br />다</p></td>');
     expect(result).not.toContain('&lt;br&gt;');
   });
 
-  test('<br/> and <br /> variants pass through', () => {
+  test('<br/> and <br /> variants normalize to self-closing storage XHTML', () => {
     const result = converter.markdownToStorage('a<br/>b and c<br />d');
-    expect(result).toContain('a<br>b and c<br>d');
+    expect(result).toContain('a<br />b and c<br />d');
     expect(result).not.toContain('&lt;br');
+  });
+
+  test('markdown hard breaks normalize to self-closing storage XHTML', () => {
+    const markdown = [
+      '# Lines paragraph',
+      '**Test Line 1:** line 1  ',
+      '**Test Line 2:** `line 2`  ',
+      '**Test Line 3:** line 3'
+    ].join('\n');
+
+    const result = converter.markdownToStorage(markdown);
+
+    expect(result).toContain('<strong>Test Line 1:</strong> line 1<br />');
+    expect(result).toContain('<strong>Test Line 2:</strong> <code>line 2</code><br />');
+    expect(result).not.toContain('<br>');
   });
 
   test('literal <br> inside inline code stays escaped, not passed through', () => {

@@ -35,8 +35,8 @@ describe('htmlToStorage', () => {
       expect(htmlToStorage('<hr>')).toBe('<hr />');
     });
 
-    test('br stays in markdown-it form `<br>` (V1 does not transform it)', () => {
-      expect(htmlToStorage('<br>')).toBe('<br>');
+    test('br is normalized to self-closing XHTML', () => {
+      expect(htmlToStorage('<br>')).toBe('<br />');
     });
 
     test('img stays in markdown-it form `<img …>` with attributes preserved', () => {
@@ -229,7 +229,25 @@ describe('htmlToStorage', () => {
   describe('paragraph marker patterns', () => {
     test('`<p><strong>TOC</strong></p>` becomes the toc macro', () => {
       expect(htmlToStorage('<p><strong>TOC</strong></p>'))
-        .toBe('<ac:structured-macro ac:name="toc" />');
+        .toBe('<ac:structured-macro ac:name="toc" ac:schema-version="1" />');
+    });
+
+    test('`<p>[[_TOC_]]</p>` becomes the toc macro', () => {
+      expect(htmlToStorage('<p>[[_TOC_]]</p>'))
+        .toBe('<ac:structured-macro ac:name="toc" ac:schema-version="1" />');
+    });
+
+    test('`<p><strong>LISTING</strong></p>` becomes the children macro', () => {
+      expect(htmlToStorage('<p><strong>LISTING</strong></p>'))
+        .toBe('<ac:structured-macro ac:name="children" ac:schema-version="2" />');
+    });
+
+    test('macro placeholders in HTML comments become storage macros', () => {
+      expect(htmlToStorage('<!-- _TOC_ --><!-- [[_LISTING_]] -->'))
+        .toBe(
+          '<ac:structured-macro ac:name="toc" ac:schema-version="1" />' +
+          '<ac:structured-macro ac:name="children" ac:schema-version="2" />'
+        );
     });
 
     test('`<p><strong>ANCHOR: id</strong></p>` becomes the anchor macro', () => {
@@ -278,7 +296,7 @@ describe('htmlToStorage', () => {
 
     test('TOC marker detection tolerates trailing whitespace text nodes', () => {
       const html = '<p><strong>TOC</strong>\n</p>';
-      expect(htmlToStorage(html)).toBe('<ac:structured-macro ac:name="toc" />');
+      expect(htmlToStorage(html)).toBe('<ac:structured-macro ac:name="toc" ac:schema-version="1" />');
     });
   });
 
