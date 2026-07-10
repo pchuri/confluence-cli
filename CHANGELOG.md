@@ -1,3 +1,10 @@
+## [2.16.1](https://github.com/pchuri/confluence-cli/compare/v2.16.0...v2.16.1) (2026-07-10)
+
+
+### Bug Fixes
+
+* render external links as standard anchors ([#214](https://github.com/pchuri/confluence-cli/issues/214)) ([2fa54fb](https://github.com/pchuri/confluence-cli/commit/2fa54fb396bc5a7e7b46792af4cc296856447d4a))
+
 # [2.16.0](https://github.com/pchuri/confluence-cli/compare/v2.15.1...v2.16.0) (2026-07-09)
 
 
