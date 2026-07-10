@@ -860,7 +860,7 @@ describe('ConfluenceClient', () => {
       expect(result).not.toContain('<ac:link>');
     });
 
-    test('should convert links to ac:link format on Server/Data Center instances', () => {
+    test('should convert links to standard anchor format on Server/Data Center instances', () => {
       const serverClient = new ConfluenceClient({
         domain: 'confluence.example.com',
         token: 'test-token'
@@ -868,9 +868,8 @@ describe('ConfluenceClient', () => {
       const markdown = '[Example Link](https://example.com)';
       const result = serverClient.markdownToStorage(markdown);
 
-      expect(result).toContain('<ac:link>');
-      expect(result).toContain('ri:value="https://example.com"');
-      expect(result).toContain('Example Link');
+      expect(result).toContain('<a href="https://example.com">Example Link</a>');
+      expect(result).not.toContain('<ac:link>');
       expect(result).not.toContain('data-card-appearance');
     });
 

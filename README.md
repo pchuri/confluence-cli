@@ -264,7 +264,7 @@ The stats file (`stats.json`) follows the same resolution and lives alongside `c
 
 **Custom domains on Confluence Cloud:**
 
-If your Confluence Cloud instance uses a custom domain (e.g., `wiki.example.org` instead of `*.atlassian.net`), the CLI may misidentify it as a Server/Data Center instance and produce broken link formats. Set `CONFLUENCE_FORCE_CLOUD=true` to override the automatic detection:
+If your Confluence Cloud instance uses a custom domain (e.g., `wiki.example.org` instead of `*.atlassian.net`), the CLI may identify it as a Server/Data Center instance and use standard links instead of Cloud smart links. Set `CONFLUENCE_FORCE_CLOUD=true` to override the automatic detection:
 
 ```bash
 export CONFLUENCE_FORCE_CLOUD=true
@@ -283,9 +283,9 @@ Or add `"forceCloud": true` to your profile in the config file (see [Config file
 }
 ```
 
-**Link rendering on Cloud (`linkStyle`):**
+**Link rendering (`linkStyle`):**
 
-Some Cloud instances — particularly custom-domain Cloud setups — fail to render smart links (`<a data-card-appearance="inline">`) and show "Cannot handle: DefaultLink" errors instead. If you hit this, set `linkStyle` to `plain` to emit simple `<a href>` tags, which render reliably everywhere:
+External links use Cloud smart links (`<a data-card-appearance="inline">`) on Cloud and standard `<a href>` tags on Server/Data Center and local conversions. Some Cloud instances — particularly custom-domain Cloud setups — fail to render smart links and show "Cannot handle: DefaultLink" errors instead. If you hit this, set `linkStyle` to `plain`:
 
 ```bash
 export CONFLUENCE_LINK_STYLE=plain
@@ -305,7 +305,7 @@ Or per-profile:
 }
 ```
 
-Valid values: `smart` (Cloud smart links), `plain` (simple `<a href>`), `wiki` (Server/DC `ac:link`). When unset, the CLI picks `smart` for Cloud and `wiki` for Server/DC — existing behavior is unchanged.
+Valid values: `smart` (Cloud smart links), `plain` (standard `<a href>`), and `wiki` (legacy `ac:link` + `ri:url` output for explicit backward compatibility). When unset, the CLI picks `smart` for Cloud and `plain` for Server/Data Center and local conversions. New configurations should not use `wiki` for external links.
 
 **Read-only mode** (recommended for AI agents):
 ```bash

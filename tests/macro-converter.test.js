@@ -7,9 +7,9 @@ describe('MacroConverter', () => {
       expect(converter.linkStyle).toBe('smart');
     });
 
-    test('defaults to "wiki" when isCloud is false and no linkStyle is passed', () => {
+    test('defaults to "plain" when isCloud is false and no linkStyle is passed', () => {
       const converter = new MacroConverter({ isCloud: false });
-      expect(converter.linkStyle).toBe('wiki');
+      expect(converter.linkStyle).toBe('plain');
     });
 
     test('explicit "smart" is used even when isCloud is false', () => {
@@ -27,8 +27,10 @@ describe('MacroConverter', () => {
     test('invalid linkStyle silently falls back to the isCloud-based default', () => {
       // Config-level validation is the user-facing guardrail; the converter is
       // lenient so direct library consumers cannot break the pipeline.
-      const converter = new MacroConverter({ isCloud: true, linkStyle: 'garbage' });
-      expect(converter.linkStyle).toBe('smart');
+      const cloudConverter = new MacroConverter({ isCloud: true, linkStyle: 'garbage' });
+      const serverConverter = new MacroConverter({ isCloud: false, linkStyle: 'garbage' });
+      expect(cloudConverter.linkStyle).toBe('smart');
+      expect(serverConverter.linkStyle).toBe('plain');
     });
   });
 
@@ -50,13 +52,20 @@ describe('MacroConverter', () => {
       expect(result).not.toContain('<ac:link>');
     });
 
-    test('"wiki" emits the Server/DC ac:link + ri:url storage macro', () => {
+    test('explicit legacy "wiki" emits the ac:link + ri:url storage macro', () => {
       const converter = new MacroConverter({ isCloud: false, linkStyle: 'wiki' });
       const result = converter.markdownToStorage(markdown);
       expect(result).toContain('<ac:link>');
       expect(result).toContain('ri:value="https://example.com"');
       expect(result).toContain('<![CDATA[Example]]>');
       expect(result).not.toContain('data-card-appearance');
+    });
+
+    test('Server/DC default emits a standard anchor for external Markdown links', () => {
+      const converter = new MacroConverter({ isCloud: false });
+      const result = converter.markdownToStorage('**My external link:** [My Link Text](https://test.com)');
+      expect(result).toBe('<p><strong>My external link:</strong> <a href="https://test.com">My Link Text</a></p>\n');
+      expect(result).not.toContain('<ac:link>');
     });
   });
 
@@ -220,9 +229,7 @@ describe('MacroConverter markdownToStorage marker conventions', () => {
         '[Jump](#my-section) and [External](https://example.com)'
       );
       expect(result).toContain('ac:anchor="my-section"');
-      // External link should get the ac:link + ri:url storage format, not be
-      // double-wrapped by the anchor replacement.
-      expect(result).toContain('ri:value="https://example.com"');
+      expect(result).toContain('<a href="https://example.com">External</a>');
       expect(result).not.toContain('ac:anchor="https');
     });
   });
