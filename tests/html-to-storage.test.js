@@ -342,10 +342,22 @@ describe('htmlToStorage', () => {
         .toBe('<ac:link><ri:url ri:value="https://example.com" /><ac:plain-text-link-body><![CDATA[link]]></ac:plain-text-link-body></ac:link>');
     });
 
-    test('default linkStyle is `wiki` for server (isCloud:false) and `smart` for cloud', () => {
+    test('default linkStyle is `plain` for server (isCloud:false) and `smart` for cloud', () => {
       const a = '<a href="x">y</a>';
-      expect(htmlToStorage(a, { isCloud: false })).toContain('<ac:link>');
+      expect(htmlToStorage(a, { isCloud: false })).toBe(a);
       expect(htmlToStorage(a, { isCloud: true })).toContain('data-card-appearance="inline"');
+    });
+
+    test('server default safely escapes quotes in external link attributes', () => {
+      const html = '<a href=\'https://example.com/?q="x"&a=1\'>quoted</a>';
+      expect(htmlToStorage(html, { isCloud: false })).toBe(
+        '<a href="https://example.com/?q=&quot;x&quot;&a=1">quoted</a>'
+      );
+    });
+
+    test('server default preserves rich external link bodies', () => {
+      const html = '<a href="https://example.com"><strong>bold</strong> text</a>';
+      expect(htmlToStorage(html, { isCloud: false })).toBe(html);
     });
 
     test('anchor link (`#id`) becomes ac:link with ac:anchor regardless of linkStyle', () => {
