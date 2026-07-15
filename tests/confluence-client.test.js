@@ -536,6 +536,91 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('readPage preserves semantic macro page references while resolving body links', async () => {
+      const mock = new MockAdapter(client.client);
+      const lookedUpTitles = [];
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<ac:structured-macro ac:name="include"><ac:parameter ac:name=""><ac:link><ri:page ri:content-title="Included page" /></ac:link></ac:parameter></ac:structured-macro>'
+              + '<ac:structured-macro ac:name="include-shared-block"><ac:parameter ac:name="shared-block-key">block-1</ac:parameter><ac:parameter ac:name="page"><ac:link><ri:page ri:content-title="Shared source" /></ac:link></ac:parameter></ac:structured-macro>'
+              + '<p><ac:link><ri:page ri:content-title="Body target" /></ac:link></p>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(config => {
+        lookedUpTitles.push(config.params.title);
+        return [200, {
+          results: [{
+            title: config.params.title,
+            _links: { webui: '/spaces/ENG/pages/456/Body-target' }
+          }]
+        }];
+      });
+
+      const result = await client.readPage('123', 'markdown');
+
+      expect(lookedUpTitles).toEqual(['Body target']);
+      expect(result).toContain('**Include Page**: [Included page]');
+      expect(result).toContain('**Include Shared Block**: block-1 (from page: Shared source');
+      expect(result).toContain('[Body target](https://test.atlassian.net/spaces/ENG/pages/456/Body-target)');
+
+      mock.restore();
+    });
+
+    test('readPage escapes resolved page-link labels while preserving inline formatting', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p><ac:link><ri:page ri:content-title="evil](https://attacker) [x" /></ac:link> and '
+              + '<ac:link><ri:page ri:content-title="Custom" /><ac:link-body><strong>Read [this]</strong></ac:link-body></ac:link></p>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(config => [200, {
+        results: [{
+          title: config.params.title,
+          _links: {
+            webui: config.params.title === 'Custom'
+              ? '/spaces/ENG/pages/456/Custom'
+              : '/spaces/ENG/pages/456/Fallback'
+          }
+        }]
+      }]);
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[evil\\]\\(https://attacker\\) \\[x](https://test.atlassian.net/spaces/ENG/pages/456/Fallback)'
+          + ' and [**Read \\[this\\]**](https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
+      );
+
+      mock.restore();
+    });
+
+    test('resolvePageLinksInHtml caps concurrent unique page lookups', async () => {
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const titles = Array.from({ length: 25 }, (_, index) => `Page ${index}`);
+      client.findPageByTitleAndSpace = jest.fn(async (_spaceKey, title) => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise(resolve => setImmediate(resolve));
+        inFlight--;
+        return { title, url: `https://example.com/${encodeURIComponent(title)}` };
+      });
+      const html = [...titles, titles[0]]
+        .map(title => `<ac:link><ri:page ri:content-title="${title}" /></ac:link>`)
+        .join('');
+
+      const result = await client.resolvePageLinksInHtml(html, 'ENG');
+
+      expect(client.findPageByTitleAndSpace).toHaveBeenCalledTimes(titles.length);
+      expect(maxInFlight).toBeLessThanOrEqual(10);
+      expect(result.match(/<a href=/g)).toHaveLength(titles.length + 1);
+    });
+
     describe('bodyless content (folder) handling', () => {
       const NO_BODY_MESSAGE = /Page 123 has no readable body \(it may be a folder or an unsupported content type\)\./;
 
