@@ -4,7 +4,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 
 ## Features
 
-- 📖 **Read pages** - Get page content in text or HTML format
+- 📖 **Read pages** - Get page content in text, HTML, storage, or Markdown format
 - 🔍 **Search** - Find pages using Confluence's powerful search
 - ℹ️ **Page info** - Get detailed information about pages
 - 🏠 **List spaces** - View available Confluence spaces
@@ -390,6 +390,8 @@ confluence read "https://your-domain.atlassian.net/wiki/viewpage.action?pageId=1
 ```
 
 Use `--format storage` when you need Confluence's native storage representation, especially for macros and other Confluence-specific markup.
+
+Markdown reads resolve accessible Confluence page links, including links that omit a space key because they target the same space, to absolute URLs. Custom link text and inline formatting are preserved. Markdown exports use the same link resolution.
 
 Reading requires content with a storage body. Folders and other bodyless content return `Page <id> has no readable body (it may be a folder or an unsupported content type).`; use `confluence info <id>` to inspect their metadata.
 
