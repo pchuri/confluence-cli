@@ -628,6 +628,26 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('resolvePageLinksInHtml preserves implicitly closed links and trailing content', async () => {
+      client.findPageByTitleAndSpace = jest.fn();
+      const storage = '<p>Before <ac:link><ri:page ri:content-title="Target" /></p>'
+        + '<p>Trailing content</p>';
+
+      const result = await client.resolvePageLinksInHtml(storage, 'ENG');
+      const warnings = [];
+      const markdown = client.storageToMarkdown(result, {
+        onWarnings: emitted => warnings.push(...emitted)
+      });
+
+      expect(result).toBe(storage);
+      expect(client.findPageByTitleAndSpace).not.toHaveBeenCalled();
+      expect(markdown).toContain('Trailing content');
+      expect(warnings).toContainEqual(expect.objectContaining({
+        type: 'implicit-close',
+        tag: 'ac:link'
+      }));
+    });
+
     test('resolvePageLinksInHtml caps concurrent unique page lookups', async () => {
       let inFlight = 0;
       let maxInFlight = 0;
