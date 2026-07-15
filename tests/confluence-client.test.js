@@ -628,6 +628,33 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('readPage escapes datetime attributes in resolved page-link labels', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p><ac:link><ri:page ri:content-title="Custom" /><ac:link-body>'
+              + '<time datetime="x](https://attacker.example) [y"></time>'
+              + '</ac:link-body></ac:link></p>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(200, {
+        results: [{
+          title: 'Custom',
+          _links: { webui: '/spaces/ENG/pages/456/Custom' }
+        }]
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[x\\]\\(https://attacker.example\\) \\[y]'
+          + '(https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
+      );
+
+      mock.restore();
+    });
+
     test('resolvePageLinksInHtml preserves implicitly closed links and trailing content', async () => {
       client.findPageByTitleAndSpace = jest.fn();
       const storage = '<p>Before <ac:link><ri:page ri:content-title="Target" /></p>'
@@ -1253,6 +1280,12 @@ describe('ConfluenceClient', () => {
       const storage = '<ac:link><ri:page ri:content-title="Some Long Page Title" ri:version-at-save="28" /><ac:link-body>Short Name</ac:link-body></ac:link>';
       const result = client.storageToMarkdown(storage);
       expect(result).toContain('Short Name');
+    });
+
+    test('should preserve datetime attributes outside markdown link labels', () => {
+      const storage = '<p>at <time datetime="x](https://example.com) [y"></time></p>';
+
+      expect(client.storageToMarkdown(storage)).toBe('at x](https://example.com) [y');
     });
 
     test('should remove ac:link tags with attributes', () => {
