@@ -478,6 +478,64 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('readPage resolves same-space page links in markdown output', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(config => {
+        expect(config.params.expand).toBe('body.storage,space');
+        return [200, {
+          space: { key: 'ENG' },
+          body: {
+            storage: {
+              value: '<p>See <ac:link><ri:page ri:content-title="Target page" /></ac:link>.</p>'
+            }
+          }
+        }];
+      });
+      mock.onGet('/content').reply(config => {
+        expect(config.params).toEqual({
+          spaceKey: 'ENG',
+          title: 'Target page',
+          limit: 1
+        });
+        return [200, {
+          results: [{
+            title: 'Target page',
+            _links: { webui: '/spaces/ENG/pages/456/Target-page' }
+          }]
+        }];
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        'See [Target page](https://test.atlassian.net/spaces/ENG/pages/456/Target-page).'
+      );
+
+      mock.restore();
+    });
+
+    test('readPage preserves custom text for resolved same-space page links', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p><ac:link><ri:page ri:content-title="Target page" /><ac:link-body><strong>Read this</strong></ac:link-body></ac:link></p>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(200, {
+        results: [{
+          title: 'Target page',
+          _links: { webui: '/spaces/ENG/pages/456/Target-page' }
+        }]
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[**Read this**](https://test.atlassian.net/spaces/ENG/pages/456/Target-page)'
+      );
+
+      mock.restore();
+    });
+
     describe('bodyless content (folder) handling', () => {
       const NO_BODY_MESSAGE = /Page 123 has no readable body \(it may be a folder or an unsupported content type\)\./;
 
