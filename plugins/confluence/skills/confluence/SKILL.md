@@ -120,7 +120,7 @@ confluence read "https://company.atlassian.net/wiki/spaces/MYSPACE/pages/1234567
 
 | Format | Notes |
 |---|---|
-| `markdown` | Recommended for agent-generated content. Automatically converted by the API. |
+| `markdown` | Recommended for agent-generated content. Automatically converted by the CLI. |
 | `storage` | Confluence XML storage format (default for create/update). Use for programmatic round-trips. |
 | `html` | Raw HTML. |
 | `text` | Plain text — for read/export output only, not for creation. |
@@ -162,6 +162,8 @@ confluence read 123456789
 confluence read 123456789 --format storage
 confluence read 123456789 --format markdown
 ```
+
+Markdown output resolves accessible Confluence page links, including links to pages in the same space, to absolute URLs while preserving custom link text and inline formatting.
 
 Requires content with a storage body. Folders and other bodyless content return `Page <id> has no readable body (it may be a folder or an unsupported content type).`; use `confluence info <id>` to inspect their metadata.
 

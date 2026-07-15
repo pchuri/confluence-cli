@@ -4,6 +4,7 @@ const path = require('path');
 const FormData = require('form-data');
 const axios = require('axios');
 const ConfluenceClient = require('../lib/confluence-client');
+const { StorageDepthExceededError } = require('../lib/storage-walker');
 const MockAdapter = require('axios-mock-adapter');
 
 const removeDirRecursive = (dir) => {
@@ -474,6 +475,334 @@ describe('ConfluenceClient', () => {
       });
 
       await expect(client.readPage('123', 'storage')).resolves.toBe('<p>Storage body</p>');
+
+      mock.restore();
+    });
+
+    test('readPage resolves same-space page links in markdown output', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(config => {
+        expect(config.params.expand).toBe('body.storage,space');
+        return [200, {
+          space: { key: 'ENG' },
+          body: {
+            storage: {
+              value: '<p>See <ac:link><ri:page ri:content-title="Target page" /></ac:link>.</p>'
+            }
+          }
+        }];
+      });
+      mock.onGet('/content').reply(config => {
+        expect(config.params).toEqual({
+          spaceKey: 'ENG',
+          title: 'Target page',
+          limit: 1
+        });
+        return [200, {
+          results: [{
+            title: 'Target page',
+            _links: { webui: '/spaces/ENG/pages/456/Target-page' }
+          }]
+        }];
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        'See [Target page](https://test.atlassian.net/spaces/ENG/pages/456/Target-page).'
+      );
+
+      mock.restore();
+    });
+
+    test('readPage uses the containing page base when scoped lookup results omit it', async () => {
+      const scopedClient = new ConfluenceClient({
+        domain: 'api.atlassian.com',
+        email: 'user@example.com',
+        token: 'scoped-token',
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
+      });
+      const mock = new MockAdapter(scopedClient.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p><ac:link><ri:page ri:content-title="Fallback base" /></ac:link> and '
+              + '<ac:link><ri:page ri:content-title="Result base" /></ac:link></p>'
+          }
+        },
+        _links: { base: 'https://tenant.atlassian.net/wiki' }
+      });
+      mock.onGet('/content').reply(config => [200, {
+        results: [{
+          title: config.params.title,
+          _links: {
+            ...(config.params.title === 'Result base'
+              ? { base: 'https://result-tenant.atlassian.net/wiki' }
+              : {}),
+            webui: `/spaces/ENG/pages/456/${config.params.title.replace(' ', '-')}`
+          }
+        }]
+      }]);
+
+      await expect(scopedClient.readPage('123', 'markdown')).resolves.toBe(
+        '[Fallback base](https://tenant.atlassian.net/wiki/spaces/ENG/pages/456/Fallback-base)'
+          + ' and [Result base](https://result-tenant.atlassian.net/wiki/spaces/ENG/pages/456/Result-base)'
+      );
+
+      mock.restore();
+    });
+
+    test('readPage preserves custom text for resolved same-space page links', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p><ac:link><ri:page ri:content-title="Target page" /><ac:link-body><strong>Read this</strong></ac:link-body></ac:link></p>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(200, {
+        results: [{
+          title: 'Target page',
+          _links: { webui: '/spaces/ENG/pages/456/Target-page' }
+        }]
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[**Read this**](https://test.atlassian.net/spaces/ENG/pages/456/Target-page)'
+      );
+
+      mock.restore();
+    });
+
+    test('readPage preserves semantic macro page references while resolving body links', async () => {
+      const mock = new MockAdapter(client.client);
+      const lookedUpTitles = [];
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<ac:structured-macro ac:name="include"><ac:parameter ac:name=""><ac:link><ri:page ri:content-title="Included page" /></ac:link></ac:parameter></ac:structured-macro>'
+              + '<ac:structured-macro ac:name="include-shared-block"><ac:parameter ac:name="shared-block-key">block-1</ac:parameter><ac:parameter ac:name="page"><ac:link><ri:page ri:content-title="Shared source" /></ac:link></ac:parameter></ac:structured-macro>'
+              + '<p><ac:link><ri:page ri:content-title="Body target" /></ac:link></p>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(config => {
+        lookedUpTitles.push(config.params.title);
+        return [200, {
+          results: [{
+            title: config.params.title,
+            _links: { webui: '/spaces/ENG/pages/456/Body-target' }
+          }]
+        }];
+      });
+
+      const result = await client.readPage('123', 'markdown');
+
+      expect(lookedUpTitles).toEqual(['Body target']);
+      expect(result).toContain('**Include Page**: [Included page]');
+      expect(result).toContain('**Include Shared Block**: block-1 (from page: Shared source');
+      expect(result).toContain('[Body target](https://test.atlassian.net/spaces/ENG/pages/456/Body-target)');
+
+      mock.restore();
+    });
+
+    test('readPage escapes resolved page-link labels while preserving inline formatting', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p><ac:link><ri:page ri:content-title="evil](https://attacker) [x" /></ac:link> and '
+              + '<ac:link><ri:page ri:content-title="Custom" /><ac:link-body>*literal* <code>[x]</code> '
+              + '<strong>Read [this]</strong> <em>styled</em></ac:link-body></ac:link></p>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(config => [200, {
+        results: [{
+          title: config.params.title,
+          _links: {
+            webui: config.params.title === 'Custom'
+              ? '/spaces/ENG/pages/456/Custom'
+              : '/spaces/ENG/pages/456/Fallback'
+          }
+        }]
+      }]);
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[evil\\]\\(https://attacker\\) \\[x](https://test.atlassian.net/spaces/ENG/pages/456/Fallback)'
+          + ' and [\\*literal\\* `[x]` **Read \\[this\\]** *styled*](https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
+      );
+
+      mock.restore();
+    });
+
+    test('readPage uses collision-safe code spans in resolved page-link labels', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p><ac:link><ri:page ri:content-title="Custom" /><ac:link-body>'
+              + '<code>safe`](https://attacker.example) [x</code>'
+              + '</ac:link-body></ac:link></p>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(200, {
+        results: [{
+          title: 'Custom',
+          _links: { webui: '/spaces/ENG/pages/456/Custom' }
+        }]
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[``safe`](https://attacker.example) [x``]'
+          + '(https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
+      );
+
+      mock.restore();
+    });
+
+    test('readPage escapes datetime attributes in resolved page-link labels', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p><ac:link><ri:page ri:content-title="Custom" /><ac:link-body>'
+              + '<time datetime="x](https://attacker.example) [y"></time>'
+              + '</ac:link-body></ac:link></p>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(200, {
+        results: [{
+          title: 'Custom',
+          _links: { webui: '/spaces/ENG/pages/456/Custom' }
+        }]
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[x\\]\\(https://attacker.example\\) \\[y]'
+          + '(https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
+      );
+
+      mock.restore();
+    });
+
+    test('readPage escapes attachment images in resolved page-link labels', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<ac:link><ri:page ri:content-title="Custom" /><ac:link-body>'
+              + '<ac:image><ri:attachment ri:filename="plot](https://attacker.example) [x.png" /></ac:image>'
+              + '</ac:link-body></ac:link>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(200, {
+        results: [{
+          title: 'Custom',
+          _links: { webui: '/spaces/ENG/pages/456/Custom' }
+        }]
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[![plot\\]\\(https://attacker.example\\) \\[x.png]'
+          + '(attachments/plot\\]\\(https://attacker.example\\) \\[x.png)]'
+          + '(https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
+      );
+
+      mock.restore();
+    });
+
+    test('readPage escapes external images in resolved page-link labels', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<ac:link><ri:page ri:content-title="Custom" /><ac:link-body>'
+              + '<ac:image><ri:url ri:value="https://images.example/x.png)](https://attacker.example) [x" /></ac:image>'
+              + '</ac:link-body></ac:link>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(200, {
+        results: [{
+          title: 'Custom',
+          _links: { webui: '/spaces/ENG/pages/456/Custom' }
+        }]
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[![](https://images.example/x.png\\)\\]\\(https://attacker.example\\) \\[x)]'
+          + '(https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
+      );
+
+      mock.restore();
+    });
+
+    test('resolvePageLinksInHtml preserves implicitly closed links and trailing content', async () => {
+      client.findPageByTitleAndSpace = jest.fn();
+      const storage = '<p>Before <ac:link><ri:page ri:content-title="Target" /></p>'
+        + '<p>Trailing content</p>';
+
+      const result = await client.resolvePageLinksInHtml(storage, 'ENG');
+      const warnings = [];
+      const markdown = client.storageToMarkdown(result, {
+        onWarnings: emitted => warnings.push(...emitted)
+      });
+
+      expect(result).toBe(storage);
+      expect(client.findPageByTitleAndSpace).not.toHaveBeenCalled();
+      expect(markdown).toContain('Trailing content');
+      expect(warnings).toContainEqual(expect.objectContaining({
+        type: 'implicit-close',
+        tag: 'ac:link'
+      }));
+    });
+
+    test('resolvePageLinksInHtml caps concurrent unique page lookups', async () => {
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const titles = Array.from({ length: 25 }, (_, index) => `Page ${index}`);
+      client.findPageByTitleAndSpace = jest.fn(async (_spaceKey, title) => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise(resolve => setImmediate(resolve));
+        inFlight--;
+        return { title, url: `https://example.com/${encodeURIComponent(title)}` };
+      });
+      const html = [...titles, titles[0]]
+        .map(title => `<ac:link><ri:page ri:content-title="${title}" /></ac:link>`)
+        .join('');
+
+      const result = await client.resolvePageLinksInHtml(html, 'ENG');
+
+      expect(client.findPageByTitleAndSpace).toHaveBeenCalledTimes(titles.length);
+      expect(maxInFlight).toBeLessThanOrEqual(10);
+      expect(result.match(/<a href=/g)).toHaveLength(titles.length + 1);
+    });
+
+    test('readPage reports controlled depth errors for deeply nested storage', async () => {
+      const mock = new MockAdapter(client.client);
+      const nesting = 20000;
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p>'.repeat(nesting) + 'content' + '</p>'.repeat(nesting)
+          }
+        }
+      });
+
+      await expect(client.readPage('123', 'markdown')).rejects.toThrow(StorageDepthExceededError);
 
       mock.restore();
     });
@@ -1044,6 +1373,24 @@ describe('ConfluenceClient', () => {
       const storage = '<ac:link><ri:page ri:content-title="Some Long Page Title" ri:version-at-save="28" /><ac:link-body>Short Name</ac:link-body></ac:link>';
       const result = client.storageToMarkdown(storage);
       expect(result).toContain('Short Name');
+    });
+
+    test('should preserve datetime attributes outside markdown link labels', () => {
+      const storage = '<p>at <time datetime="x](https://example.com) [y"></time></p>';
+
+      expect(client.storageToMarkdown(storage)).toBe('at x](https://example.com) [y');
+    });
+
+    test('should preserve image attributes outside markdown link labels', () => {
+      const attachment = '<ac:image><ri:attachment ri:filename="plot](draft).png" /></ac:image>';
+      const external = '<ac:image><ri:url ri:value="https://images.example/x](draft).png" /></ac:image>';
+
+      expect(client.storageToMarkdown(attachment)).toBe(
+        '![plot](draft).png](attachments/plot](draft).png)'
+      );
+      expect(client.storageToMarkdown(external)).toBe(
+        '![](https://images.example/x](draft).png)'
+      );
     });
 
     test('should remove ac:link tags with attributes', () => {
