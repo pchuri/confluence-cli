@@ -4,6 +4,7 @@ const path = require('path');
 const FormData = require('form-data');
 const axios = require('axios');
 const ConfluenceClient = require('../lib/confluence-client');
+const { StorageDepthExceededError } = require('../lib/storage-walker');
 const MockAdapter = require('axios-mock-adapter');
 
 const removeDirRecursive = (dir) => {
@@ -576,7 +577,8 @@ describe('ConfluenceClient', () => {
         body: {
           storage: {
             value: '<p><ac:link><ri:page ri:content-title="evil](https://attacker) [x" /></ac:link> and '
-              + '<ac:link><ri:page ri:content-title="Custom" /><ac:link-body><strong>Read [this]</strong></ac:link-body></ac:link></p>'
+              + '<ac:link><ri:page ri:content-title="Custom" /><ac:link-body>*literal* <code>[x]</code> '
+              + '<strong>Read [this]</strong> <em>styled</em></ac:link-body></ac:link></p>'
           }
         }
       });
@@ -593,7 +595,7 @@ describe('ConfluenceClient', () => {
 
       await expect(client.readPage('123', 'markdown')).resolves.toBe(
         '[evil\\]\\(https://attacker\\) \\[x](https://test.atlassian.net/spaces/ENG/pages/456/Fallback)'
-          + ' and [**Read \\[this\\]**](https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
+          + ' and [\\*literal\\* `[x]` **Read \\[this\\]** *styled*](https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
       );
 
       mock.restore();
@@ -619,6 +621,23 @@ describe('ConfluenceClient', () => {
       expect(client.findPageByTitleAndSpace).toHaveBeenCalledTimes(titles.length);
       expect(maxInFlight).toBeLessThanOrEqual(10);
       expect(result.match(/<a href=/g)).toHaveLength(titles.length + 1);
+    });
+
+    test('readPage reports controlled depth errors for deeply nested storage', async () => {
+      const mock = new MockAdapter(client.client);
+      const nesting = 20000;
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p>'.repeat(nesting) + 'content' + '</p>'.repeat(nesting)
+          }
+        }
+      });
+
+      await expect(client.readPage('123', 'markdown')).rejects.toThrow(StorageDepthExceededError);
+
+      mock.restore();
     });
 
     describe('bodyless content (folder) handling', () => {
