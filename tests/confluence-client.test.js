@@ -601,6 +601,33 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('readPage uses collision-safe code spans in resolved page-link labels', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p><ac:link><ri:page ri:content-title="Custom" /><ac:link-body>'
+              + '<code>safe`](https://attacker.example) [x</code>'
+              + '</ac:link-body></ac:link></p>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(200, {
+        results: [{
+          title: 'Custom',
+          _links: { webui: '/spaces/ENG/pages/456/Custom' }
+        }]
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[``safe`](https://attacker.example) [x``]'
+          + '(https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
+      );
+
+      mock.restore();
+    });
+
     test('resolvePageLinksInHtml caps concurrent unique page lookups', async () => {
       let inFlight = 0;
       let maxInFlight = 0;
