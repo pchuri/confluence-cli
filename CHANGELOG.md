@@ -1,3 +1,10 @@
+## [2.16.2](https://github.com/pchuri/confluence-cli/compare/v2.16.1...v2.16.2) (2026-07-15)
+
+
+### Bug Fixes
+
+* preserve same-space page links in Markdown ([#217](https://github.com/pchuri/confluence-cli/issues/217)) ([d59a25a](https://github.com/pchuri/confluence-cli/commit/d59a25af79d1ad4f07b8def380513c1d6f87da8e)), closes [#215](https://github.com/pchuri/confluence-cli/issues/215)
+
 ## [2.16.1](https://github.com/pchuri/confluence-cli/compare/v2.16.0...v2.16.1) (2026-07-10)
 
 
