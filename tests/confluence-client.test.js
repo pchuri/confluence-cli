@@ -693,6 +693,61 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('readPage escapes attachment images in resolved page-link labels', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<ac:link><ri:page ri:content-title="Custom" /><ac:link-body>'
+              + '<ac:image><ri:attachment ri:filename="plot](https://attacker.example) [x.png" /></ac:image>'
+              + '</ac:link-body></ac:link>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(200, {
+        results: [{
+          title: 'Custom',
+          _links: { webui: '/spaces/ENG/pages/456/Custom' }
+        }]
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[![plot\\]\\(https://attacker.example\\) \\[x.png]'
+          + '(attachments/plot\\]\\(https://attacker.example\\) \\[x.png)]'
+          + '(https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
+      );
+
+      mock.restore();
+    });
+
+    test('readPage escapes external images in resolved page-link labels', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<ac:link><ri:page ri:content-title="Custom" /><ac:link-body>'
+              + '<ac:image><ri:url ri:value="https://images.example/x.png)](https://attacker.example) [x" /></ac:image>'
+              + '</ac:link-body></ac:link>'
+          }
+        }
+      });
+      mock.onGet('/content').reply(200, {
+        results: [{
+          title: 'Custom',
+          _links: { webui: '/spaces/ENG/pages/456/Custom' }
+        }]
+      });
+
+      await expect(client.readPage('123', 'markdown')).resolves.toBe(
+        '[![](https://images.example/x.png\\)\\]\\(https://attacker.example\\) \\[x)]'
+          + '(https://test.atlassian.net/spaces/ENG/pages/456/Custom)'
+      );
+
+      mock.restore();
+    });
+
     test('resolvePageLinksInHtml preserves implicitly closed links and trailing content', async () => {
       client.findPageByTitleAndSpace = jest.fn();
       const storage = '<p>Before <ac:link><ri:page ri:content-title="Target" /></p>'
@@ -1324,6 +1379,18 @@ describe('ConfluenceClient', () => {
       const storage = '<p>at <time datetime="x](https://example.com) [y"></time></p>';
 
       expect(client.storageToMarkdown(storage)).toBe('at x](https://example.com) [y');
+    });
+
+    test('should preserve image attributes outside markdown link labels', () => {
+      const attachment = '<ac:image><ri:attachment ri:filename="plot](draft).png" /></ac:image>';
+      const external = '<ac:image><ri:url ri:value="https://images.example/x](draft).png" /></ac:image>';
+
+      expect(client.storageToMarkdown(attachment)).toBe(
+        '![plot](draft).png](attachments/plot](draft).png)'
+      );
+      expect(client.storageToMarkdown(external)).toBe(
+        '![](https://images.example/x](draft).png)'
+      );
     });
 
     test('should remove ac:link tags with attributes', () => {
