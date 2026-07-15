@@ -513,6 +513,44 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('readPage uses the containing page base when scoped lookup results omit it', async () => {
+      const scopedClient = new ConfluenceClient({
+        domain: 'api.atlassian.com',
+        email: 'user@example.com',
+        token: 'scoped-token',
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
+      });
+      const mock = new MockAdapter(scopedClient.client);
+      mock.onGet('/content/123').reply(200, {
+        space: { key: 'ENG' },
+        body: {
+          storage: {
+            value: '<p><ac:link><ri:page ri:content-title="Fallback base" /></ac:link> and '
+              + '<ac:link><ri:page ri:content-title="Result base" /></ac:link></p>'
+          }
+        },
+        _links: { base: 'https://tenant.atlassian.net/wiki' }
+      });
+      mock.onGet('/content').reply(config => [200, {
+        results: [{
+          title: config.params.title,
+          _links: {
+            ...(config.params.title === 'Result base'
+              ? { base: 'https://result-tenant.atlassian.net/wiki' }
+              : {}),
+            webui: `/spaces/ENG/pages/456/${config.params.title.replace(' ', '-')}`
+          }
+        }]
+      }]);
+
+      await expect(scopedClient.readPage('123', 'markdown')).resolves.toBe(
+        '[Fallback base](https://tenant.atlassian.net/wiki/spaces/ENG/pages/456/Fallback-base)'
+          + ' and [Result base](https://result-tenant.atlassian.net/wiki/spaces/ENG/pages/456/Result-base)'
+      );
+
+      mock.restore();
+    });
+
     test('readPage preserves custom text for resolved same-space page links', async () => {
       const mock = new MockAdapter(client.client);
       mock.onGet('/content/123').reply(200, {
