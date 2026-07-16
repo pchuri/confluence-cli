@@ -83,6 +83,25 @@ describe('getConfig env var aliases', () => {
     expect(config.domain).toBe('host.example.com');
   });
 
+  test('infers the Cloud API path and strips a trailing slash from the domain', () => {
+    process.env.CONFLUENCE_DOMAIN = 'cloud.atlassian.net/';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+
+    const config = getConfig();
+    expect(config.apiPath).toBe('/wiki/rest/api');
+    expect(config.domain).toBe('cloud.atlassian.net');
+  });
+
+  test('preserves an on-prem context path in the env domain for URL building', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.com/confluence';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_AUTH_TYPE = 'bearer';
+
+    const config = getConfig();
+    expect(config.domain).toBe('wiki.example.com/confluence');
+    expect(config.apiPath).toBe('/rest/api');
+  });
+
   test('protocol defaults to https when CONFLUENCE_PROTOCOL is not set', () => {
     process.env.CONFLUENCE_DOMAIN = 'example.com';
     process.env.CONFLUENCE_API_TOKEN = 'token';
