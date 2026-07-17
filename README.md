@@ -244,6 +244,21 @@ export CONFLUENCE_API_TOKEN="your-scoped-token"
 
 `CONFLUENCE_API_PATH` defaults to `/wiki/rest/api` for Atlassian Cloud domains and `/rest/api` otherwise. Override it when your site lives under a custom reverse proxy or on-premises path. `CONFLUENCE_AUTH_TYPE` defaults to `basic` when an email is present and falls back to `bearer` otherwise. For `mtls`, set `CONFLUENCE_TLS_CLIENT_CERT` and `CONFLUENCE_TLS_CLIENT_KEY`; `CONFLUENCE_TLS_CA_CERT` is optional.
 
+### Option 4: `.netrc` file
+
+To keep your API token out of `config.json`, store it in a standard [`.netrc`](https://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-file.html) file (the same mechanism used by `curl` and Git). Configure a profile as usual but omit the token, then add an entry to your `~/.netrc`:
+
+```
+machine your-domain.atlassian.net
+  login your.email@example.com
+  password your-api-token
+```
+
+- The `machine` must match the profile's domain, and `login` must match the profile's email (basic auth). For bearer auth (no email), only the `machine` is matched.
+- The token is resolved with this precedence: environment variable / `--token` → profile `token` in `config.json` → `.netrc`. A token from a higher-priority source wins.
+- `.netrc` supplies the token for `basic` and `bearer` auth only (not `mtls`, `cookie`, or `none`).
+- The file location is `~/.netrc` (`~/_netrc` on Windows), or the path in the `NETRC` environment variable if set.
+
 **Config file location:**
 
 confluence-cli supports the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/latest/). The config directory is resolved in this order:
