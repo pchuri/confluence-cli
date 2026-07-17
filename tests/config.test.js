@@ -92,6 +92,14 @@ describe('getConfig env var aliases', () => {
     expect(config.domain).toBe('cloud.atlassian.net');
   });
 
+  test('infers the Cloud API path for a mixed-case domain', () => {
+    process.env.CONFLUENCE_DOMAIN = 'Cloud.Atlassian.NET';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+
+    const config = getConfig();
+    expect(config.apiPath).toBe('/wiki/rest/api');
+  });
+
   test('preserves an on-prem context path in the env domain for URL building', () => {
     process.env.CONFLUENCE_DOMAIN = 'wiki.example.com/confluence';
     process.env.CONFLUENCE_API_TOKEN = 'token';
