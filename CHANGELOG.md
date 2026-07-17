@@ -1,3 +1,10 @@
+## [2.17.1](https://github.com/pchuri/confluence-cli/compare/v2.17.0...v2.17.1) (2026-07-17)
+
+
+### Bug Fixes
+
+* match Cloud domains case-insensitively when inferring API path ([1c0455f](https://github.com/pchuri/confluence-cli/commit/1c0455f9309990f2f33455ff43c93c4e3e74711d))
+
 # [2.17.0](https://github.com/pchuri/confluence-cli/compare/v2.16.2...v2.17.0) (2026-07-17)
 
 
