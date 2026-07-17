@@ -1,3 +1,10 @@
+# [2.17.0](https://github.com/pchuri/confluence-cli/compare/v2.16.2...v2.17.0) (2026-07-17)
+
+
+### Features
+
+* add NETRC support ([#216](https://github.com/pchuri/confluence-cli/issues/216)) ([79d1757](https://github.com/pchuri/confluence-cli/commit/79d17578f128eb21db6beac92e8c07a8849e0300))
+
 ## [2.16.2](https://github.com/pchuri/confluence-cli/compare/v2.16.1...v2.16.2) (2026-07-15)
 
 
