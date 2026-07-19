@@ -388,6 +388,31 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('retries a 429 write request (rejected before processing)', async () => {
+      const retryClient = makeClient();
+      const mock = new MockAdapter(retryClient.client);
+      mock
+        .onPost('/content').replyOnce(429, {}, { 'retry-after': '0' })
+        .onPost('/content').replyOnce(200, { id: '456' });
+
+      const response = await retryClient.client.post('/content', { title: 'New page' });
+      expect(response.data.id).toBe('456');
+      expect(mock.history.post.length).toBe(2);
+      mock.restore();
+    });
+
+    test('does not retry a 503 write request (may already be applied)', async () => {
+      const retryClient = makeClient();
+      const mock = new MockAdapter(retryClient.client);
+      mock.onPost('/content').reply(503);
+
+      await expect(
+        retryClient.client.post('/content', { title: 'New page' })
+      ).rejects.toThrow(/503/);
+      expect(mock.history.post.length).toBe(1);
+      mock.restore();
+    });
+
     test('gives up after maxRetries attempts', async () => {
       const retryClient = makeClient();
       retryClient.maxRetries = 2;
