@@ -1,3 +1,10 @@
+# [2.18.0](https://github.com/pchuri/confluence-cli/compare/v2.17.1...v2.18.0) (2026-07-19)
+
+
+### Features
+
+* retry rate-limited requests and share pagination logic ([#218](https://github.com/pchuri/confluence-cli/issues/218)) ([281b9a6](https://github.com/pchuri/confluence-cli/commit/281b9a68cca4d8c8257703fe3230ff7b06676d8f))
+
 ## [2.17.1](https://github.com/pchuri/confluence-cli/compare/v2.17.0...v2.17.1) (2026-07-17)
 
 
