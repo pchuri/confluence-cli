@@ -349,6 +349,123 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('rate-limit retry (429/503)', () => {
+    const makeClient = () => {
+      const retryClient = new ConfluenceClient({
+        domain: 'confluence.company.com',
+        token: 'test-token',
+        apiPath: '/rest/api'
+      });
+      retryClient.retryBaseDelayMs = 1;
+      return retryClient;
+    };
+
+    test('retries a 429 response and succeeds', async () => {
+      const retryClient = makeClient();
+      const mock = new MockAdapter(retryClient.client);
+      mock
+        .onGet(/\/content\/123/).replyOnce(429, {}, { 'retry-after': '0' })
+        .onGet(/\/content\/123/).replyOnce(200, {
+          body: { storage: { value: '<p>hi</p>' } }
+        });
+
+      await expect(retryClient.readPage('123', 'storage')).resolves.toBe('<p>hi</p>');
+      expect(mock.history.get.length).toBe(2);
+      mock.restore();
+    });
+
+    test('retries a 503 response and succeeds', async () => {
+      const retryClient = makeClient();
+      const mock = new MockAdapter(retryClient.client);
+      mock
+        .onGet(/\/content\/123/).replyOnce(503)
+        .onGet(/\/content\/123/).replyOnce(200, {
+          body: { storage: { value: '<p>hi</p>' } }
+        });
+
+      await expect(retryClient.readPage('123', 'storage')).resolves.toBe('<p>hi</p>');
+      expect(mock.history.get.length).toBe(2);
+      mock.restore();
+    });
+
+    test('retries a 429 write request (rejected before processing)', async () => {
+      const retryClient = makeClient();
+      const mock = new MockAdapter(retryClient.client);
+      mock
+        .onPost('/content').replyOnce(429, {}, { 'retry-after': '0' })
+        .onPost('/content').replyOnce(200, { id: '456' });
+
+      const response = await retryClient.client.post('/content', { title: 'New page' });
+      expect(response.data.id).toBe('456');
+      expect(mock.history.post.length).toBe(2);
+      mock.restore();
+    });
+
+    test('does not retry a 503 write request (may already be applied)', async () => {
+      const retryClient = makeClient();
+      const mock = new MockAdapter(retryClient.client);
+      mock.onPost('/content').reply(503);
+
+      await expect(
+        retryClient.client.post('/content', { title: 'New page' })
+      ).rejects.toThrow(/503/);
+      expect(mock.history.post.length).toBe(1);
+      mock.restore();
+    });
+
+    test('gives up after maxRetries attempts', async () => {
+      const retryClient = makeClient();
+      retryClient.maxRetries = 2;
+      const mock = new MockAdapter(retryClient.client);
+      mock.onGet(/\/content\/123/).reply(429);
+
+      await expect(retryClient.readPage('123')).rejects.toThrow(/429/);
+      expect(mock.history.get.length).toBe(3);
+      mock.restore();
+    });
+
+    test('does not retry non-retryable errors', async () => {
+      const retryClient = makeClient();
+      const mock = new MockAdapter(retryClient.client);
+      mock.onGet(/\/content\/123/).reply(400);
+
+      await expect(retryClient.readPage('123')).rejects.toThrow(/400/);
+      expect(mock.history.get.length).toBe(1);
+      mock.restore();
+    });
+
+    test('does not retry requests with a stream body', async () => {
+      const retryClient = makeClient();
+      const mock = new MockAdapter(retryClient.client);
+      mock.onPost('/upload').reply(429);
+
+      const streamLike = { pipe: () => {} };
+      await expect(
+        retryClient.client.request({ url: '/upload', method: 'post', data: streamLike })
+      ).rejects.toThrow(/429/);
+      expect(mock.history.post.length).toBe(1);
+      mock.restore();
+    });
+
+    test('retryDelayMs honors Retry-After seconds, dates, and backoff', () => {
+      const retryClient = makeClient();
+      retryClient.retryBaseDelayMs = 1000;
+
+      expect(retryClient.retryDelayMs({ headers: { 'retry-after': '2' } }, 0)).toBe(2000);
+      expect(retryClient.retryDelayMs({ headers: { 'retry-after': '120' } }, 0)).toBe(60000);
+
+      const soon = new Date(Date.now() + 5000).toUTCString();
+      const dateDelay = retryClient.retryDelayMs({ headers: { 'retry-after': soon } }, 0);
+      expect(dateDelay).toBeGreaterThan(0);
+      expect(dateDelay).toBeLessThanOrEqual(5000);
+
+      expect(retryClient.retryDelayMs({ headers: {} }, 0)).toBe(1000);
+      expect(retryClient.retryDelayMs({ headers: {} }, 1)).toBe(2000);
+      expect(retryClient.retryDelayMs({ headers: {} }, 2)).toBe(4000);
+      expect(retryClient.retryDelayMs(undefined, 0)).toBe(1000);
+    });
+  });
+
   describe('401 error handling (cookie auth)', () => {
     test('provides cookie-specific hints for cookie auth', async () => {
       const cookieClient = new ConfluenceClient({
