@@ -1,5 +1,7 @@
 # Confluence CLI
 
+[![npm downloads](https://img.shields.io/npm/dm/confluence-cli.svg)](https://www.npmjs.com/package/confluence-cli)
+
 A powerful command-line interface for Atlassian Confluence that allows you to read, search, and manage your Confluence content from the terminal.
 
 ## Features
