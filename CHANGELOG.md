@@ -1,3 +1,10 @@
+## [2.18.1](https://github.com/pchuri/confluence-cli/compare/v2.18.0...v2.18.1) (2026-07-22)
+
+
+### Bug Fixes
+
+* bump axios to ^1.18.1 and linkify-it to 5.0.2 to resolve audit failures ([#220](https://github.com/pchuri/confluence-cli/issues/220)) ([778c639](https://github.com/pchuri/confluence-cli/commit/778c6394ca47888f1878be4af6651a7a7a4a43b7))
+
 # [2.18.0](https://github.com/pchuri/confluence-cli/compare/v2.17.1...v2.18.0) (2026-07-19)
 
 
