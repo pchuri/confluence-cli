@@ -1,3 +1,10 @@
+## [2.19.1](https://github.com/pchuri/confluence-cli/compare/v2.19.0...v2.19.1) (2026-07-23)
+
+
+### Bug Fixes
+
+* escape passthrough tags in rendered attributes ([#222](https://github.com/pchuri/confluence-cli/issues/222)) ([71f1b31](https://github.com/pchuri/confluence-cli/commit/71f1b318b97dab815a6c41750291c1c44536f1dc))
+
 # [2.19.0](https://github.com/pchuri/confluence-cli/compare/v2.18.1...v2.19.0) (2026-07-23)
 
 
