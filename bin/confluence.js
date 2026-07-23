@@ -19,11 +19,14 @@ const registerApiCommand = require('./commands/api');
 const { readStdin } = require('../lib/stdin-utils');
 const { emitJson, emitJsonError, jsonRequested } = require('../lib/output');
 
+const READ_ONLY_MESSAGE = 'This profile is in read-only mode. Write operations are not allowed.';
+const READ_ONLY_TIP = 'Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.';
+
+class ReadOnlyError extends Error {}
+
 function assertWritable(config) {
   if (config.readOnly) {
-    console.error(chalk.red('Error: This profile is in read-only mode. Write operations are not allowed.'));
-    console.error(chalk.yellow('Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.'));
-    process.exit(1);
+    throw new ReadOnlyError(READ_ONLY_MESSAGE);
   }
 }
 
@@ -68,6 +71,11 @@ function handleCommandError(analytics, commandName, error, onExtra = null) {
   // failures. Non-JSON callers keep the exact human-readable prose below.
   if (program.opts().json) {
     emitJsonError(error);
+    process.exit(1);
+  }
+  if (error instanceof ReadOnlyError) {
+    console.error(chalk.red(`Error: ${error.message}`));
+    console.error(chalk.yellow(READ_ONLY_TIP));
     process.exit(1);
   }
   console.error(chalk.red('Error:'), error.message);

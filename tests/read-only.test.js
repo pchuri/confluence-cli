@@ -1,4 +1,8 @@
+const { spawnSync } = require('child_process');
+const path = require('path');
 const { getConfig } = require('../lib/config');
+
+const CLI = path.resolve(__dirname, '../bin/index.js');
 
 const ENV_KEYS = [
   'CONFLUENCE_DOMAIN', 'CONFLUENCE_HOST',
@@ -210,20 +214,10 @@ describe('assertWritable', () => {
     mockError.mockRestore();
   });
 
-  test('exits with code 1 for readOnly config', () => {
-    const mockExit = jest.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
-    const mockError = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    expect(() => assertWritable({ readOnly: true })).toThrow('process.exit called');
-    expect(mockExit).toHaveBeenCalledWith(1);
-    expect(mockError).toHaveBeenCalledWith(
-      expect.stringContaining('read-only mode')
+  test('throws for readOnly config', () => {
+    expect(() => assertWritable({ readOnly: true })).toThrow(
+      'This profile is in read-only mode. Write operations are not allowed.'
     );
-
-    mockExit.mockRestore();
-    mockError.mockRestore();
   });
 
   test('does not exit when readOnly is undefined', () => {
@@ -237,6 +231,33 @@ describe('assertWritable', () => {
 
     mockExit.mockRestore();
     mockError.mockRestore();
+  });
+});
+
+describe('readOnly mode in the CLI', () => {
+  test('global --json write command emits one structured error on stderr', () => {
+    const env = { ...process.env };
+    for (const key of ENV_KEYS) delete env[key];
+    Object.assign(env, {
+      CONFLUENCE_DOMAIN: 'test.atlassian.net',
+      CONFLUENCE_API_TOKEN: 'test-token',
+      CONFLUENCE_READ_ONLY: 'true',
+    });
+
+    const result = spawnSync(
+      process.execPath,
+      [CLI, '--json', 'delete', '123', '--yes'],
+      { encoding: 'utf8', env }
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(JSON.parse(result.stderr)).toEqual({
+      error: 'This profile is in read-only mode. Write operations are not allowed.',
+      code: 'VALIDATION',
+      status: null,
+      details: null,
+    });
   });
 });
 
