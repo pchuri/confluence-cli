@@ -79,6 +79,15 @@ describe('withClient wrapper', () => {
     await expect(action('title', 'KEY', {})).rejects.toThrow('process.exit called');
     expect(handler).not.toHaveBeenCalled();
     expect(ConfluenceClient).not.toHaveBeenCalled();
+    expect(trackSpy).toHaveBeenCalledWith('create', false);
+    expect(errorSpy).toHaveBeenNthCalledWith(
+      1,
+      expect.stringContaining('Error: This profile is in read-only mode.')
+    );
+    expect(errorSpy).toHaveBeenNthCalledWith(
+      2,
+      expect.stringContaining('Tip: Use "confluence profile add <name>" without --read-only')
+    );
     expect(exitSpy).toHaveBeenCalledWith(1);
   });
 

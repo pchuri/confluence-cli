@@ -1,4 +1,10 @@
+const { spawnSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const { getConfig } = require('../lib/config');
+
+const CLI = path.resolve(__dirname, '../bin/index.js');
 
 const ENV_KEYS = [
   'CONFLUENCE_DOMAIN', 'CONFLUENCE_HOST',
@@ -210,20 +216,10 @@ describe('assertWritable', () => {
     mockError.mockRestore();
   });
 
-  test('exits with code 1 for readOnly config', () => {
-    const mockExit = jest.spyOn(process, 'exit').mockImplementation(() => {
-      throw new Error('process.exit called');
-    });
-    const mockError = jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    expect(() => assertWritable({ readOnly: true })).toThrow('process.exit called');
-    expect(mockExit).toHaveBeenCalledWith(1);
-    expect(mockError).toHaveBeenCalledWith(
-      expect.stringContaining('read-only mode')
+  test('throws for readOnly config', () => {
+    expect(() => assertWritable({ readOnly: true })).toThrow(
+      'This profile is in read-only mode. Write operations are not allowed.'
     );
-
-    mockExit.mockRestore();
-    mockError.mockRestore();
   });
 
   test('does not exit when readOnly is undefined', () => {
@@ -237,6 +233,107 @@ describe('assertWritable', () => {
 
     mockExit.mockRestore();
     mockError.mockRestore();
+  });
+});
+
+describe('JSON errors in the CLI', () => {
+  test.each([
+    ['missing argument', ['--json', 'info']],
+    ['unknown command', ['--json', 'unknown-command']],
+  ])('%s emits one structured error on stderr', (name, args) => {
+    const result = spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(JSON.parse(result.stderr)).toEqual({
+      error: expect.any(String),
+      code: 'VALIDATION',
+      status: null,
+      details: null,
+    });
+  });
+
+  test('global --json write command emits one structured error on stderr', () => {
+    const env = { ...process.env };
+    for (const key of ENV_KEYS) delete env[key];
+    Object.assign(env, {
+      CONFLUENCE_DOMAIN: 'test.atlassian.net',
+      CONFLUENCE_API_TOKEN: 'test-token',
+      CONFLUENCE_READ_ONLY: 'true',
+    });
+
+    const result = spawnSync(
+      process.execPath,
+      [CLI, '--json', 'delete', '123', '--yes'],
+      { encoding: 'utf8', env }
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(JSON.parse(result.stderr)).toEqual({
+      error: 'This profile is in read-only mode. Write operations are not allowed.',
+      code: 'VALIDATION',
+      status: null,
+      details: null,
+    });
+  });
+
+  test('missing configuration emits one structured error on stderr', () => {
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-empty-config-'));
+    const env = { ...process.env };
+    for (const key of ENV_KEYS) delete env[key];
+    Object.assign(env, {
+      CONFLUENCE_CONFIG_DIR: configDir,
+      CONFLUENCE_CLI_ANALYTICS: 'false',
+    });
+
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [CLI, '--json', 'spaces'],
+        { encoding: 'utf8', env }
+      );
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(JSON.parse(result.stderr)).toEqual({
+        error: 'No configuration found!',
+        code: 'VALIDATION',
+        status: null,
+        details: null,
+      });
+    } finally {
+      fs.rmSync(configDir, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ['standard command', ['--json', 'spaces']],
+    ['api command', ['--json', 'api', '/rest/api/content']],
+  ])('malformed configuration in %s emits one structured error on stderr', (name, args) => {
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-malformed-config-'));
+    const env = { ...process.env };
+    for (const key of ENV_KEYS) delete env[key];
+    Object.assign(env, {
+      CONFLUENCE_CONFIG_DIR: configDir,
+      CONFLUENCE_CLI_ANALYTICS: 'false',
+    });
+    fs.writeFileSync(path.join(configDir, 'config.json'), '{ not valid json');
+
+    try {
+      const result = spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8', env });
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(JSON.parse(result.stderr)).toEqual({
+        error: expect.any(String),
+        code: 'VALIDATION',
+        status: null,
+        details: null,
+      });
+    } finally {
+      fs.rmSync(configDir, { recursive: true, force: true });
+    }
   });
 });
 

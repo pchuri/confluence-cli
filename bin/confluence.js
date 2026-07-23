@@ -17,13 +17,16 @@ const registerCommentCommands = require('./commands/comment');
 const registerExportCommand = require('./commands/export');
 const registerApiCommand = require('./commands/api');
 const { readStdin } = require('../lib/stdin-utils');
-const { emitJson, jsonRequested } = require('../lib/output');
+const { emitJson, emitJsonError, jsonRequested, setJsonMode } = require('../lib/output');
+
+const READ_ONLY_MESSAGE = 'This profile is in read-only mode. Write operations are not allowed.';
+const READ_ONLY_TIP = 'Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.';
+
+class ReadOnlyError extends Error {}
 
 function assertWritable(config) {
   if (config.readOnly) {
-    console.error(chalk.red('Error: This profile is in read-only mode. Write operations are not allowed.'));
-    console.error(chalk.yellow('Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.'));
-    process.exit(1);
+    throw new ReadOnlyError(READ_ONLY_MESSAGE);
   }
 }
 
@@ -63,6 +66,18 @@ function formatApiErrorBody(data) {
 
 function handleCommandError(analytics, commandName, error, onExtra = null) {
   analytics.track(commandName, false);
+  // In --json mode, emit a single structured error object (on stderr, preserving
+  // the stdout=data / stderr=diagnostics contract) so agents/scripts can parse
+  // failures. Non-JSON callers keep the exact human-readable prose below.
+  if (program.opts().json) {
+    emitJsonError(error);
+    process.exit(1);
+  }
+  if (error instanceof ReadOnlyError) {
+    console.error(chalk.red(`Error: ${error.message}`));
+    console.error(chalk.yellow(READ_ONLY_TIP));
+    process.exit(1);
+  }
   console.error(chalk.red('Error:'), error.message);
   const apiDetail = formatApiErrorBody(error.response?.data);
   if (apiDetail && !onExtra) {
@@ -83,7 +98,7 @@ function withClient(commandName, handler, { writable = false, onError = null } =
   return async (...actionArgs) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig(getProfileName());
+      const config = getConfig(getProfileName(), { throwOnError: Boolean(program.opts().json) });
       if (writable) assertWritable(config);
       const client = new ConfluenceClient(config);
       await handler({ client, config, analytics, emitJson, wantsJson }, ...actionArgs);
@@ -115,6 +130,16 @@ program
   .option('--profile <name>', 'Use a specific configuration profile')
   .option('--json', 'Output raw JSON to stdout (for scripting / piping to jq)');
 
+program.configureOutput({
+  outputError: (message, write) => {
+    if (program.opts().json) {
+      emitJsonError(null, { message: message.trim(), code: 'VALIDATION' });
+      return;
+    }
+    write(message);
+  },
+});
+
 // Helper: resolve profile name from global --profile flag
 function getProfileName() {
   return program.opts().profile || undefined;
@@ -142,11 +167,11 @@ const JSON_COMMANDS = new Set([
 ]);
 
 program.hook('preAction', (thisCommand, actionCommand) => {
+  setJsonMode(program.opts().json);
   if (program.opts().json && !JSON_COMMANDS.has(actionCommand.name())) {
-    console.error(chalk.red(
-      `Error: --json is not supported by "${actionCommand.name()}". ` +
-      `Supported commands: ${[...JSON_COMMANDS].join(', ')}.`
-    ));
+    const message = `--json is not supported by "${actionCommand.name()}". ` +
+      `Supported commands: ${[...JSON_COMMANDS].join(', ')}.`;
+    emitJsonError(null, { message, code: 'VALIDATION' });
     process.exit(1);
   }
 });

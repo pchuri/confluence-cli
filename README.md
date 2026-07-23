@@ -391,6 +391,33 @@ confluence create "Notes" ENG --content "hi" --json | jq -r '.id'   # capture th
 
 > **Deprecation:** the per-command `--format json` form is deprecated in favor of the global `--json` flag. It still works but prints a warning to stderr and will be removed in a future major version.
 
+#### Structured errors
+
+When `--json` is active, command failures are machine-parseable: the command prints exactly one JSON object to **stderr** (stdout stays empty) and, except as noted below, exits with status `1`. This lets scripts and agents branch on failures without scraping prose. The shape is:
+
+```json
+{
+  "error": "Authentication failed (401 Unauthorized).",
+  "code": "AUTH_FAILED",
+  "status": 401,
+  "details": { "message": "...", "status-code": 401 }
+}
+```
+
+- `error` — the human-readable message.
+- `code` — a stable machine code, one of `AUTH_FAILED`, `NOT_FOUND`, `VALIDATION`, `API_ERROR`, `NETWORK`, `UNKNOWN`.
+- `status` — the HTTP status when the failure came from the server, otherwise `null`.
+- `details` — the raw API response body when present, otherwise `null`.
+
+```bash
+# Read errors from stderr and inspect the code
+confluence info 123 --json 2> >(jq -r '.code') 1>/dev/null
+```
+
+Without `--json`, error output is unchanged (human-readable prose on stderr).
+
+Exceptions: `api` failures caused by missing `jq` or a failing `--jq` expression still use the structured stderr format but preserve exit status `2`. Partial failures from `copy-tree --fail-on-error` and `versions-purge` emit their result JSON to stdout and signal the partial failure with exit status `1` instead of a structured error on stderr.
+
 ### Read a Page
 ```bash
 # Read by page ID

@@ -4,6 +4,7 @@ const chalk = require('chalk');
 const ConfluenceClient = require('../../lib/confluence-client');
 const { getConfig } = require('../../lib/config');
 const Analytics = require('../../lib/analytics');
+const { emitJsonError } = require('../../lib/output');
 
 const WRITE_METHODS = ['POST', 'PUT', 'PATCH', 'DELETE'];
 
@@ -35,15 +36,21 @@ Endpoint resolution:
 `)
     .action(async (endpoint, options) => {
       const analytics = new Analytics();
+      // When the global --json flag is active, failures emit a single structured
+      // JSON object on stderr instead of prose (agents/scripts can then parse
+      // errors). Non-JSON output stays byte-identical.
+      const jsonMode = Boolean(program.opts().json);
       try {
-        const config = getConfig(getProfileName());
+        const config = getConfig(getProfileName(), { throwOnError: jsonMode });
         const client = new ConfluenceClient(config);
 
         const fields = {};
         for (const raw of options.field) {
           const idx = raw.indexOf('=');
           if (idx === -1) {
-            console.error(chalk.red(`Error: Invalid field "${raw}". Must be key=value.`));
+            const message = `Invalid field "${raw}". Must be key=value.`;
+            if (jsonMode) emitJsonError(null, { message, code: 'VALIDATION' });
+            else console.error(chalk.red(`Error: ${message}`));
             trackAndExit(analytics, 1);
           }
           fields[raw.slice(0, idx)] = raw.slice(idx + 1);
@@ -53,7 +60,9 @@ Endpoint resolution:
         for (const raw of options.header) {
           const idx = raw.indexOf(':');
           if (idx === -1) {
-            console.error(chalk.red(`Error: Invalid header "${raw}". Must be key:value.`));
+            const message = `Invalid header "${raw}". Must be key:value.`;
+            if (jsonMode) emitJsonError(null, { message, code: 'VALIDATION' });
+            else console.error(chalk.red(`Error: ${message}`));
             trackAndExit(analytics, 1);
           }
           extraHeaders[raw.slice(0, idx).trim()] = raw.slice(idx + 1).trim();
@@ -76,8 +85,15 @@ Endpoint resolution:
         const method = (options.method || (hasBody ? 'POST' : 'GET')).toUpperCase();
 
         if (config.readOnly && WRITE_METHODS.includes(method)) {
-          console.error(chalk.red('Error: This profile is in read-only mode. Write operations are not allowed.'));
-          console.error(chalk.yellow('Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.'));
+          if (jsonMode) {
+            emitJsonError(null, {
+              message: 'This profile is in read-only mode. Write operations are not allowed.',
+              code: 'VALIDATION',
+            });
+          } else {
+            console.error(chalk.red('Error: This profile is in read-only mode. Write operations are not allowed.'));
+            console.error(chalk.yellow('Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.'));
+          }
           trackAndExit(analytics, 1);
         }
 
@@ -118,16 +134,19 @@ Endpoint resolution:
             encoding: 'utf-8',
           });
           if (r.error) {
-            if (r.error.code === 'ENOENT') {
-              console.error(chalk.red('Error: jq is not installed (--jq requires jq in PATH).'));
-            } else {
-              console.error(chalk.red('Error: jq failed:'), r.error.message);
-            }
+            const message = r.error.code === 'ENOENT'
+              ? 'jq is not installed (--jq requires jq in PATH).'
+              : `jq failed: ${r.error.message}`;
+            if (jsonMode) emitJsonError(null, { message, code: 'VALIDATION' });
+            else if (r.error.code === 'ENOENT') console.error(chalk.red(`Error: ${message}`));
+            else console.error(chalk.red('Error: jq failed:'), r.error.message);
             trackAndExit(analytics, 2);
           }
           if (r.status !== 0) {
             const stderr = (r.stderr || '').toString().trim();
-            console.error(chalk.red(`Error: jq exited with status ${r.status}${stderr ? `\n${stderr}` : ''}`));
+            const message = `jq exited with status ${r.status}${stderr ? `\n${stderr}` : ''}`;
+            if (jsonMode) emitJsonError(null, { message, code: 'VALIDATION' });
+            else console.error(chalk.red(`Error: ${message}`));
             trackAndExit(analytics, 2);
           }
           output += r.stdout;
@@ -142,7 +161,9 @@ Endpoint resolution:
         analytics.track('api', true);
       } catch (error) {
         analytics.track('api', false);
-        if (error.response) {
+        if (jsonMode) {
+          emitJsonError(error);
+        } else if (error.response) {
           const errBody = error.response.data;
           const errStr = typeof errBody === 'string' ? errBody : JSON.stringify(errBody, null, 2);
           process.stderr.write(errStr + '\n');

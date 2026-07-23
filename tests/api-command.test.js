@@ -167,6 +167,37 @@ describe('api command', () => {
     });
   });
 
+  describe('--json structured errors', () => {
+    test('invalid field under --json emits one JSON error object on stderr, nothing on stdout', () => {
+      const { stderr, stdout } = runErr(['--json', 'api', '/rest/api/content', '-f', 'badfield']);
+      expect(stdout).toBe('');
+      const payload = JSON.parse(stderr);
+      expect(payload).toEqual({
+        error: 'Invalid field "badfield". Must be key=value.',
+        code: 'VALIDATION',
+        status: null,
+        details: null,
+      });
+    });
+
+    test('read-only block under --json emits structured VALIDATION error (no Tip prose)', () => {
+      const { stderr } = runErr(['--json', 'api', '/rest/api/content/123', '-X', 'DELETE'], {
+        env: { CONFLUENCE_READ_ONLY: 'true' },
+      });
+      const payload = JSON.parse(stderr);
+      expect(payload).toMatchObject({ code: 'VALIDATION', status: null });
+      expect(payload.error).toContain('read-only');
+      expect(stderr).not.toContain('Tip:');
+    });
+
+    test('without --json, invalid field stays human-readable prose (not JSON)', () => {
+      const { stderr } = runErr(['api', '/rest/api/content', '-f', 'badfield']);
+      expect(stderr).toContain('Error:');
+      expect(stderr).toContain('Invalid field');
+      expect(() => JSON.parse(stderr)).toThrow();
+    });
+  });
+
   describe('help output', () => {
     test('api command appears in help', () => {
       const output = run(['api', '--help']);
