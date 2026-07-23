@@ -17,7 +17,7 @@ const registerCommentCommands = require('./commands/comment');
 const registerExportCommand = require('./commands/export');
 const registerApiCommand = require('./commands/api');
 const { readStdin } = require('../lib/stdin-utils');
-const { emitJson, emitJsonError, jsonRequested } = require('../lib/output');
+const { emitJson, emitJsonError, jsonRequested, setJsonMode } = require('../lib/output');
 
 const READ_ONLY_MESSAGE = 'This profile is in read-only mode. Write operations are not allowed.';
 const READ_ONLY_TIP = 'Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.';
@@ -167,6 +167,7 @@ const JSON_COMMANDS = new Set([
 ]);
 
 program.hook('preAction', (thisCommand, actionCommand) => {
+  setJsonMode(program.opts().json);
   if (program.opts().json && !JSON_COMMANDS.has(actionCommand.name())) {
     const message = `--json is not supported by "${actionCommand.name()}". ` +
       `Supported commands: ${[...JSON_COMMANDS].join(', ')}.`;
