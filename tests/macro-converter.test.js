@@ -1143,6 +1143,76 @@ describe('MacroConverter <br> passthrough', () => {
   });
 });
 
+describe('MacroConverter passthrough tags in link/image title attributes', () => {
+  // Whitelisted inline tags (br|u|sub|sup|mark|details|summary) are stashed as
+  // placeholders before rendering and restored across the whole HTML string.
+  // When a placeholder lands inside an attribute value (a link/image `title`),
+  // restoring the raw tag would inject unescaped `<>"&` and produce storage XML
+  // that Confluence rejects. The restore step must XML-escape those, while
+  // leaving body-text passthrough byte-identical (see the <br> passthrough suite
+  // above, which must stay green).
+  const converter = new MacroConverter({ isCloud: true });
+
+  // Focused well-formedness check for this defect class: every attribute value
+  // must be free of raw `<`/`>`. htmlparser2 (xmlMode) is too lenient to flag
+  // these, so we scan attribute values directly.
+  const assertAttrsWellFormed = (xml) => {
+    const attrRe = /\b[\w:-]+\s*=\s*"([^"]*)"/g;
+    let m;
+    while ((m = attrRe.exec(xml)) !== null) {
+      expect(m[1]).not.toMatch(/[<>]/);
+    }
+  };
+
+  test('link title with <br> is XML-escaped, not restored raw', () => {
+    const result = converter.markdownToStorage('[x](https://example.com "<br>")');
+    expect(result).toContain('title="&lt;br&gt;"');
+    expect(result).not.toContain('title="<br>"');
+    assertAttrsWellFormed(result);
+  });
+
+  test('image title with <sub>...</sub> is XML-escaped, not restored raw', () => {
+    const result = converter.markdownToStorage('![img](https://example.com/i.png "cap<sub>x</sub>")');
+    expect(result).toContain('title="cap&lt;sub&gt;x&lt;/sub&gt;"');
+    expect(result).not.toContain('title="cap<sub>');
+    assertAttrsWellFormed(result);
+  });
+
+  test('same tag in body AND title: body stays raw XHTML, title gets escaped', () => {
+    const result = converter.markdownToStorage('Line a<br>b then [x](https://example.com "<br>")');
+    // body passthrough unchanged (self-closed by markdown/storage pipeline)
+    expect(result).toContain('a<br />b');
+    // attribute context escaped
+    expect(result).toContain('title="&lt;br&gt;"');
+    assertAttrsWellFormed(result);
+  });
+
+  test('all seven whitelisted tags in a title attribute are escaped', () => {
+    const tags = ['br', 'u', 'sub', 'sup', 'mark', 'details', 'summary'];
+    for (const tag of tags) {
+      const result = converter.markdownToStorage(`[x](https://example.com "a<${tag}>b")`);
+      expect(result).toContain(`title="a&lt;${tag}&gt;b"`);
+      assertAttrsWellFormed(result);
+    }
+  });
+
+  test('output with escaped title parses as well-formed XML', () => {
+    const htmlparser2 = require('htmlparser2');
+    const result = converter.markdownToStorage('![img](https://example.com/i.png "cap<sub>x</sub>") and text a<br>b');
+    let error = null;
+    const parser = new htmlparser2.Parser(
+      { onerror: (e) => { error = e; } },
+      { xmlMode: true, recognizeSelfClosing: true }
+    );
+    parser.write(`<root>${result}</root>`);
+    parser.end();
+    expect(error).toBeNull();
+    // xmlMode is lenient about attribute contents, so also assert no raw
+    // angle brackets survive inside any attribute value.
+    assertAttrsWellFormed(result);
+  });
+});
+
 describe('MacroConverter storageToMarkdown panel formatting', () => {
   const converter = new MacroConverter({ isCloud: true });
 
