@@ -1,4 +1,6 @@
 const { spawnSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { getConfig } = require('../lib/config');
 
@@ -234,7 +236,7 @@ describe('assertWritable', () => {
   });
 });
 
-describe('readOnly mode in the CLI', () => {
+describe('JSON errors in the CLI', () => {
   test('global --json write command emits one structured error on stderr', () => {
     const env = { ...process.env };
     for (const key of ENV_KEYS) delete env[key];
@@ -258,6 +260,35 @@ describe('readOnly mode in the CLI', () => {
       status: null,
       details: null,
     });
+  });
+
+  test('missing configuration emits one structured error on stderr', () => {
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-empty-config-'));
+    const env = { ...process.env };
+    for (const key of ENV_KEYS) delete env[key];
+    Object.assign(env, {
+      CONFLUENCE_CONFIG_DIR: configDir,
+      CONFLUENCE_CLI_ANALYTICS: 'false',
+    });
+
+    try {
+      const result = spawnSync(
+        process.execPath,
+        [CLI, '--json', 'spaces'],
+        { encoding: 'utf8', env }
+      );
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(JSON.parse(result.stderr)).toEqual({
+        error: 'No configuration found!',
+        code: 'VALIDATION',
+        status: null,
+        details: null,
+      });
+    } finally {
+      fs.rmSync(configDir, { recursive: true, force: true });
+    }
   });
 });
 

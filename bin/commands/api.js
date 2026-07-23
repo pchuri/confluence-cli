@@ -41,7 +41,7 @@ Endpoint resolution:
       // errors). Non-JSON output stays byte-identical.
       const jsonMode = Boolean(program.opts().json);
       try {
-        const config = getConfig(getProfileName());
+        const config = getConfig(getProfileName(), { throwOnError: jsonMode });
         const client = new ConfluenceClient(config);
 
         const fields = {};

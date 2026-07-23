@@ -98,7 +98,7 @@ function withClient(commandName, handler, { writable = false, onError = null } =
   return async (...actionArgs) => {
     const analytics = new Analytics();
     try {
-      const config = getConfig(getProfileName());
+      const config = getConfig(getProfileName(), { throwOnError: Boolean(program.opts().json) });
       if (writable) assertWritable(config);
       const client = new ConfluenceClient(config);
       await handler({ client, config, analytics, emitJson, wantsJson }, ...actionArgs);
