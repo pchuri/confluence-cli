@@ -817,7 +817,7 @@ confluence search --cql 'siteSearch ~ "release notes" and space = "MYSPACE"' --l
 
 ### Parsing failures under `--json`
 
-When you pass the global `--json` flag, command failures routed through the standard error handler (`handleCommandError`) and the `api` command's own error path are machine-parseable: the command prints **exactly one JSON object to stderr** (stdout stays empty) and, except as noted below, exits `1`. Parse stderr instead of matching prose:
+When you pass the global `--json` flag, command failures are machine-parseable: the command prints **exactly one JSON object to stderr** (stdout stays empty) and, except as noted below, exits `1`. This includes CLI parser and usage errors, unsupported-`--json` errors, read-only failures, configuration-loading failures, failures routed through the standard error handler, and the `api` command's own error path. Parse stderr instead of matching prose:
 
 ```json
 { "error": "<message>", "code": "<CODE>", "status": <httpStatus|null>, "details": <api body|null> }
@@ -825,4 +825,4 @@ When you pass the global `--json` flag, command failures routed through the stan
 
 `code` is one of `AUTH_FAILED` (401/403), `NOT_FOUND` (404), `VALIDATION` (bad args / local precondition), `API_ERROR` (other 4xx/5xx), `NETWORK` (connection/DNS/timeout), `UNKNOWN`. Branch on `code` rather than the human-readable `error` string, which may change. Without `--json`, errors remain human-readable prose on stderr.
 
-Exceptions: `api` failures caused by missing `jq` or a failing `--jq` expression still use the structured stderr format but preserve exit status `2`. CLI parser argument and usage errors, the unsupported-`--json` guard, and read-only or configuration-loading failures that exit before the standard handler still print human-readable prose. Partial failures from `copy-tree --fail-on-error` and `versions-purge` emit their result JSON to stdout and signal the partial failure with exit status `1` instead of a structured error on stderr.
+Exceptions: `api` failures caused by missing `jq` or a failing `--jq` expression still use the structured stderr format but preserve exit status `2`. Partial failures from `copy-tree --fail-on-error` and `versions-purge` emit their result JSON to stdout and signal the partial failure with exit status `1` instead of a structured error on stderr.
