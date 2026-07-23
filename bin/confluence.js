@@ -17,7 +17,7 @@ const registerCommentCommands = require('./commands/comment');
 const registerExportCommand = require('./commands/export');
 const registerApiCommand = require('./commands/api');
 const { readStdin } = require('../lib/stdin-utils');
-const { emitJson, jsonRequested } = require('../lib/output');
+const { emitJson, emitJsonError, jsonRequested } = require('../lib/output');
 
 function assertWritable(config) {
   if (config.readOnly) {
@@ -63,6 +63,13 @@ function formatApiErrorBody(data) {
 
 function handleCommandError(analytics, commandName, error, onExtra = null) {
   analytics.track(commandName, false);
+  // In --json mode, emit a single structured error object (on stderr, preserving
+  // the stdout=data / stderr=diagnostics contract) so agents/scripts can parse
+  // failures. Non-JSON callers keep the exact human-readable prose below.
+  if (program.opts().json) {
+    emitJsonError(error);
+    process.exit(1);
+  }
   console.error(chalk.red('Error:'), error.message);
   const apiDetail = formatApiErrorBody(error.response?.data);
   if (apiDetail && !onExtra) {

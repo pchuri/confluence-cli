@@ -187,6 +187,87 @@ describe('Global --json output flag', () => {
     expect(output).toEqual({ id: '600', title: 'Doomed', deleted: true });
   });
 
+  test('auth failure under --json emits one structured error object on stderr, nothing on stdout', async () => {
+    const authError = Object.assign(new Error('Authentication failed (401 Unauthorized).'), {
+      response: { status: 401, data: { message: 'Unauthorized', 'status-code': 401 } },
+    });
+    const { program } = await loadCli({ search: jest.fn(async () => { throw authError; }) });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+
+    await expect(runCli(program, ['search', 'foo', '--json'])).rejects.toThrow('exit');
+
+    // stdout carries no data on failure
+    expect(logSpy).not.toHaveBeenCalled();
+    // exactly one JSON object on stderr, fully parseable
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    const payload = JSON.parse(errSpy.mock.calls[0][0]);
+    expect(payload).toEqual({
+      error: 'Authentication failed (401 Unauthorized).',
+      code: 'AUTH_FAILED',
+      status: 401,
+      details: { message: 'Unauthorized', 'status-code': 401 },
+    });
+  });
+
+  test('API error with a response body under --json surfaces code, status and details', async () => {
+    const apiError = Object.assign(new Error('Request failed with status code 500'), {
+      response: { status: 500, data: { message: 'Internal Server Error' } },
+    });
+    const { program } = await loadCli({ getSpaces: jest.fn(async () => { throw apiError; }) });
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+
+    await expect(runCli(program, ['spaces', '--json'])).rejects.toThrow('exit');
+
+    const payload = JSON.parse(errSpy.mock.calls[0][0]);
+    expect(payload).toMatchObject({
+      code: 'API_ERROR',
+      status: 500,
+      details: { message: 'Internal Server Error' },
+    });
+  });
+
+  test('validation error (no HTTP response) under --json maps to VALIDATION with null status/details', async () => {
+    const { program } = await loadCli({
+      getPageInfo: jest.fn(async () => { throw new Error('Page 123 has no readable body.'); }),
+    });
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+
+    await expect(runCli(program, ['info', '123', '--json'])).rejects.toThrow('exit');
+
+    const payload = JSON.parse(errSpy.mock.calls[0][0]);
+    expect(payload).toEqual({
+      error: 'Page 123 has no readable body.',
+      code: 'VALIDATION',
+      status: null,
+      details: null,
+    });
+  });
+
+  test('without --json, failures stay human-readable prose (no JSON emitted)', async () => {
+    const authError = Object.assign(new Error('Authentication failed (401 Unauthorized).'), {
+      response: { status: 401, data: { message: 'Unauthorized' } },
+    });
+    const { program } = await loadCli({ search: jest.fn(async () => { throw authError; }) });
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    jest.spyOn(process, 'exit').mockImplementation(() => { throw new Error('exit'); });
+
+    await expect(runCli(program, ['search', 'foo'])).rejects.toThrow('exit');
+
+    // First stderr line is the chalk prose "Error:" label + message, not JSON
+    const first = errSpy.mock.calls[0];
+    expect(String(first[0])).toContain('Error:');
+    expect(String(first[1])).toBe('Authentication failed (401 Unauthorized).');
+    // Nothing on stderr is a parseable JSON object
+    const parsedAny = errSpy.mock.calls.some(c => {
+      try { JSON.parse(c[0]); return true; } catch { return false; }
+    });
+    expect(parsedAny).toBe(false);
+  });
+
   test('delete --json without --yes refuses instead of prompting', async () => {
     const deletePage = jest.fn();
     const { program } = await loadCli({

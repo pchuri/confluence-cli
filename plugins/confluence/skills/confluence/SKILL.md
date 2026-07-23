@@ -814,3 +814,13 @@ confluence search --cql 'siteSearch ~ "release notes" and space = "MYSPACE"' --l
 | `Profile "<name>" not found!` | Specified profile doesn't exist | Run `confluence profile list` to see available profiles |
 | `Cannot delete the only remaining profile.` | Tried to remove the last profile | Add another profile before removing |
 | `This profile is in read-only mode` | Write command used with a read-only profile | Use a writable profile or remove `readOnly` from config |
+
+### Parsing failures under `--json`
+
+When you pass the global `--json` flag, failures are machine-parseable too: the command prints **exactly one JSON object to stderr** (stdout stays empty) and exits `1`. Parse stderr instead of matching prose:
+
+```json
+{ "error": "<message>", "code": "<CODE>", "status": <httpStatus|null>, "details": <api body|null> }
+```
+
+`code` is one of `AUTH_FAILED` (401/403), `NOT_FOUND` (404), `VALIDATION` (bad args / local precondition), `API_ERROR` (other 4xx/5xx), `NETWORK` (connection/DNS/timeout), `UNKNOWN`. Branch on `code` rather than the human-readable `error` string, which may change. Without `--json`, errors remain human-readable prose on stderr.
