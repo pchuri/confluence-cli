@@ -140,8 +140,13 @@ describe('Global --json output flag', () => {
 
     await expect(runCli(program, ['read', '123', '--json'])).rejects.toThrow('process.exit called');
     expect(exitSpy).toHaveBeenCalledWith(1);
-    const msg = errSpy.mock.calls.map(c => String(c[0])).find(m => m.includes('--json'));
-    expect(msg).toContain('not supported');
+    expect(errSpy).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(errSpy.mock.calls[0][0])).toEqual({
+      error: expect.stringContaining('--json is not supported'),
+      code: 'VALIDATION',
+      status: null,
+      details: null,
+    });
   });
 
   test('find --json prints the page object directly', async () => {

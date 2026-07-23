@@ -130,6 +130,16 @@ program
   .option('--profile <name>', 'Use a specific configuration profile')
   .option('--json', 'Output raw JSON to stdout (for scripting / piping to jq)');
 
+program.configureOutput({
+  outputError: (message, write) => {
+    if (program.opts().json) {
+      emitJsonError(null, { message: message.trim(), code: 'VALIDATION' });
+      return;
+    }
+    write(message);
+  },
+});
+
 // Helper: resolve profile name from global --profile flag
 function getProfileName() {
   return program.opts().profile || undefined;
@@ -158,10 +168,9 @@ const JSON_COMMANDS = new Set([
 
 program.hook('preAction', (thisCommand, actionCommand) => {
   if (program.opts().json && !JSON_COMMANDS.has(actionCommand.name())) {
-    console.error(chalk.red(
-      `Error: --json is not supported by "${actionCommand.name()}". ` +
-      `Supported commands: ${[...JSON_COMMANDS].join(', ')}.`
-    ));
+    const message = `--json is not supported by "${actionCommand.name()}". ` +
+      `Supported commands: ${[...JSON_COMMANDS].join(', ')}.`;
+    emitJsonError(null, { message, code: 'VALIDATION' });
     process.exit(1);
   }
 });

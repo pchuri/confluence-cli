@@ -237,6 +237,22 @@ describe('assertWritable', () => {
 });
 
 describe('JSON errors in the CLI', () => {
+  test.each([
+    ['missing argument', ['--json', 'info']],
+    ['unknown command', ['--json', 'unknown-command']],
+  ])('%s emits one structured error on stderr', (name, args) => {
+    const result = spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8' });
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(JSON.parse(result.stderr)).toEqual({
+      error: expect.any(String),
+      code: 'VALIDATION',
+      status: null,
+      details: null,
+    });
+  });
+
   test('global --json write command emits one structured error on stderr', () => {
     const env = { ...process.env };
     for (const key of ENV_KEYS) delete env[key];
@@ -282,6 +298,35 @@ describe('JSON errors in the CLI', () => {
       expect(result.stdout).toBe('');
       expect(JSON.parse(result.stderr)).toEqual({
         error: 'No configuration found!',
+        code: 'VALIDATION',
+        status: null,
+        details: null,
+      });
+    } finally {
+      fs.rmSync(configDir, { recursive: true, force: true });
+    }
+  });
+
+  test.each([
+    ['standard command', ['--json', 'spaces']],
+    ['api command', ['--json', 'api', '/rest/api/content']],
+  ])('malformed configuration in %s emits one structured error on stderr', (name, args) => {
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-malformed-config-'));
+    const env = { ...process.env };
+    for (const key of ENV_KEYS) delete env[key];
+    Object.assign(env, {
+      CONFLUENCE_CONFIG_DIR: configDir,
+      CONFLUENCE_CLI_ANALYTICS: 'false',
+    });
+    fs.writeFileSync(path.join(configDir, 'config.json'), '{ not valid json');
+
+    try {
+      const result = spawnSync(process.execPath, [CLI, ...args], { encoding: 'utf8', env });
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(JSON.parse(result.stderr)).toEqual({
+        error: expect.any(String),
         code: 'VALIDATION',
         status: null,
         details: null,
