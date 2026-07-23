@@ -393,7 +393,7 @@ confluence create "Notes" ENG --content "hi" --json | jq -r '.id'   # capture th
 
 #### Structured errors
 
-When `--json` is active, command failures routed through the standard error handler (`handleCommandError`) and the `api` command's own error path are machine-parseable: the command prints exactly one JSON object to **stderr** (stdout stays empty) and exits with status `1`. This lets scripts and agents branch on covered failures without scraping prose. The shape is:
+When `--json` is active, command failures routed through the standard error handler (`handleCommandError`) and the `api` command's own error path are machine-parseable: the command prints exactly one JSON object to **stderr** (stdout stays empty) and, except as noted below, exits with status `1`. This lets scripts and agents branch on covered failures without scraping prose. The shape is:
 
 ```json
 {
@@ -416,7 +416,7 @@ confluence info 123 --json 2> >(jq -r '.code') 1>/dev/null
 
 Without `--json`, error output is unchanged (human-readable prose on stderr).
 
-Exceptions: CLI parser argument and usage errors, the unsupported-`--json` guard, and read-only or configuration-loading failures that exit before the standard handler still print human-readable prose. Partial failures from `copy-tree --fail-on-error` and `versions-purge` emit their result JSON to stdout and signal the partial failure with exit status `1` instead of a structured error on stderr.
+Exceptions: `api` failures caused by missing `jq` or a failing `--jq` expression still use the structured stderr format but preserve exit status `2`. CLI parser argument and usage errors, the unsupported-`--json` guard, and read-only or configuration-loading failures that exit before the standard handler still print human-readable prose. Partial failures from `copy-tree --fail-on-error` and `versions-purge` emit their result JSON to stdout and signal the partial failure with exit status `1` instead of a structured error on stderr.
 
 ### Read a Page
 ```bash
