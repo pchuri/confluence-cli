@@ -580,12 +580,12 @@ confluence spaces --limit 2000
 confluence spaces --all
 ```
 
-### List Child Pages
+### List Children
 ```bash
 # List direct child pages
 confluence children 123456789
 
-# List all descendants recursively
+# List descendant pages recursively
 confluence children 123456789 --recursive
 
 # List child folders instead of pages (Confluence Cloud only)
@@ -597,19 +597,19 @@ confluence children 123456789 --type all
 # Display as tree structure
 confluence children 123456789 --recursive --format tree
 
-# Show page IDs and URLs
+# Show child IDs and available URLs
 confluence children 123456789 --show-id --show-url
 
-# Limit recursion depth
+# Limit page recursion depth
 confluence children 123456789 --recursive --max-depth 3
 
 # Output as JSON for scripting
 confluence children 123456789 --recursive --json > children.json
 ```
 
-`children --json` returns structured metadata for each page, including `id`, `title`, `type`, `status`, `spaceKey`, `parentId`, `version`, and `url`. Recursive output also includes `depth`, and when available, `ancestors`.
+`children --json` returns structured metadata for each child, including `id`, `title`, `type`, `status`, `spaceKey`, `parentId`, `version`, and `url`. Recursive page entries also include `depth`, and when available, `ancestors`.
 
-Use `--type` to choose what is listed: `pages` (default, unchanged behavior), `folders`, or `all`. The `type` field on each item distinguishes `page` from `folder`, and the human-readable list marks folders with a `[folder]` tag. Folders are a Confluence Cloud concept; on Server/Data Center, `--type folders`/`all` prints a warning and lists no folders instead of failing.
+Use `--type` to choose what is listed: `pages` (default, unchanged behavior), `folders`, or `all`. The `type` field on each item distinguishes `page` from `folder`; when folders can appear, the human-readable list marks every item with `[page]` or `[folder]`, and tree output uses distinct page and folder icons. Folders are a Confluence Cloud concept; on Server/Data Center, `--type folders`/`all` prints a warning and skips folders instead of failing, while `all` still lists pages. When pages are included, `--recursive` lists their descendants as before, but folders remain limited to direct children of the requested page.
 
 Example recursive JSON item:
 ```json

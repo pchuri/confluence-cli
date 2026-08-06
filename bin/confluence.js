@@ -779,13 +779,13 @@ program
 // List children command
 program
   .command('children <pageId>')
-  .description('List child pages of a Confluence page')
-  .option('-r, --recursive', 'List all descendants recursively', false)
-  .option('--max-depth <number>', 'Maximum depth for recursive listing', '10')
+  .description('List child pages and folders of a Confluence page')
+  .option('-r, --recursive', 'Recurse through descendant pages; folders remain direct children', false)
+  .option('--max-depth <number>', 'Maximum page recursion depth', '10')
   .option('--type <type>', 'Content type to list: pages, folders, all (folders are Cloud-only)', 'pages')
   .option('--format <format>', 'Output format (list, tree). "json" is deprecated — use --json', 'list')
-  .option('--show-url', 'Show page URLs', false)
-  .option('--show-id', 'Show page IDs', false)
+  .option('--show-url', 'Show available child URLs', false)
+  .option('--show-id', 'Show child IDs', false)
   .action(withClient('children', async ({ client, config, analytics, wantsJson, emitJson }, pageId, options) => {
     const format = (options.format || 'list').toLowerCase();
     const jsonMode = wantsJson(options);
