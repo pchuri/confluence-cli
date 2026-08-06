@@ -1,3 +1,10 @@
+# [2.20.0](https://github.com/pchuri/confluence-cli/compare/v2.19.1...v2.20.0) (2026-08-06)
+
+
+### Features
+
+* list folders with the children command ([#224](https://github.com/pchuri/confluence-cli/issues/224)) ([91a3b9d](https://github.com/pchuri/confluence-cli/commit/91a3b9d77cbb37dcbc250fd789b929ac4f0f9e6a))
+
 ## [2.19.1](https://github.com/pchuri/confluence-cli/compare/v2.19.0...v2.19.1) (2026-07-23)
 
 
