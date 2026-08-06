@@ -242,13 +242,14 @@ confluence spaces
 List child pages of a page.
 
 ```sh
-confluence children <pageId> [--recursive] [--max-depth <number>] [--format list|tree|json] [--show-id] [--show-url]
+confluence children <pageId> [--recursive] [--max-depth <number>] [--type pages|folders|all] [--format list|tree|json] [--show-id] [--show-url]
 ```
 
 | Option | Default | Description |
 |---|---|---|
 | `--recursive` | false | List all descendants recursively |
 | `--max-depth` | `10` | Maximum depth for recursive listing |
+| `--type` | `pages` | Content type to list: `pages`, `folders`, or `all` (folders are Confluence Cloud only) |
 | `--format` | `list` | Output format: `list`, `tree`, or `json` |
 | `--show-id` | false | Show page IDs |
 | `--show-url` | false | Show page URLs |
@@ -257,6 +258,7 @@ confluence children <pageId> [--recursive] [--max-depth <number>] [--format list
 confluence children 123456789
 confluence children 123456789 --recursive --format json
 confluence children 123456789 --recursive --format tree --show-id
+confluence children 123456789 --type all
 ```
 
 ---

@@ -27,7 +27,9 @@ describe('CLI metadata and storage output', () => {
       getPageInfo: jest.fn(),
       extractPageId: jest.fn(async (pageId) => String(pageId)),
       getChildPages: jest.fn(),
+      getChildFolders: jest.fn(async () => []),
       getAllDescendantPages: jest.fn(),
+      isCloud: jest.fn(() => true),
       buildUrl: jest.fn((value) => value),
       webUrlPrefix: '/wiki',
       ...clientOverrides
@@ -209,6 +211,111 @@ describe('CLI metadata and storage output', () => {
     });
     expect(output.children[0].depth).toBeUndefined();
     expect(output.children[0].ancestors).toBeUndefined();
+  });
+
+  test('children defaults to pages and does not query folders', async () => {
+    const { program, client } = await loadCli({
+      getChildPages: jest.fn(async () => ([
+        { id: '200', title: 'Child Page', type: 'page', status: 'current', parentId: '123' }
+      ]))
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['children', '123', '--format', 'json']);
+
+    expect(client.getChildPages).toHaveBeenCalledWith('123');
+    expect(client.getChildFolders).not.toHaveBeenCalled();
+    const output = JSON.parse(logSpy.mock.calls[0][0]);
+    expect(output.children.map((c) => c.type)).toEqual(['page']);
+  });
+
+  test('children --type folders lists only folders with type indication', async () => {
+    const { program, client } = await loadCli({
+      getChildFolders: jest.fn(async () => ([
+        {
+          id: '400',
+          title: 'Docs Folder',
+          type: 'folder',
+          status: 'current',
+          spaceKey: null,
+          parentId: '123',
+          version: null,
+          url: null
+        }
+      ]))
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['children', '123', '--type', 'folders', '--format', 'json']);
+
+    expect(client.getChildPages).not.toHaveBeenCalled();
+    expect(client.getChildFolders).toHaveBeenCalledWith('123');
+    const output = JSON.parse(logSpy.mock.calls[0][0]);
+    expect(output).toEqual({
+      pageId: '123',
+      childCount: 1,
+      children: [
+        {
+          id: '400',
+          title: 'Docs Folder',
+          type: 'folder',
+          status: 'current',
+          spaceKey: null,
+          parentId: '123',
+          version: null,
+          url: null
+        }
+      ]
+    });
+  });
+
+  test('children --type all lists pages and folders together', async () => {
+    const { program, client } = await loadCli({
+      getChildPages: jest.fn(async () => ([
+        { id: '200', title: 'Child Page', type: 'page', status: 'current', spaceKey: 'ENG', parentId: '123', version: 4, url: null }
+      ])),
+      getChildFolders: jest.fn(async () => ([
+        { id: '400', title: 'Docs Folder', type: 'folder', status: 'current', spaceKey: null, parentId: '123', version: null, url: null }
+      ]))
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['children', '123', '--type', 'all', '--format', 'json']);
+
+    expect(client.getChildPages).toHaveBeenCalledWith('123');
+    expect(client.getChildFolders).toHaveBeenCalledWith('123');
+    const output = JSON.parse(logSpy.mock.calls[0][0]);
+    expect(output.childCount).toBe(2);
+    expect(output.children.map((c) => c.type)).toEqual(['page', 'folder']);
+  });
+
+  test('children --type folders on non-Cloud warns and lists nothing', async () => {
+    const { program, client } = await loadCli({
+      isCloud: jest.fn(() => false)
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    await runCli(program, ['children', '123', '--type', 'folders']);
+
+    expect(client.getChildFolders).not.toHaveBeenCalled();
+    const warnings = errorSpy.mock.calls.map((call) => stripAnsi(call[0]));
+    expect(warnings.some((line) => line.includes('only supported on Confluence Cloud'))).toBe(true);
+    const messages = logSpy.mock.calls.map((call) => stripAnsi(call[0]));
+    expect(messages).toContain('No child folders found.');
+  });
+
+  test('children rejects an invalid --type value', async () => {
+    const { program } = await loadCli();
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(runCli(program, ['children', '123', '--type', 'bogus'])).rejects.toThrow('process.exit called');
+    expect(exitSpy).toHaveBeenCalledWith(1);
+    const errors = errorSpy.mock.calls.map((call) => stripAnsi(call.join(' ')));
+    expect(errors.some((line) => line.includes('Invalid --type'))).toBe(true);
   });
 
   test('children --recursive --format json includes depth and ancestors', async () => {

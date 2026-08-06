@@ -1149,6 +1149,36 @@ describe('ConfluenceClient', () => {
 
       mock.restore();
     });
+
+    test('getChildFolders queries the v2 direct-children endpoint and keeps only folders', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('https://test.atlassian.net/api/v2/pages/123/direct-children').reply(config => {
+        expect(config.params.limit).toBe(250);
+        return [200, {
+          results: [
+            { id: '200', title: 'Child Page', type: 'page', status: 'current' },
+            { id: '400', title: 'Docs Folder', type: 'folder', status: 'current' },
+            { id: '500', title: 'A Whiteboard', type: 'whiteboard', status: 'current' }
+          ]
+        }];
+      });
+
+      const folders = await client.getChildFolders('123');
+      expect(folders).toEqual([
+        {
+          id: '400',
+          title: 'Docs Folder',
+          type: 'folder',
+          status: 'current',
+          spaceKey: null,
+          parentId: '123',
+          version: null,
+          url: null
+        }
+      ]);
+
+      mock.restore();
+    });
   });
 
   describe('extractPageId', () => {

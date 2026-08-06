@@ -588,6 +588,12 @@ confluence children 123456789
 # List all descendants recursively
 confluence children 123456789 --recursive
 
+# List child folders instead of pages (Confluence Cloud only)
+confluence children 123456789 --type folders
+
+# List both pages and folders; each item shows its content type
+confluence children 123456789 --type all
+
 # Display as tree structure
 confluence children 123456789 --recursive --format tree
 
@@ -602,6 +608,8 @@ confluence children 123456789 --recursive --json > children.json
 ```
 
 `children --json` returns structured metadata for each page, including `id`, `title`, `type`, `status`, `spaceKey`, `parentId`, `version`, and `url`. Recursive output also includes `depth`, and when available, `ancestors`.
+
+Use `--type` to choose what is listed: `pages` (default, unchanged behavior), `folders`, or `all`. The `type` field on each item distinguishes `page` from `folder`, and the human-readable list marks folders with a `[folder]` tag. Folders are a Confluence Cloud concept; on Server/Data Center, `--type folders`/`all` prints a warning and lists no folders instead of failing.
 
 Example recursive JSON item:
 ```json
