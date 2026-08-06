@@ -76,6 +76,8 @@ Required classic scopes for scoped tokens:
 - Write: add `write:confluence-content`, `write:confluence-file`, `write:confluence-space`
 - Attachments: `readonly:content.attachment:confluence` (download), `write:confluence-file` (upload)
 
+Folder listing with `children --type folders`/`all` also requires the granular scope `read:hierarchical-content:confluence`.
+
 **Read-only mode (recommended for AI agents):**
 
 Prevents all write operations (create, update, delete, move, etc.) at the profile level. Useful when giving an AI agent access to Confluence for reading only.
@@ -239,25 +241,30 @@ confluence spaces
 
 ### `children <pageId>`
 
-List child pages of a page.
+List child pages and Confluence Cloud folders of a page.
 
 ```sh
-confluence children <pageId> [--recursive] [--max-depth <number>] [--format list|tree|json] [--show-id] [--show-url]
+confluence children <pageId> [--recursive] [--max-depth <number>] [--type pages|folders|all] [--format list|tree] [--json] [--show-id] [--show-url]
 ```
 
 | Option | Default | Description |
 |---|---|---|
-| `--recursive` | false | List all descendants recursively |
-| `--max-depth` | `10` | Maximum depth for recursive listing |
-| `--format` | `list` | Output format: `list`, `tree`, or `json` |
-| `--show-id` | false | Show page IDs |
-| `--show-url` | false | Show page URLs |
+| `--recursive` | false | Recurse through descendant pages; folders remain limited to direct children |
+| `--max-depth` | `10` | Maximum page recursion depth |
+| `--type` | `pages` | Content type to list: `pages`, `folders`, or `all` (folders are Confluence Cloud only) |
+| `--format` | `list` | Human-readable output format: `list` or `tree` |
+| `--json` | false | Emit structured JSON |
+| `--show-id` | false | Show child IDs |
+| `--show-url` | false | Show available child URLs |
 
 ```sh
 confluence children 123456789
-confluence children 123456789 --recursive --format json
+confluence children 123456789 --recursive --json
 confluence children 123456789 --recursive --format tree --show-id
+confluence children 123456789 --type all
 ```
+
+The default `pages` mode preserves the existing output. In `folders` and `all` modes, list output tags every item as `[page]` or `[folder]`, and tree output uses distinct page and folder icons. On Server/Data Center, folder modes warn instead of failing; `folders` produces an empty result, while `all` still lists pages.
 
 ---
 
@@ -779,7 +786,7 @@ confluence export 123456789 --format markdown --dest ./local-docs
 ### Process children as JSON
 
 ```sh
-confluence children 123456789 --recursive --format json | jq '.[].id'
+confluence children 123456789 --recursive --json | jq '.children[].id'
 ```
 
 ### Search and process results
@@ -794,7 +801,7 @@ confluence search --cql 'siteSearch ~ "release notes" and space = "MYSPACE"' --l
 
 - **Always use `--yes`** on destructive commands (`delete`, `comment-delete`, `attachment-delete`) to avoid interactive prompts blocking the agent.
 - **Prefer `--format markdown`** when creating or updating content from agent-generated text — it's the most natural format and the API converts it automatically.
-- **Use `--format json`** on `children` and `comments` for machine-parseable output.
+- **Use `--json`** on `children` and `comments` for machine-parseable output.
 - **ANSI color codes**: stdout may contain ANSI escape sequences. Pipe through `| cat` or use `NO_COLOR=1` if your downstream tool doesn't handle them.
 - **Page ID vs URL**: when you have a Confluence URL, extract `?pageId=<number>` and pass the number. Do not pass pretty/display URLs — they are not supported.
 - **Cross-space moves**: `confluence move` only works within the same space. Moving across spaces is not supported.

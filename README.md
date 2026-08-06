@@ -364,7 +364,7 @@ When creating a scoped token, select the following [classic scopes](https://deve
 | `write:confluence-file` | Uploading attachments (`attachments --upload`) |
 | `write:confluence-space` | Managing spaces |
 
-For **read-only** usage, select at minimum: `read:confluence-content.all`, `read:confluence-content.summary`, `read:confluence-space.summary`, and `search:confluence`.
+For **read-only** usage, select at minimum the classic scopes `read:confluence-content.all`, `read:confluence-content.summary`, `read:confluence-space.summary`, and `search:confluence`. Listing folders with `children --type folders`/`all` additionally requires the granular scope `read:hierarchical-content:confluence`.
 
 **On-premise / Data Center:** Use your Confluence username and password for basic authentication.
 
@@ -580,28 +580,36 @@ confluence spaces --limit 2000
 confluence spaces --all
 ```
 
-### List Child Pages
+### List Children
 ```bash
 # List direct child pages
 confluence children 123456789
 
-# List all descendants recursively
+# List descendant pages recursively
 confluence children 123456789 --recursive
+
+# List child folders instead of pages (Confluence Cloud only)
+confluence children 123456789 --type folders
+
+# List both pages and folders; each item shows its content type
+confluence children 123456789 --type all
 
 # Display as tree structure
 confluence children 123456789 --recursive --format tree
 
-# Show page IDs and URLs
+# Show child IDs and available URLs
 confluence children 123456789 --show-id --show-url
 
-# Limit recursion depth
+# Limit page recursion depth
 confluence children 123456789 --recursive --max-depth 3
 
 # Output as JSON for scripting
 confluence children 123456789 --recursive --json > children.json
 ```
 
-`children --json` returns structured metadata for each page, including `id`, `title`, `type`, `status`, `spaceKey`, `parentId`, `version`, and `url`. Recursive output also includes `depth`, and when available, `ancestors`.
+`children --json` returns structured metadata for each child, including `id`, `title`, `type`, `status`, `spaceKey`, `parentId`, `version`, and `url`. Recursive page entries also include `depth`, and when available, `ancestors`.
+
+Use `--type` to choose what is listed: `pages` (default, unchanged behavior), `folders`, or `all`. The `type` field on each item distinguishes `page` from `folder`; when folders can appear, the human-readable list marks every item with `[page]` or `[folder]`, and tree output uses distinct page and folder icons. Folders are a Confluence Cloud concept; on Server/Data Center, `--type folders`/`all` prints a warning and skips folders instead of failing, while `all` still lists pages. When pages are included, `--recursive` lists their descendants as before, but folders remain limited to direct children of the requested page.
 
 Example recursive JSON item:
 ```json
@@ -864,7 +872,7 @@ confluence stats
 | `search <query>` | Search for pages | `--json`, `--limit <number>`, `--start <number>` |
 | `spaces` | List available spaces | `--json`, `--limit <number>`, `--all` |
 | `find <title>` | Find a page by its title | `--space <spaceKey>`, `--json` |
-| `children <pageId>` | List child pages of a page | `--recursive`, `--max-depth <number>`, `--format <list\|tree>`, `--json`, `--show-url`, `--show-id` |
+| `children <pageId>` | List child pages and folders of a page | `--recursive`, `--max-depth <number>`, `--type <pages\|folders\|all>`, `--format <list\|tree>`, `--json`, `--show-url`, `--show-id` |
 | `create <title> <spaceKey>` | Create a new page or folder | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--type <page\|folder>`, `--json` |
 | `create-child <title> <parentId>` | Create a child page or folder | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--type <page\|folder>`, `--json` |
 | `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--copy-suffix <text>`, `--dry-run`, `--fail-on-error`, `--quiet`, `--json` |

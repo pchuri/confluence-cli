@@ -512,6 +512,7 @@ describe('ConfluenceClient', () => {
 
       await expect(scopedClient.readPage('123')).rejects.toThrow(/scoped API token/);
       await expect(scopedClient.readPage('123')).rejects.toThrow(/read:confluence-content\.all/);
+      await expect(scopedClient.readPage('123')).rejects.toThrow(/read:hierarchical-content:confluence/);
       mock.restore();
     });
 
@@ -1146,6 +1147,56 @@ describe('ConfluenceClient', () => {
 
       const pages = await client.getChildPages('123', 500, { includeAncestors: true });
       expect(pages[0].ancestors).toEqual([{ id: '123', type: 'page', title: 'Parent Page' }]);
+
+      mock.restore();
+    });
+
+    test('getChildFolders follows v2 pagination and keeps only folders', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('https://test.atlassian.net/api/v2/pages/123/direct-children').reply(config => {
+        expect(config.params.limit).toBe(250);
+        if (!config.params.cursor) {
+          return [200, {
+            results: [
+              { id: '200', title: 'Child Page', type: 'page', status: 'current' },
+              { id: '400', title: 'Docs Folder', type: 'folder', status: 'current' }
+            ],
+            _links: { next: '/api/v2/pages/123/direct-children?cursor=next-page' }
+          }];
+        }
+        expect(config.params.cursor).toBe('next-page');
+        return [200, {
+          results: [
+            { id: '500', title: 'A Whiteboard', type: 'whiteboard', status: 'current' },
+            { id: '600', title: 'Runbooks Folder', type: 'folder', status: 'current' }
+          ],
+          _links: {}
+        }];
+      });
+
+      const folders = await client.getChildFolders('123');
+      expect(folders).toEqual([
+        {
+          id: '400',
+          title: 'Docs Folder',
+          type: 'folder',
+          status: 'current',
+          spaceKey: null,
+          parentId: '123',
+          version: null,
+          url: null
+        },
+        {
+          id: '600',
+          title: 'Runbooks Folder',
+          type: 'folder',
+          status: 'current',
+          spaceKey: null,
+          parentId: '123',
+          version: null,
+          url: null
+        }
+      ]);
 
       mock.restore();
     });

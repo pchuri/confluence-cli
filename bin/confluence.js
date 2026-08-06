@@ -779,30 +779,51 @@ program
 // List children command
 program
   .command('children <pageId>')
-  .description('List child pages of a Confluence page')
-  .option('-r, --recursive', 'List all descendants recursively', false)
-  .option('--max-depth <number>', 'Maximum depth for recursive listing', '10')
+  .description('List child pages and folders of a Confluence page')
+  .option('-r, --recursive', 'Recurse through descendant pages; folders remain direct children', false)
+  .option('--max-depth <number>', 'Maximum page recursion depth', '10')
+  .option('--type <type>', 'Content type to list: pages, folders, all (folders are Cloud-only)', 'pages')
   .option('--format <format>', 'Output format (list, tree). "json" is deprecated — use --json', 'list')
-  .option('--show-url', 'Show page URLs', false)
-  .option('--show-id', 'Show page IDs', false)
+  .option('--show-url', 'Show available child URLs', false)
+  .option('--show-id', 'Show child IDs', false)
   .action(withClient('children', async ({ client, config, analytics, wantsJson, emitJson }, pageId, options) => {
     const format = (options.format || 'list').toLowerCase();
     const jsonMode = wantsJson(options);
 
+    const type = (options.type || 'pages').toLowerCase();
+    if (!['pages', 'folders', 'all'].includes(type)) {
+      throw new Error(`Invalid --type "${options.type}". Valid values are: pages, folders, all.`);
+    }
+    const includePages = type === 'pages' || type === 'all';
+    const includeFolders = type === 'folders' || type === 'all';
+
     // Extract page ID from URL if needed
     const resolvedPageId = await client.extractPageId(pageId);
 
-    // Get children
-    let children;
-    if (options.recursive) {
-      const maxDepth = parseInt(options.maxDepth) || 10;
-      children = await client.getAllDescendantPages(
-        resolvedPageId,
-        maxDepth,
-        { includeAncestors: jsonMode }
-      );
-    } else {
-      children = await client.getChildPages(resolvedPageId);
+    // Get child pages
+    let children = [];
+    if (includePages) {
+      if (options.recursive) {
+        const maxDepth = parseInt(options.maxDepth) || 10;
+        children = await client.getAllDescendantPages(
+          resolvedPageId,
+          maxDepth,
+          { includeAncestors: jsonMode }
+        );
+      } else {
+        children = await client.getChildPages(resolvedPageId);
+      }
+    }
+
+    // Get child folders (Confluence Cloud only). On Server/DC there is no
+    // folder content type, so degrade gracefully instead of crashing.
+    if (includeFolders) {
+      if (client.isCloud()) {
+        const folders = await client.getChildFolders(resolvedPageId);
+        children = children.concat(folders);
+      } else {
+        console.error(chalk.yellow('Folders are only supported on Confluence Cloud; none were listed.'));
+      }
     }
 
     if (children.length === 0) {
@@ -813,7 +834,8 @@ program
           children: []
         });
       } else {
-        console.log(chalk.yellow('No child pages found.'));
+        const emptyNoun = type === 'folders' ? 'child folders' : type === 'all' ? 'children' : 'child pages';
+        console.log(chalk.yellow(`No ${emptyNoun} found.`));
       }
       analytics.track('children', true);
       return;
@@ -858,21 +880,26 @@ program
       printTree(tree, client, config, options, 1);
 
       console.log('');
-      console.log(chalk.gray(`Total: ${children.length} child page${children.length === 1 ? '' : 's'}`));
+      console.log(chalk.gray(`Total: ${children.length} ${totalLabel(type, children.length)}`));
     } else {
       // List format (default)
-      console.log(chalk.blue('Child pages:'));
+      console.log(chalk.blue(type === 'pages' ? 'Child pages:' : 'Children:'));
       console.log('');
 
       children.forEach((page, index) => {
         let output = `${index + 1}. ${chalk.green(page.title)}`;
 
+        // Indicate the content type whenever folders may appear in the output.
+        if (includeFolders) {
+          output += ` ${chalk.cyan(`[${page.type === 'folder' ? 'folder' : 'page'}]`)}`;
+        }
+
         if (options.showId) {
           output += ` ${chalk.gray(`(ID: ${page.id})`)}`;
         }
 
-        if (options.showUrl) {
-          const url = `${client.buildUrl(`${client.webUrlPrefix}/spaces/${page.space?.key}/pages/${page.id}`)}`;
+        const url = options.showUrl ? childUrl(page, client) : null;
+        if (url) {
           output += `\n   ${chalk.gray(url)}`;
         }
 
@@ -884,11 +911,26 @@ program
       });
 
       console.log('');
-      console.log(chalk.gray(`Total: ${children.length} child page${children.length === 1 ? '' : 's'}`));
+      console.log(chalk.gray(`Total: ${children.length} ${totalLabel(type, children.length)}`));
     }
 
     analytics.track('children', true);
   }));
+
+// Pluralized noun for the "Total: N ..." summary line. Keeps the historical
+// "child page(s)" wording for the default (pages) type for byte-compatibility.
+function totalLabel(type, count) {
+  const noun = type === 'pages' ? 'child page' : 'item';
+  return `${noun}${count === 1 ? '' : 's'}`;
+}
+
+function childUrl(child, client) {
+  if (child.type === 'folder') {
+    return child.url || null;
+  }
+
+  return client.buildUrl(`${client.webUrlPrefix}/spaces/${child.space?.key}/pages/${child.id}`);
+}
 
 // Helper function to build tree structure
 function buildTree(pages, rootId) {
@@ -925,14 +967,15 @@ function printTree(nodes, client, config, options, depth = 1) {
     const indent = '  '.repeat(depth - 1);
     const prefix = isLast ? '└── ' : '├── ';
     
-    let output = `${indent}${prefix}📄 ${chalk.green(node.title)}`;
+    const icon = node.type === 'folder' ? '📁' : '📄';
+    let output = `${indent}${prefix}${icon} ${chalk.green(node.title)}`;
     
     if (options.showId) {
       output += ` ${chalk.gray(`(ID: ${node.id})`)}`;
     }
     
-    if (options.showUrl) {
-      const url = `${client.buildUrl(`${client.webUrlPrefix}/spaces/${node.space?.key}/pages/${node.id}`)}`;
+    const url = options.showUrl ? childUrl(node, client) : null;
+    if (url) {
       output += `\n${indent}${isLast ? '    ' : '│   '}${chalk.gray(url)}`;
     }
     
