@@ -358,13 +358,14 @@ When creating a scoped token, select the following [classic scopes](https://deve
 | `read:confluence-content.all` | Reading pages and blog posts (`read`, `info`) |
 | `read:confluence-content.summary` | Reading content summaries and metadata (`read`, `info`) |
 | `read:confluence-space.summary` | Listing spaces (`spaces`) |
+| `read:hierarchical-content:confluence` | Listing folders (`children --type folders`/`all`) |
 | `search:confluence` | Searching content (`search`) |
 | `readonly:content.attachment:confluence` | Downloading attachments (`attachments --download`) |
 | `write:confluence-content` | Creating and updating pages (`create`, `update`) |
 | `write:confluence-file` | Uploading attachments (`attachments --upload`) |
 | `write:confluence-space` | Managing spaces |
 
-For **read-only** usage, select at minimum: `read:confluence-content.all`, `read:confluence-content.summary`, `read:confluence-space.summary`, and `search:confluence`.
+For **read-only** usage, select at minimum: `read:confluence-content.all`, `read:confluence-content.summary`, `read:confluence-space.summary`, `read:hierarchical-content:confluence`, and `search:confluence`.
 
 **On-premise / Data Center:** Use your Confluence username and password for basic authentication.
 
@@ -872,7 +873,7 @@ confluence stats
 | `search <query>` | Search for pages | `--json`, `--limit <number>`, `--start <number>` |
 | `spaces` | List available spaces | `--json`, `--limit <number>`, `--all` |
 | `find <title>` | Find a page by its title | `--space <spaceKey>`, `--json` |
-| `children <pageId>` | List child pages of a page | `--recursive`, `--max-depth <number>`, `--format <list\|tree>`, `--json`, `--show-url`, `--show-id` |
+| `children <pageId>` | List child pages and folders of a page | `--recursive`, `--max-depth <number>`, `--type <pages\|folders\|all>`, `--format <list\|tree>`, `--json`, `--show-url`, `--show-id` |
 | `create <title> <spaceKey>` | Create a new page or folder | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--type <page\|folder>`, `--json` |
 | `create-child <title> <parentId>` | Create a child page or folder | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--type <page\|folder>`, `--json` |
 | `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--copy-suffix <text>`, `--dry-run`, `--fail-on-error`, `--quiet`, `--json` |

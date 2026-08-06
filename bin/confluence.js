@@ -821,7 +821,7 @@ program
       if (client.isCloud()) {
         const folders = await client.getChildFolders(resolvedPageId);
         children = children.concat(folders);
-      } else if (!jsonMode) {
+      } else {
         console.error(chalk.yellow('Folders are only supported on Confluence Cloud; none were listed.'));
       }
     }
@@ -898,8 +898,8 @@ program
           output += ` ${chalk.gray(`(ID: ${page.id})`)}`;
         }
 
-        if (options.showUrl) {
-          const url = `${client.buildUrl(`${client.webUrlPrefix}/spaces/${page.space?.key}/pages/${page.id}`)}`;
+        const url = options.showUrl ? childUrl(page, client) : null;
+        if (url) {
           output += `\n   ${chalk.gray(url)}`;
         }
 
@@ -922,6 +922,17 @@ program
 function totalLabel(type, count) {
   const noun = type === 'pages' ? 'child page' : 'item';
   return `${noun}${count === 1 ? '' : 's'}`;
+}
+
+function childUrl(child, client) {
+  if (child.url) {
+    return child.url;
+  }
+
+  const spaceKey = child.spaceKey || child.space?.key;
+  return spaceKey
+    ? client.buildUrl(`${client.webUrlPrefix}/spaces/${spaceKey}/pages/${child.id}`)
+    : null;
 }
 
 // Helper function to build tree structure
@@ -966,8 +977,8 @@ function printTree(nodes, client, config, options, depth = 1) {
       output += ` ${chalk.gray(`(ID: ${node.id})`)}`;
     }
     
-    if (options.showUrl) {
-      const url = `${client.buildUrl(`${client.webUrlPrefix}/spaces/${node.space?.key}/pages/${node.id}`)}`;
+    const url = options.showUrl ? childUrl(node, client) : null;
+    if (url) {
       output += `\n${indent}${isLast ? '    ' : '│   '}${chalk.gray(url)}`;
     }
     

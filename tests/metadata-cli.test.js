@@ -289,20 +289,39 @@ describe('CLI metadata and storage output', () => {
     expect(output.children.map((c) => c.type)).toEqual(['page', 'folder']);
   });
 
-  test('children --type folders on non-Cloud warns and lists nothing', async () => {
+  test('children --type folders on non-Cloud warns in JSON mode and lists nothing', async () => {
     const { program, client } = await loadCli({
       isCloud: jest.fn(() => false)
     });
     const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
-    await runCli(program, ['children', '123', '--type', 'folders']);
+    await runCli(program, ['--json', 'children', '123', '--type', 'folders']);
 
     expect(client.getChildFolders).not.toHaveBeenCalled();
     const warnings = errorSpy.mock.calls.map((call) => stripAnsi(call[0]));
     expect(warnings.some((line) => line.includes('only supported on Confluence Cloud'))).toBe(true);
-    const messages = logSpy.mock.calls.map((call) => stripAnsi(call[0]));
-    expect(messages).toContain('No child folders found.');
+    expect(JSON.parse(logSpy.mock.calls[0][0])).toEqual({
+      pageId: '123',
+      childCount: 0,
+      children: []
+    });
+  });
+
+  test('children --show-url omits unavailable folder URLs', async () => {
+    const { program, client } = await loadCli({
+      getChildFolders: jest.fn(async () => ([
+        { id: '400', title: 'Docs Folder', type: 'folder', parentId: '123', url: null }
+      ]))
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['children', '123', '--type', 'folders', '--show-url']);
+
+    const output = logSpy.mock.calls.map((call) => stripAnsi(call[0])).join('\n');
+    expect(output).toContain('Docs Folder [folder]');
+    expect(output).not.toContain('/spaces/undefined/');
+    expect(client.buildUrl).not.toHaveBeenCalled();
   });
 
   test('children rejects an invalid --type value', async () => {
