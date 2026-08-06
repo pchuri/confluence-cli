@@ -324,6 +324,28 @@ describe('CLI metadata and storage output', () => {
     expect(client.buildUrl).not.toHaveBeenCalled();
   });
 
+  test('children --show-url preserves legacy page URLs', async () => {
+    const { program, client } = await loadCli({
+      getChildPages: jest.fn(async () => ([
+        {
+          id: '200',
+          title: 'Child Page',
+          type: 'page',
+          space: { key: 'ENG' },
+          url: 'https://test.atlassian.net/wiki/spaces/ENG/pages/200/Child+Page'
+        }
+      ]))
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['children', '123', '--show-url']);
+
+    expect(client.buildUrl).toHaveBeenCalledWith('/wiki/spaces/ENG/pages/200');
+    const output = logSpy.mock.calls.map((call) => stripAnsi(call[0])).join('\n');
+    expect(output).toContain('/wiki/spaces/ENG/pages/200');
+    expect(output).not.toContain('/Child+Page');
+  });
+
   test('children rejects an invalid --type value', async () => {
     const { program } = await loadCli();
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});

@@ -925,14 +925,11 @@ function totalLabel(type, count) {
 }
 
 function childUrl(child, client) {
-  if (child.url) {
-    return child.url;
+  if (child.type === 'folder') {
+    return child.url || null;
   }
 
-  const spaceKey = child.spaceKey || child.space?.key;
-  return spaceKey
-    ? client.buildUrl(`${client.webUrlPrefix}/spaces/${spaceKey}/pages/${child.id}`)
-    : null;
+  return client.buildUrl(`${client.webUrlPrefix}/spaces/${child.space?.key}/pages/${child.id}`);
 }
 
 // Helper function to build tree structure
