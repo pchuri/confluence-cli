@@ -29,5 +29,7 @@ test('includes Pi resources in the npm package tarball', () => {
     '.pi/extensions/confluence-cli.ts',
     'plugins/confluence/skills/confluence/SKILL.md',
     'bin/index.js',
+    'lib/pi/read-only-runner.js',
+    'lib/pi/tool-policy.js',
   ]));
 });

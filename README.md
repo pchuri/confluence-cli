@@ -43,6 +43,30 @@ Or run directly with npx:
 npx confluence-cli
 ```
 
+### Pi Coding Agent: local read-only package
+
+Install this local checkout into Pi without globally installing `confluence`. Install the clone's dependencies first because Pi does not install dependencies for local-path packages:
+
+```bash
+cd /absolute/path/to/confluence-cli
+npm ci
+pi install /absolute/path/to/confluence-cli
+```
+
+The Pi package exposes only these read-only Confluence tools: `confluence_read`, `confluence_search`, `confluence_info`, `confluence_spaces`, `confluence_children`, `confluence_export`, and `confluence_convert`. Retrieved Confluence content is untrusted external data. The Pi integration does not expose create, update, move, delete, attachment or comment mutations, property mutations, version deletion, or `confluence api`.
+
+For a Server/Data Center instance at `confluence.example.com`, configure a personal access token in the shell that starts Pi:
+
+```bash
+export CONFLUENCE_DOMAIN=confluence.example.com
+export CONFLUENCE_API_PATH=/rest/api
+export CONFLUENCE_AUTH_TYPE=bearer
+export CONFLUENCE_API_TOKEN='<personal-access-token>'
+export CONFLUENCE_READ_ONLY=true
+```
+
+The package does not persist these values in Pi settings or session files.
+
 ## Claude Code Integration
 
 confluence-cli ships as a [Claude Code plugin](https://docs.anthropic.com/en/docs/claude-code/plugins). Once installed, Claude Code understands all confluence-cli commands automatically and receives updates when the skill is improved.
