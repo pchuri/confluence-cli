@@ -79,7 +79,7 @@ confluence init \
 
 **Cloud vs Server/DC:**
 - Atlassian Cloud (`*.atlassian.net`): use `--api-path "/wiki/rest/api"`, auth type `basic` with email + API token
-- Atlassian Cloud (custom domain): if your Cloud instance uses a custom domain (e.g., `wiki.example.org`), set `CONFLUENCE_FORCE_CLOUD=true` or add `"forceCloud": true` to your profile in `~/.confluence-cli/config.json` to enable Cloud smart-link rendering.
+- Atlassian Cloud (custom domain): if your Cloud instance uses a custom domain (e.g., `wiki.example.org`), set `CONFLUENCE_FORCE_CLOUD=true` or add `"forceCloud": true` to your profile in `~/.config/confluence-cli/config.json` to enable Cloud smart-link rendering (or the legacy `~/.confluence-cli/config.json` if that directory already exists).
 - Atlassian Cloud (scoped token): use `--domain "api.atlassian.com"`, `--api-path "/ex/confluence/<your-cloud-id>/wiki/rest/api"`, auth type `basic` with email + scoped token. Get your Cloud ID from `https://<your-site>.atlassian.net/_edge/tenant_info`. Recommended for agents (least privilege).
 - Self-hosted / Data Center: use `--api-path "/rest/api"`, auth type `bearer` with a personal access token (no email needed)
 
@@ -172,7 +172,7 @@ confluence read "https://company.atlassian.net/wiki/spaces/MYSPACE/pages/1234567
 
 ### `init`
 
-Initialize configuration. Saves credentials to `~/.confluence-cli/config.json`.
+Initialize configuration. By default, saves credentials to `~/.config/confluence-cli/config.json`; an existing legacy `~/.confluence-cli/` directory or `CONFLUENCE_CONFIG_DIR` may change the location.
 
 ```sh
 confluence init [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>] [--read-only]
