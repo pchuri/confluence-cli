@@ -136,6 +136,77 @@ test('kills the child when the caller aborts', async () => {
   }
 });
 
+test('marks an in-flight aborted mutation as unknown', async () => {
+  const packageRoot = fakePackage('setTimeout(() => {}, 60000);');
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-project-'));
+  const controller = new AbortController();
+
+  try {
+    const pending = runCommand({
+      packageRoot,
+      projectRoot,
+      args: ['--json', 'update', '123'],
+      env: { PATH: '' },
+      signal: controller.signal,
+      timeoutMs: 10000,
+      maxOutputBytes: 4096,
+      expectJson: true,
+      mutation: true,
+    });
+    setTimeout(() => controller.abort(), 25);
+    await expect(pending).rejects.toMatchObject({ code: 'UNKNOWN_RESULT', unknownResult: true });
+  } finally {
+    cleanup(packageRoot);
+    cleanup(projectRoot);
+  }
+});
+
+test('marks a timed out mutation as unknown', async () => {
+  const packageRoot = fakePackage('setTimeout(() => {}, 60000);');
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-project-'));
+
+  try {
+    await expect(runCommand({
+      packageRoot,
+      projectRoot,
+      args: ['--json', 'update', '123'],
+      env: { PATH: '' },
+      timeoutMs: 25,
+      maxOutputBytes: 4096,
+      expectJson: true,
+      mutation: true,
+    })).rejects.toMatchObject({ code: 'UNKNOWN_RESULT', unknownResult: true });
+  } finally {
+    cleanup(packageRoot);
+    cleanup(projectRoot);
+  }
+});
+
+test('prioritizes an unknown truncated mutation over its termination exit', async () => {
+  const packageRoot = fakePackage(`
+    process.on('SIGTERM', () => process.exit(3));
+    process.stdout.write('x'.repeat(4096));
+    setTimeout(() => {}, 60000);
+  `);
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-project-'));
+
+  try {
+    await expect(runCommand({
+      packageRoot,
+      projectRoot,
+      args: ['--json', 'update', '123'],
+      env: { PATH: '' },
+      timeoutMs: 1000,
+      maxOutputBytes: 64,
+      expectJson: true,
+      mutation: true,
+    })).rejects.toMatchObject({ code: 'UNKNOWN_RESULT', unknownResult: true });
+  } finally {
+    cleanup(packageRoot);
+    cleanup(projectRoot);
+  }
+});
+
 test('rejects timed out commands with TIMEOUT', async () => {
   const packageRoot = fakePackage('setTimeout(() => {}, 60000);');
   const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-project-'));

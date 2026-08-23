@@ -346,6 +346,42 @@ describe('CLI metadata and storage output', () => {
     expect(output).not.toContain('/Child+Page');
   });
 
+  test('copy-tree JSON dry-run returns canonical identities and a versioned complete plan', async () => {
+    const getPageInfo = jest.fn(async (pageId) => (
+      String(pageId) === '123'
+        ? { id: '123', title: 'Source', version: 7, space: { key: 'ENG' } }
+        : { id: '456', title: 'Destination', version: 3, space: { key: 'ENG' } }
+    ));
+    const getAllDescendantPages = jest.fn(async () => ([
+      { id: '200', parentId: '123', title: 'Child', version: 4 },
+      { id: '201', parentId: '200', title: 'Grandchild', version: { number: 2 } },
+      { id: '300', parentId: '123', title: 'Draft Parent', version: 1 },
+      { id: '301', parentId: '300', title: 'Visible Child of Excluded Parent', version: 1 },
+    ]));
+    const { program } = await loadCli({
+      getPageInfo,
+      getAllDescendantPages,
+      shouldExcludePage: jest.fn((title) => title.startsWith('Draft')),
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['--json', 'copy-tree', '123', '456', '--dry-run', '--quiet']);
+
+    const output = JSON.parse(logSpy.mock.calls[0][0]);
+    expect(output).toMatchObject({
+      sourcePageId: '123',
+      sourceVersion: 7,
+      targetParentId: '456',
+      targetParentVersion: 3,
+      childCount: 2,
+      plannedTree: [
+        { id: '200', parentId: '123', title: 'Child', version: 4 },
+        { id: '201', parentId: '200', title: 'Grandchild', version: 2 },
+      ],
+    });
+    expect(getPageInfo).toHaveBeenCalledWith('456');
+  });
+
   test('children rejects an invalid --type value', async () => {
     const { program } = await loadCli();
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});

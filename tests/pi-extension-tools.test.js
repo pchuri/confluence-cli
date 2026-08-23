@@ -53,11 +53,18 @@ function setting(name, fallback) {
 }
 
 function page(pageId) {
-  const id = String(pageId);
+  const requestedId = String(pageId);
+  const id = requestedId.startsWith('http') ? String(setting('canonicalPageId', '123')) : requestedId;
   if (id === '456') {
-    return { id, title: setting('destinationTitle', 'Operations Runbooks'), space: { key: setting('destinationSpace', 'ENG') } };
+    return {
+      id, title: setting('destinationTitle', 'Operations Runbooks'),
+      space: { key: setting('destinationSpace', 'ENG') }, version: { number: setting('destinationVersion', 3) },
+    };
   }
-  return { id, title: setting('pageTitle', 'Release Notes'), space: { key: setting('pageSpace', 'ENG') } };
+  return {
+    id, title: setting('pageTitle', 'Release Notes'),
+    space: { key: setting('pageSpace', 'ENG') }, version: { number: setting('sourceVersion', 7) },
+  };
 }
 
 function identify(args) {
@@ -65,6 +72,7 @@ function identify(args) {
   const first = args[0] === '--json' ? args[2] : args[1];
   const map = {
     info: 'confluence_info',
+    spaces: 'confluence_spaces',
     attachments: 'confluence_attachments',
     comments: 'confluence_comments',
     'property-list': 'confluence_property_list',
@@ -129,13 +137,23 @@ async function runCommand(options) {
     let json;
     if (info.toolName === 'confluence_info') {
       json = page(info.id);
+    } else if (info.toolName === 'confluence_spaces') {
+      json = { spaceCount: 1, spaces: [{ key: setting('createSpaceKey', 'ENG'), name: setting('createSpaceName', 'Engineering') }] };
     } else if (['confluence_comments', 'confluence_attachments', 'confluence_property_list', 'confluence_versions'].includes(info.toolName)) {
       json = listResult(info.toolName, { pageId: info.id });
     } else if (info.toolName === 'confluence_copy_tree_preview') {
+      const childCount = setting('childCount', 13);
       json = {
-        pageId: String(info.id),
+        sourcePageId: setting('previewSourcePageId', '123'),
+        sourceVersion: setting('previewSourceVersion', setting('sourceVersion', 7)),
+        targetParentId: setting('previewTargetParentId', '456'),
+        targetParentVersion: setting('previewTargetVersion', setting('destinationVersion', 3)),
         rootTitle: setting('copyRootTitle', 'Release Notes (Copy)'),
-        childCount: setting('childCount', 13),
+        childCount,
+        plannedTree: Array.from({ length: childCount }, (_, index) => ({
+          id: String(200 + index), parentId: index === 0 ? '123' : String(199 + index),
+          title: 'Child ' + index, version: setting('plannedVersion', 4),
+        })),
       };
     } else {
       json = { ok: true, argv: options.args };
@@ -146,7 +164,8 @@ async function runCommand(options) {
   events.push('mutation:' + info.toolName + ':' + info.id);
   if (setting('mutationFails')) {
     const error = new Error('Confluence CLI failed: token=' + setting('secret') + ' server rejected update');
-    error.code = 'CLI_FAILED';
+    error.code = setting('mutationErrorCode', 'CLI_FAILED');
+    error.unknownResult = error.code === 'UNKNOWN_RESULT';
     error.stdout = '{"error":"token=' + setting('secret') + ' stdout failure"}';
     error.stderr = 'token=' + setting('secret') + ' stderr failure';
     error.truncated = false;
@@ -161,6 +180,7 @@ function makeUi(controller) {
     async confirm(title, message) {
       events.push('confirm:' + message);
       if (setting('mutateEnvOnConfirm')) env.CONFLUENCE_PI_WRITES = '';
+      if (setting('maxBodyBytesOnConfirm')) env.CONFLUENCE_PI_MAX_BODY_BYTES = String(setting('maxBodyBytesOnConfirm'));
       if (setting('mutateFileOnConfirm')) fs.writeFileSync(setting('mutateFileOnConfirm'), 'changed after confirmation');
       if (setting('abortInConfirm')) controller.abort();
       return setting('confirmResult', undefined) !== undefined ? setting('confirmResult') : true;
@@ -169,6 +189,7 @@ function makeUi(controller) {
       if (setting('recordInputMessage')) events.push('input-message:' + message);
       events.push('input:' + placeholder);
       if (setting('mutateEnvOnConfirm')) env.CONFLUENCE_PI_WRITES = '';
+      if (setting('maxBodyBytesOnConfirm')) env.CONFLUENCE_PI_MAX_BODY_BYTES = String(setting('maxBodyBytesOnConfirm'));
       if (setting('mutateFileOnConfirm')) fs.writeFileSync(setting('mutateFileOnConfirm'), 'changed after confirmation');
       if (setting('abortInConfirm')) controller.abort();
       return setting('inputResult', undefined) !== undefined ? setting('inputResult') : String(placeholder).replace('Type exactly: ', '');
@@ -227,6 +248,10 @@ for (let index = 0; index < steps.length; index += 1) {
 process.stdout.write(JSON.stringify({
   registered: tools.map((tool) => tool.name),
   writeSchemas: Object.keys(extensionModule.WRITE_TOOL_SCHEMAS),
+  schemaDetails: {
+    commentLocations: extensionModule.WRITE_TOOL_SCHEMAS.confluence_comment_create.properties.location.enum,
+    attachmentFilesMaxItems: extensionModule.WRITE_TOOL_SCHEMAS.confluence_attachment_upload.properties.files.maxItems ?? null,
+  },
   events,
   calls,
   result,
@@ -275,6 +300,25 @@ test('registers exactly sixteen write tools only under a valid write gate', () =
   expect(output.writeSchemas).toHaveLength(16);
 });
 
+test('write schemas match real CLI location values and defer attachment count to runtime limits', () => {
+  const output = runHarness({ env: VALID_WRITE_ENV });
+
+  expect(output.schemaDetails.commentLocations).toEqual(['footer', 'inline']);
+  expect(output.schemaDetails.attachmentFilesMaxItems).toBeNull();
+});
+
+test('invalid payload limits do not change write registration but fail execution', () => {
+  const output = runHarness({
+    env: { ...VALID_WRITE_ENV, CONFLUENCE_PI_MAX_BODY_BYTES: 'invalid' },
+    toolName: 'confluence_update',
+    input: { pageId: '123', title: 'No mutation' },
+  });
+
+  expect(output.registered).toEqual([...READ_TOOLS, ...ORDINARY_WRITE_TOOLS, ...BULK_WRITE_TOOLS]);
+  expect(output.error).toMatchObject({ code: 'INVALID_LIMITS' });
+  expect(output.calls).toHaveLength(0);
+});
+
 test('read tools execute through the injected policy runner as non-mutating commands', () => {
   const output = runHarness({
     env: { CONFLUENCE_DOMAIN: 'example.atlassian.net' },
@@ -295,6 +339,39 @@ test('read tools execute through the injected policy runner as non-mutating comm
   expect(output.result.content[0].text).toContain(UNTRUSTED_PREFIX);
 });
 
+test.each([
+  ['convert input symlink', 'confluence_convert', (_root) => ({ inputFile: 'escape/secret.md', inputFormat: 'markdown', outputFormat: 'storage' })],
+  ['convert absolute input', 'confluence_convert', (_root, outside) => ({ inputFile: path.join(outside, 'secret.md'), inputFormat: 'markdown', outputFormat: 'storage' })],
+  ['convert traversal input', 'confluence_convert', (root, outside) => ({ inputFile: path.relative(root, path.join(outside, 'secret.md')), inputFormat: 'markdown', outputFormat: 'storage' })],
+  ['convert output symlink', 'confluence_convert', () => ({ inputFile: 'inside.md', outputFile: 'escape/output.xml', inputFormat: 'markdown', outputFormat: 'storage' })],
+  ['convert dangling output symlink', 'confluence_convert', () => ({ inputFile: 'inside.md', outputFile: 'dangling/output.xml', inputFormat: 'markdown', outputFormat: 'storage' })],
+  ['export destination symlink', 'confluence_export', () => ({ pageId: '123', destination: 'escape' })],
+  ['export file traversal', 'confluence_export', () => ({ pageId: '123', destination: 'exports', file: '../../escaped.md' })],
+  ['attachment download destination symlink', 'confluence_attachments', () => ({ pageId: '123', download: true, destination: 'escape' })],
+])('real extension rejects project escape via %s', (_label, toolName, makeInput) => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-extension-path-project-'));
+  const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-extension-path-outside-'));
+  fs.writeFileSync(path.join(projectRoot, 'inside.md'), '# inside');
+  fs.writeFileSync(path.join(outsideRoot, 'secret.md'), '# outside');
+  fs.symlinkSync(outsideRoot, path.join(projectRoot, 'escape'), 'dir');
+  fs.symlinkSync(path.join(outsideRoot, 'missing'), path.join(projectRoot, 'dangling'), 'dir');
+
+  try {
+    const output = runHarness({
+      cwd: projectRoot,
+      env: {},
+      toolName,
+      input: makeInput(projectRoot, outsideRoot),
+    });
+
+    expect(output.calls).toHaveLength(0);
+    expect(output.error).toMatchObject({ code: 'PROJECT_PATH' });
+  } finally {
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+    fs.rmSync(outsideRoot, { recursive: true, force: true });
+  }
+});
+
 test('update executes preflight before confirmation and mutation with canonical page title', () => {
   const output = runHarness({
     env: VALID_WRITE_ENV,
@@ -305,7 +382,7 @@ test('update executes preflight before confirmation and mutation with canonical 
   expect(output.error).toBeNull();
   expect(output.events).toEqual([
     'preflight:confluence_info:123',
-    'confirm:Update Release Notes (ID: 123, SPACE: ENG)?',
+    'confirm:Update Release Notes (ID: 123, SPACE: ENG); new title: "Release Notes v2"?',
     'mutation:confluence_update:123',
   ]);
   expect(output.calls[1]).toMatchObject({
@@ -315,6 +392,19 @@ test('update executes preflight before confirmation and mutation with canonical 
     timeoutMs: 30000,
   });
   expect(output.result.content[0].text).toContain(UNTRUSTED_PREFIX);
+});
+
+test('URL mutation input is rewritten to the canonical confirmed page ID before execution', () => {
+  const pageUrl = 'https://example.atlassian.net/wiki/pages/123/Release-Notes';
+  const output = runHarness({
+    env: VALID_WRITE_ENV,
+    toolName: 'confluence_delete',
+    input: { pageId: pageUrl },
+  });
+
+  expect(output.error).toBeNull();
+  expect(output.events).toContain('input:Type exactly: DELETE PAGE 123');
+  expect(output.calls.at(-1).args).toEqual(['--json', 'delete', '123', '--yes']);
 });
 
 test('destructive page delete requires the exact page phrase before building argv with --yes', () => {
@@ -388,7 +478,7 @@ test('copy tree preview issues a one-use approval and execution revalidates befo
   expect(output.calls[2].args).toContain('--dry-run');
   expect(output.calls[5].args).toContain('--dry-run');
   expect(output.calls[6]).toMatchObject({
-    args: ['--json', 'copy-tree', '123', '456', 'Launch Notes', '--max-depth', '2', '--delay-ms', '0', '--copy-suffix', ' (Clone)', '--quiet'],
+    args: ['--json', 'copy-tree', '123', '456', 'Launch Notes', '--max-depth', '2', '--delay-ms', '0', '--copy-suffix', ' (Clone)', '--fail-on-error', '--quiet'],
     mutation: true,
     timeoutMs: 300000,
   });
@@ -433,6 +523,7 @@ test('version purge preview approves only historical versions and execution requ
 
 test.each([
   ['stale current version snapshot', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' }, currentVersion: 5, versions: [{ number: 1 }, { number: 2 }, { number: 3 }, { number: 4 }, { number: 5 }] }], 'STALE_PREFLIGHT'],
+  ['stale copy descendant version snapshot', [{ toolName: 'confluence_copy_tree_preview', input: { sourcePageId: '123', targetParentId: '456' }, plannedVersion: 4 }, { toolName: 'confluence_copy_tree', input: { approvalId: '$approvalId' }, plannedVersion: 5 }], 'STALE_PREFLIGHT'],
   ['expired approval', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' }, now: 1000 }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' }, now: 301001 }], 'EXPIRED_APPROVAL'],
   ['mismatched operation', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } }, { toolName: 'confluence_copy_tree', input: { approvalId: '$approvalId' } }], 'APPROVAL_OPERATION_MISMATCH'],
   ['approval input with extra fields', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId', pageId: '123' } }], 'INVALID_APPROVAL_INPUT'],
@@ -457,23 +548,23 @@ test('bulk mutation failure is untrusted, requires a new preview, and does not r
     ],
   });
 
-  expect(output.stepOutputs[1].error).toBeNull();
-  expect(output.stepOutputs[1].result.content[0].text).toContain(UNTRUSTED_PREFIX);
-  expect(output.stepOutputs[1].result.content[0].text).toContain('A new preview is required before retry.');
-  expect(output.stepOutputs[1].result.content[0].text).toContain('[REDACTED]');
-  expect(JSON.stringify(output.stepOutputs[1].result)).not.toContain('secret-token-123');
+  expect(output.stepOutputs[1].result).toBeUndefined();
+  expect(output.stepOutputs[1].error).toMatchObject({ code: 'CLI_FAILED' });
+  expect(output.stepOutputs[1].error.message).toContain('A new preview is required before retry.');
+  expect(output.stepOutputs[1].error.message).toContain('[REDACTED]');
+  expect(output.stepOutputs[1].error.message).not.toContain('secret-token-123');
   expect(output.stepOutputs[2].error).toMatchObject({ code: 'UNKNOWN_APPROVAL' });
 });
 
 test.each([
-  ['create page', 'confluence_create', { title: 'New Page', spaceKey: 'ENG', content: 'body' }, 'confirm:Create New Page in SPACE ENG?'],
-  ['create child', 'confluence_create_child', { title: 'Child Page', parentId: '123', content: 'body' }, 'confirm:Create child under Release Notes (ID: 123, SPACE: ENG)?'],
+  ['create page', 'confluence_create', { title: 'New Page', spaceKey: 'ENG', content: 'body' }, /confirm:Create "New Page" in Engineering \(SPACE: ENG\).*4 bytes.*type: page/],
+  ['create child', 'confluence_create_child', { title: 'Child Page', parentId: '123', content: 'body' }, /confirm:Create child "Child Page" under Release Notes \(ID: 123, SPACE: ENG\).*4 bytes.*type: page/],
   ['move page', 'confluence_move', { pageId: '123', newParentId: '456' }, 'confirm:Move Release Notes (ID: 123, SPACE: ENG) to Operations Runbooks (ID: 456, SPACE: ENG)?'],
-  ['create comment', 'confluence_comment_create', { pageId: '123', content: 'comment' }, 'confirm:Create comment on Release Notes (ID: 123, SPACE: ENG)?'],
+  ['create comment', 'confluence_comment_create', { pageId: '123', content: 'comment' }, /confirm:Create comment on Release Notes \(ID: 123, SPACE: ENG\).*7 bytes.*new thread.*location: footer/],
   ['delete comment', 'confluence_comment_delete', { pageId: '123', commentId: '88' }, 'input:Type exactly: DELETE COMMENT 88 FROM 123'],
-  ['set property', 'confluence_property_set', { pageId: '123', key: 'release-notes', value: { state: 'ready' } }, 'confirm:Set property on Release Notes (ID: 123, SPACE: ENG)?'],
+  ['set property', 'confluence_property_set', { pageId: '123', key: 'release-notes', value: { state: 'ready' } }, /confirm:Set property release-notes on Release Notes \(ID: 123, SPACE: ENG\).*17 bytes.*replace existing: yes/],
   ['delete property', 'confluence_property_delete', { pageId: '123', key: 'release-notes' }, 'input:Type exactly: DELETE PROPERTY release-notes FROM 123'],
-  ['upload attachment', 'confluence_attachment_upload', { pageId: '123', files: ['package.json'], replace: true }, /confirm:Upload attachments to Release Notes \(ID: 123, SPACE: ENG\): package\.json \([0-9]+ bytes\); total [0-9]+ bytes; replace existing files\?/],
+  ['upload attachment', 'confluence_attachment_upload', { pageId: '123', files: ['package.json'], replace: true }, /confirm:Upload attachments to Release Notes \(ID: 123, SPACE: ENG\): package\.json \([0-9]+ bytes\); total [0-9]+ bytes; replace existing files; minor edit: no\?/],
   ['delete attachment', 'confluence_attachment_delete', { pageId: '123', attachmentId: '678' }, 'input:Type exactly: DELETE ATTACHMENT 678 FROM 123'],
   ['delete version', 'confluence_version_delete', { pageId: '123', versionNumber: 2 }, 'input:Type exactly: DELETE VERSION 2 FROM 123'],
 ])('%s goes through confirmation before a mutation', (_label, toolName, input, confirmationEvent) => {
@@ -488,10 +579,21 @@ test.each([
   expect(confirmationIndex).toBeLessThan(output.events.findIndex((event) => event.startsWith('mutation:')));
 });
 
+test('revalidates inline payloads against freshly tightened limits after confirmation', () => {
+  const output = runHarness({
+    env: { ...VALID_WRITE_ENV, CONFLUENCE_PI_MAX_BODY_BYTES: '100' },
+    toolName: 'confluence_update',
+    input: { pageId: '123', content: 'payload' },
+    maxBodyBytesOnConfirm: 3,
+  });
+
+  expect(hasMutation(output)).toBe(false);
+  expect(output.error).toMatchObject({ code: 'PAYLOAD_TOO_LARGE' });
+});
+
 test.each([
   ['changed environment', { mutateEnvOnConfirm: true }, 'WRITE_DISABLED'],
   ['disallowed target space', { pageSpace: 'OPS' }, 'SPACE_NOT_ALLOWED'],
-  ['missing UI', { hasUI: false }, 'NO_UI'],
   ['changed file snapshot', null, 'STALE_FILE'],
 ])('%s prevents the mutation from starting', (_label, scenarioPatch, code) => {
   const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-extension-project-'));
@@ -516,6 +618,7 @@ test.each([
 });
 
 test.each([
+  ['missing UI', 'confluence_update', { pageId: '123', title: 'Release Notes v2' }, { hasUI: false }],
   ['cancelled confirmation', 'confluence_update', { pageId: '123', title: 'Release Notes v2' }, { confirmResult: false }],
   ['phrase mismatch', 'confluence_delete', { pageId: '123' }, { inputResult: 'delete page 123' }],
   ['aborted signal', 'confluence_update', { pageId: '123', title: 'Release Notes v2' }, { abortBeforeExecute: true }],
@@ -535,7 +638,34 @@ test.each([
   expect(output.calls.some((call) => call.mutation)).toBe(false);
 });
 
-test('failed mutation output is redacted and labeled as untrusted content', () => {
+test('partial-risk attachment upload failures require a fresh listing before retry', () => {
+  const output = runHarness({
+    env: VALID_WRITE_ENV,
+    toolName: 'confluence_attachment_upload',
+    input: { pageId: '123', files: ['package.json'] },
+    mutationFails: true,
+  });
+
+  expect(output.error).toMatchObject({ code: 'CLI_FAILED' });
+  expect(output.error.message).toContain('Freshly list attachments');
+  expect(output.error.message).toContain('some uploads may have succeeded');
+});
+
+test('unknown mutation results throw a sanitized tool error instead of returning success', () => {
+  const output = runHarness({
+    env: VALID_WRITE_ENV,
+    toolName: 'confluence_update',
+    input: { pageId: '123', title: 'Release Notes v2' },
+    mutationFails: true,
+    mutationErrorCode: 'UNKNOWN_RESULT',
+  });
+
+  expect(output.result).toBeUndefined();
+  expect(output.error).toMatchObject({ code: 'UNKNOWN_RESULT' });
+  expect(output.error.message).toContain('result is unknown');
+});
+
+test('failed mutation output is redacted and thrown so Pi marks the tool call as failed', () => {
   const output = runHarness({
     env: {
       ...VALID_WRITE_ENV,
@@ -547,10 +677,9 @@ test('failed mutation output is redacted and labeled as untrusted content', () =
     secret: 'secret-token-123',
   });
 
-  expect(output.error).toBeNull();
-  expect(output.result.content[0].text).toContain(UNTRUSTED_PREFIX);
-  expect(output.result.content[0].text).toContain('[REDACTED]');
-  expect(output.result.content[0].text).not.toContain('secret-token-123');
-  expect(output.result.details).toMatchObject({ code: 'CLI_FAILED', failed: true });
-  expect(JSON.stringify(output.result)).not.toContain('secret-token-123');
+  expect(output.result).toBeUndefined();
+  expect(output.error).toMatchObject({ code: 'CLI_FAILED' });
+  expect(output.error.message).toContain(UNTRUSTED_PREFIX);
+  expect(output.error.message).toContain('[REDACTED]');
+  expect(output.error.message).not.toContain('secret-token-123');
 });

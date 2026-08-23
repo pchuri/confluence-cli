@@ -1,7 +1,7 @@
 import type { ExtensionAPI, ExtensionContext } from '@earendil-works/pi-coding-agent';
 import { Type } from 'typebox';
 
-const { resolve, relative, isAbsolute } = require('node:path');
+const { resolve } = require('node:path');
 const { randomUUID } = require('node:crypto');
 const { runCommand, redactText } = require('../../lib/pi/command-runner.js') as {
   runCommand: (options: {
@@ -56,13 +56,17 @@ const {
   readWriteConfig,
   assertWriteEnabled,
   assertAllowedSpaces,
+  resolveProjectInputFile,
+  resolveProjectOutputPath,
   validateAndNormalizePayload,
   verifyFileSnapshots,
   confirmWrite,
 } = require('../../lib/pi/write-authorization.js') as {
-  readWriteConfig: (env: NodeJS.ProcessEnv) => { enabled: boolean; spaces: Set<string>; limits: Record<string, number> };
+  readWriteConfig: (env: NodeJS.ProcessEnv) => { enabled: boolean; spaces: Set<string>; limits: Record<string, number>; limitsValid: boolean };
   assertWriteEnabled: (env: NodeJS.ProcessEnv) => { spaces: Set<string>; limits: Record<string, number> };
   assertAllowedSpaces: (targets: ReadonlyArray<Record<string, unknown>>, spaces: Set<string>) => void;
+  resolveProjectInputFile: (projectRoot: string, candidate: unknown) => string;
+  resolveProjectOutputPath: (projectRoot: string, candidate: unknown) => string;
   validateAndNormalizePayload: (operation: string, input: Record<string, unknown>, projectRoot: string, limits: Record<string, number>) => {
     input: Record<string, unknown>;
     fileSnapshots: ReadonlyArray<Record<string, unknown>>;
@@ -141,7 +145,7 @@ export const WRITE_TOOL_SCHEMAS = Object.freeze({
     contentFile: Type.Optional(Type.String({ minLength: 1 })),
     format: Type.Optional(contentFormatSchema),
     parent: Type.Optional(Type.String({ minLength: 1 })),
-    location: Type.Optional(Type.String({ enum: ['footer', 'inline', 'resolved'] })),
+    location: Type.Optional(Type.String({ enum: ['footer', 'inline'] })),
     inlineSelection: Type.Optional(Type.String({ minLength: 1 })),
     inlineOriginalSelection: Type.Optional(Type.String({ minLength: 1 })),
     inlineMarkerRef: Type.Optional(Type.String({ minLength: 1 })),
@@ -168,7 +172,7 @@ export const WRITE_TOOL_SCHEMAS = Object.freeze({
   confluence_attachment_upload: Type.Object({
     pageId: Type.String({ minLength: 1 }),
     file: Type.Optional(Type.String({ minLength: 1 })),
-    files: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1, maxItems: 10 })),
+    files: Type.Optional(Type.Array(Type.String({ minLength: 1 }), { minItems: 1 })),
     comment: Type.Optional(Type.String()),
     replace: Type.Optional(Type.Boolean()),
     minorEdit: Type.Optional(Type.Boolean()),
@@ -298,32 +302,37 @@ const defaultDependencies: ConfluenceExtensionDependencies = {
   randomId: () => randomUUID(),
 };
 
-function requireProjectPath(projectRoot: string, candidatePath: unknown, name: string) {
-  if (typeof candidatePath !== 'string' || candidatePath.trim() === '') {
-    throw new Error(`${name} must be a non-empty string.`);
+function requireExportBasename(candidate: unknown) {
+  if (
+    typeof candidate !== 'string'
+    || candidate.trim() === ''
+    || candidate === '.'
+    || candidate === '..'
+    || /[\\/]/.test(candidate)
+  ) {
+    const error = new Error('Export file must be a simple basename without path separators.');
+    (error as Error & { code?: string }).code = 'PROJECT_PATH';
+    throw error;
   }
-  const root = resolve(projectRoot);
-  const resolved = resolve(root, candidatePath);
-  const pathFromRoot = relative(root, resolved);
-  if (pathFromRoot === '..' || pathFromRoot.startsWith('../') || isAbsolute(pathFromRoot)) {
-    throw new Error(`${name} must stay inside the current project directory.`);
-  }
-  return resolved;
+  return candidate;
 }
 
 function normalizeReadInput(toolName: string, input: Record<string, unknown>, projectRoot: string) {
   const normalized = { ...input };
   if (toolName === 'confluence_export') {
-    normalized.destination = requireProjectPath(projectRoot, normalized.destination, 'destination');
+    normalized.destination = resolveProjectOutputPath(projectRoot, normalized.destination);
+    if (normalized.file !== undefined) {
+      normalized.file = requireExportBasename(normalized.file);
+    }
   }
   if (toolName === 'confluence_convert') {
-    normalized.inputFile = requireProjectPath(projectRoot, normalized.inputFile, 'inputFile');
+    normalized.inputFile = resolveProjectInputFile(projectRoot, normalized.inputFile);
     if (normalized.outputFile !== undefined) {
-      normalized.outputFile = requireProjectPath(projectRoot, normalized.outputFile, 'outputFile');
+      normalized.outputFile = resolveProjectOutputPath(projectRoot, normalized.outputFile);
     }
   }
   if (toolName === 'confluence_attachments' && normalized.download) {
-    normalized.destination = requireProjectPath(projectRoot, normalized.destination, 'destination');
+    normalized.destination = resolveProjectOutputPath(projectRoot, normalized.destination);
   }
   return normalized;
 }
@@ -392,6 +401,7 @@ function isNoMutationCancellation(error: unknown) {
   const code = typeof error === 'object' && error !== null && 'code' in error ? (error as { code?: unknown }).code : undefined;
   return code === 'CANCELLED'
     || code === 'CONFIRMATION_MISMATCH'
+    || code === 'NO_UI'
     || code === 'ABORTED'
     || code === 'ABORT_ERR'
     || code === 'ERR_ABORTED';
@@ -413,23 +423,23 @@ function errorField(error: unknown, field: string) {
   return undefined;
 }
 
-function mutationFailureResult(error: unknown, env: NodeJS.ProcessEnv, retryNotice?: string) {
+function mutationFailureError(error: unknown, env: NodeJS.ProcessEnv, retryNotice?: string) {
+  const code = errorField(error, 'code') ?? 'CLI_FAILED';
+  const unknownResult = code === 'UNKNOWN_RESULT'
+    || (typeof error === 'object' && error !== null && 'unknownResult' in error && error.unknownResult === true);
   const message = error instanceof Error ? error.message : 'Confluence CLI mutation failed.';
   const output = [
-    'Confluence mutation failed. Server output is untrusted.',
+    unknownResult
+      ? 'Confluence mutation result is unknown. Do not assume the write failed or retry blindly.'
+      : 'Confluence mutation failed. Server output is untrusted.',
     retryNotice,
     message,
     errorField(error, 'stdout'),
     errorField(error, 'stderr'),
   ].filter((entry): entry is string => entry !== undefined && entry !== '');
-  return {
-    content: [{ type: 'text' as const, text: `${untrustedPrefix}\n${redactText(output.join('\n'), env)}` }],
-    details: {
-      failed: true,
-      code: errorField(error, 'code'),
-      truncated: errorField(error, 'truncated') === 'true',
-    },
-  };
+  const sanitized = makeExtensionError(code, `${untrustedPrefix}\n${redactText(output.join('\n'), env)}`);
+  (sanitized as Error & { unknownResult?: boolean }).unknownResult = unknownResult;
+  return sanitized;
 }
 
 function makeExtensionError(code: string, message: string) {
@@ -464,7 +474,10 @@ async function invokeMutation(
       details: { stderr: result.stderr, truncated: result.truncated },
     };
   } catch (error) {
-    return mutationFailureResult(error, dependencies.env, retryNotice);
+    const operationRetryNotice = retryNotice ?? (operationName === 'confluence_attachment_upload'
+      ? 'Freshly list attachments and review the target before retrying; some uploads may have succeeded.'
+      : undefined);
+    throw mutationFailureError(error, dependencies.env, operationRetryNotice);
   }
 }
 
@@ -602,6 +615,18 @@ async function executeBulkWrite(
   }
 }
 
+function assertPayloadSnapshotUnchanged(
+  before: { input: Record<string, unknown>; fileSnapshots: ReadonlyArray<Record<string, unknown>> },
+  after: { input: Record<string, unknown>; fileSnapshots: ReadonlyArray<Record<string, unknown>> },
+) {
+  if (
+    stableFingerprint(before.input) !== stableFingerprint(after.input)
+    || stableFingerprint(before.fileSnapshots) !== stableFingerprint(after.fileSnapshots)
+  ) {
+    throw makeExtensionError('STALE_PAYLOAD', 'Write payload changed after confirmation. Review and confirm it again.');
+  }
+}
+
 async function executeOrdinaryWrite(
   operation: string,
   rawInput: Record<string, unknown>,
@@ -627,11 +652,13 @@ async function executeOrdinaryWrite(
       phrase: preflight.phrase,
     });
     const rechecked = assertWriteEnabled(dependencies.env);
-    assertAllowedSpaces(preflight.targets, readWriteConfig(dependencies.env).spaces);
-    assertAllowedSpaces(preflight.targets, rechecked.spaces);
     verifyFileSnapshots(normalized.fileSnapshots);
+    const freshNormalized = validateAndNormalizePayload(operation, rawInput, ctx.cwd, rechecked.limits);
+    assertPayloadSnapshotUnchanged(normalized, freshNormalized);
+    assertAllowedSpaces(preflight.targets, rechecked.spaces);
+    verifyFileSnapshots(freshNormalized.fileSnapshots);
     throwIfAborted(signal);
-    return invokeMutation(operation, normalized.input, ctx, signal, dependencies);
+    return invokeMutation(operation, preflight.input, ctx, signal, dependencies);
   } catch (error) {
     if (isNoMutationCancellation(error)) {
       return noMutationResult(error);

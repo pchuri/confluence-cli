@@ -116,8 +116,8 @@ const CASES = [
   },
   {
     toolName: 'confluence_create_child',
-    input: { title: 'My Folder', parentId: '123', contentFile: 'content.md', format: 'markdown', type: 'folder' },
-    args: ['--json', 'create-child', 'My Folder', '123', '--file', 'content.md', '--format', 'markdown', '--type', 'folder'],
+    input: { title: 'My Folder', parentId: '123', format: 'markdown', type: 'folder' },
+    args: ['--json', 'create-child', 'My Folder', '123', '--format', 'markdown', '--type', 'folder'],
     meta: { cliCommand: 'create-child', risk: RISK.WRITE, timeoutMs: 30_000, mutation: true, expectJson: true },
   },
   {
@@ -147,7 +147,7 @@ const CASES = [
   {
     toolName: 'confluence_copy_tree',
     input: { sourcePageId: '123', targetParentId: '456', maxDepth: 3, exclude: 'temp*,draft*', delayMs: 150, copySuffix: ' (Backup)' },
-    args: ['--json', 'copy-tree', '123', '456', '--max-depth', '3', '--exclude', 'temp*,draft*', '--delay-ms', '150', '--copy-suffix', ' (Backup)', '--quiet'],
+    args: ['--json', 'copy-tree', '123', '456', '--max-depth', '3', '--exclude', 'temp*,draft*', '--delay-ms', '150', '--copy-suffix', ' (Backup)', '--fail-on-error', '--quiet'],
     meta: { cliCommand: 'copy-tree', risk: RISK.BULK_WRITE, timeoutMs: 300_000, mutation: true, expectJson: true },
   },
   {
@@ -246,6 +246,15 @@ test.each(CASES)('$toolName maps to fixed policy metadata and argv', ({ toolName
   expect(OPERATIONS[toolName]).toBe(operation);
   expect(operation.buildArgs(input)).toEqual(args);
   expect(buildArgs(toolName, input)).toEqual(args);
+});
+
+test('builds bodyless top-level and child folder creation argv', () => {
+  expect(buildArgs('confluence_create', {
+    title: 'Folder', spaceKey: 'ENG', type: 'folder', format: 'storage',
+  })).toEqual(['--json', 'create', 'Folder', 'ENG', '--format', 'storage', '--type', 'folder']);
+  expect(buildArgs('confluence_create_child', {
+    title: 'Child Folder', parentId: '123', type: 'folder', format: 'storage',
+  })).toEqual(['--json', 'create-child', 'Child Folder', '123', '--format', 'storage', '--type', 'folder']);
 });
 
 test('ignores model-provided yes, argv, and api fields', () => {

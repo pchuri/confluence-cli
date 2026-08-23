@@ -76,7 +76,7 @@ When `CONFLUENCE_PI_WRITES=true` and `CONFLUENCE_PI_WRITE_SPACES` is a non-empty
 
 The generic API escape hatch remains unavailable: this package does not register `confluence_api` or any `api`, `argv`, or raw HTTP method tool. Use the typed tools above rather than model-controlled Bash for supported Confluence operations.
 
-Protected writes perform local preflight, enforce the space allowlist, ask for Pi UI confirmation, then re-check environment and file snapshots before running the CLI. Confirmation prompts identify existing page targets by canonical title, ID, and space, for example `Update Architecture Overview (ID: 123456789, SPACE: SAFE1)?` or `Move Child Page (ID: 222, SPACE: SAFE1) to Parent Page (ID: 111, SPACE: SAFE1)?`. The agent must not claim confirmation on the user's behalf.
+Protected writes perform local preflight, enforce the space allowlist, ask for Pi UI confirmation, then re-check environment, payload limits, normalized input, and file snapshots before running the CLI. Confirmation prompts identify existing page targets by canonical title, ID, and space, for example `Update Architecture Overview (ID: 123456789, SPACE: SAFE1)?` or `Move Child Page (ID: 222, SPACE: SAFE1) to Parent Page (ID: 111, SPACE: SAFE1)?`. The agent must not claim confirmation on the user's behalf. Write execution is blocked in print, JSON, headless, and every other noninteractive/no-UI mode; registration may remain visible, but no mutation can start without Pi-owned interactive confirmation.
 
 Destructive writes require exact phrases in the confirmation UI:
 

@@ -87,29 +87,25 @@ test('requires exact write opt-in and an explicit space list', () => {
     .toEqual(['ENG', 'OPS']);
 });
 
-test('rejects wildcard space keys and invalid environment overrides', () => {
+test('rejects wildcard space keys but keeps registration eligible with invalid execution limits', () => {
   expect(readWriteConfig({
     CONFLUENCE_PI_WRITES: 'true',
     CONFLUENCE_PI_WRITE_SPACES: 'ENG,*',
   }).enabled).toBe(false);
 
-  expect(readWriteConfig({
-    CONFLUENCE_PI_WRITES: 'true',
-    CONFLUENCE_PI_WRITE_SPACES: 'ENG',
-    CONFLUENCE_PI_MAX_BODY_BYTES: '0',
-  }).enabled).toBe(false);
-
-  expect(readWriteConfig({
-    CONFLUENCE_PI_WRITES: 'true',
-    CONFLUENCE_PI_WRITE_SPACES: 'ENG',
-    CONFLUENCE_PI_MAX_PROPERTY_BYTES: '1.2',
-  }).enabled).toBe(false);
-
-  expect(readWriteConfig({
-    CONFLUENCE_PI_WRITES: 'true',
-    CONFLUENCE_PI_WRITE_SPACES: 'ENG',
-    CONFLUENCE_PI_MAX_ATTACHMENT_TOTAL_BYTES: '9007199254740992',
-  }).enabled).toBe(false);
+  for (const invalidLimit of [
+    { CONFLUENCE_PI_MAX_BODY_BYTES: '0' },
+    { CONFLUENCE_PI_MAX_PROPERTY_BYTES: '1.2' },
+    { CONFLUENCE_PI_MAX_ATTACHMENT_TOTAL_BYTES: '9007199254740992' },
+  ]) {
+    const env = {
+      CONFLUENCE_PI_WRITES: 'true',
+      CONFLUENCE_PI_WRITE_SPACES: 'ENG',
+      ...invalidLimit,
+    };
+    expect(readWriteConfig(env)).toMatchObject({ enabled: true, limitsValid: false });
+    expect(() => assertWriteEnabled(env)).toThrow(expect.objectContaining({ code: 'INVALID_LIMITS' }));
+  }
 });
 
 test.each(['1', 'true', 'TRUE', 'yes', 'On'])(
@@ -144,11 +140,14 @@ test('returns parsed spaces and limits when writes are enabled', () => {
   });
 });
 
-test('requires every resolved target space to be allowed', () => {
+test('requires every resolved target space to be allowed and normalizes Set entries', () => {
   expect(() => assertAllowedSpaces([
     { role: 'source', spaceKey: 'ENG' },
     { role: 'destination', spaceKey: 'OPS' },
   ], new Set(['ENG']))).toThrow(/OPS/);
+  expect(() => assertAllowedSpaces([
+    { role: 'source', spaceKey: 'ENG' },
+  ], new Set(['eng']))).not.toThrow();
 });
 
 test('rejects project escapes for input and output paths', () => {
@@ -232,6 +231,7 @@ test('normalizes create payloads and snapshots body files', () => {
       title: 'Release Notes',
       spaceKey: 'ENG',
       contentFile: fs.realpathSync(fixture.bodyFile),
+      bodyBytes: Buffer.byteLength('Body from file'),
       type: 'page',
     });
     expect(result.fileSnapshots).toHaveLength(1);
@@ -285,7 +285,7 @@ test('enforces update title/body presence and UTF-8 byte limits', () => {
       fixture.projectRoot,
       DEFAULT_LIMITS,
     );
-    expect(result.input).toMatchObject({ title: 'Changed', content: 'Body' });
+    expect(result.input).toMatchObject({ title: 'Changed', content: 'Body', bodyBytes: 4 });
   } finally {
     fixture.cleanup();
   }
@@ -309,6 +309,32 @@ test('normalizes property values and enforces serialized JSON byte limits', () =
       fixture.projectRoot,
       { ...DEFAULT_LIMITS, maxPropertyBytes: 10 },
     )).toThrow(/property/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test('parses property JSON files during normalization before confirmation', () => {
+  const fixture = makeProjectFixture();
+  try {
+    const result = validateAndNormalizePayload(
+      'confluence_property_set',
+      { pageId: '123', key: 'meta', valueFile: 'value.json' },
+      fixture.projectRoot,
+      DEFAULT_LIMITS,
+    );
+    expect(result.input).toMatchObject({
+      valueFile: fs.realpathSync(fixture.valueFile),
+      propertyBytes: Buffer.byteLength('{"flag":true}'),
+    });
+
+    fs.writeFileSync(fixture.valueFile, '{not json');
+    expect(() => validateAndNormalizePayload(
+      'confluence_property_set',
+      { pageId: '123', key: 'meta', valueFile: 'value.json' },
+      fixture.projectRoot,
+      DEFAULT_LIMITS,
+    )).toThrow(expect.objectContaining({ code: 'PAYLOAD_INVALID' }));
   } finally {
     fixture.cleanup();
   }

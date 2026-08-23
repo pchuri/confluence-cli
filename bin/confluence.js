@@ -683,11 +683,36 @@ program
     // Dry-run: compute plan without creating anything
     if (options.dryRun) {
       const info = await client.getPageInfo(sourcePageId);
+      const targetInfo = await client.getPageInfo(targetParentId);
+      const canonicalSourceId = String(info.id);
+      const canonicalTargetId = String(targetInfo.id);
+      const versionNumber = (value) => Number(value && typeof value === 'object' ? value.number : value);
       const rootTitle = newTitle || `${info.title}${copySuffix}`;
-      const descendants = await client.getAllDescendantPages(sourcePageId, maxDepth);
-      const filtered = descendants.filter(p => !client.shouldExcludePage(p.title, excludePatterns));
+      const descendants = await client.getAllDescendantPages(canonicalSourceId, maxDepth);
+      const includedPageIds = new Set([canonicalSourceId]);
+      const filtered = descendants.filter((page) => {
+        if (!includedPageIds.has(String(page.parentId)) || client.shouldExcludePage(page.title, excludePatterns)) {
+          return false;
+        }
+        includedPageIds.add(String(page.id));
+        return true;
+      });
       if (jsonMode) {
-        emitJson({ dryRun: true, rootTitle, targetParentId, childCount: filtered.length });
+        emitJson({
+          dryRun: true,
+          rootTitle,
+          sourcePageId: canonicalSourceId,
+          sourceVersion: versionNumber(info.version),
+          targetParentId: canonicalTargetId,
+          targetParentVersion: versionNumber(targetInfo.version),
+          childCount: filtered.length,
+          plannedTree: filtered.map(page => ({
+            id: String(page.id),
+            parentId: String(page.parentId),
+            title: page.title,
+            version: versionNumber(page.version),
+          })),
+        });
         analytics.track('copy_tree_dry_run', true);
         return;
       }
