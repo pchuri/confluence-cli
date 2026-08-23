@@ -41,10 +41,13 @@ test('allows exactly the read-only operations', () => {
 test('exposes exactly the typed read-only Pi tools', () => {
   expect(TOOL_OPERATIONS).toEqual([
     'confluence_read', 'confluence_search', 'confluence_info', 'confluence_spaces',
-    'confluence_children', 'confluence_export', 'confluence_convert',
+    'confluence_children', 'confluence_export', 'confluence_convert', 'confluence_find',
+    'confluence_versions', 'confluence_comments', 'confluence_attachments',
+    'confluence_property_list', 'confluence_property_get',
   ]);
   expect(TOOL_TO_OPERATION.confluence_read).toBe('read');
   expect(TOOL_TO_OPERATION.confluence_convert).toBe('convert');
+  expect(TOOL_TO_OPERATION.confluence_find).toBe('find');
   expect(TOOL_OPERATIONS).not.toContain('confluence_delete');
   expect(TOOL_OPERATIONS).not.toContain('confluence_api');
 });
