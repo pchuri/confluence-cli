@@ -253,8 +253,33 @@ test('returns copy tree facts from the preview response rootTitle', async () => 
     totalCreateCount: 14,
   });
   expect(result.phrase).toBe('COPY 14 PAGES FROM 123 TO 456');
-  expect(result.summary).toContain('Release Notes (Copy) (ID: 123, SPACE: ENG)');
+  expect(result.summary).toContain('Release Notes (ID: 123, SPACE: ENG)');
   expect(result.summary).toContain('Operations Runbooks (ID: 456, SPACE: OPS)');
+  expect(result.summary).toContain('Release Notes (Copy)');
+});
+
+test('copy tree summary keeps canonical source and destination titles when planned root title differs', async () => {
+  const invokeJson = jest.fn(async (toolName, input) => {
+    if (toolName === 'confluence_info') {
+      if (String(input.pageId) === '123') return page('123', 'Release Notes', 'ENG', 7);
+      if (String(input.pageId) === '456') return page('456', 'Operations Runbooks', 'OPS', 3);
+    }
+    if (toolName === 'confluence_copy_tree_preview') {
+      return { pageId: '123', rootTitle: 'Cloned Launch Plan', childCount: 13 };
+    }
+    throw new Error(`unexpected tool ${toolName}`);
+  });
+
+  const result = await runPreflight({
+    operation: 'confluence_copy_tree_preview',
+    input: { sourcePageId: '123', targetParentId: '456' },
+    invokeJson,
+  });
+
+  expect(result.summary).toContain('Release Notes (ID: 123, SPACE: ENG)');
+  expect(result.summary).toContain('Operations Runbooks (ID: 456, SPACE: OPS)');
+  expect(result.summary).toContain('Cloned Launch Plan');
+  expect(result.phrase).toBe('COPY 14 PAGES FROM 123 TO 456');
 });
 
 test('produces stable hashes from recursively sorted records', () => {

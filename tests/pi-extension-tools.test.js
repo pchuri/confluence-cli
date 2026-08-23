@@ -19,6 +19,11 @@ const ORDINARY_WRITE_TOOLS = [
   'confluence_attachment_upload', 'confluence_attachment_delete', 'confluence_version_delete',
 ];
 
+const BULK_WRITE_TOOLS = [
+  'confluence_copy_tree_preview', 'confluence_copy_tree',
+  'confluence_versions_purge_preview', 'confluence_versions_purge',
+];
+
 const VALID_WRITE_ENV = Object.freeze({
   CONFLUENCE_PI_WRITES: 'true',
   CONFLUENCE_PI_WRITE_SPACES: 'ENG',
@@ -32,17 +37,27 @@ import { createJiti } from 'jiti';
 
 const scenario = JSON.parse(process.env.PI_EXTENSION_SCENARIO || '{}');
 const ordinaryWriteTools = new Set(${JSON.stringify(ORDINARY_WRITE_TOOLS)});
+const bulkWriteTools = new Set(${JSON.stringify(BULK_WRITE_TOOLS)});
+const allWriteTools = new Set([...ordinaryWriteTools, ...bulkWriteTools]);
 const events = [];
 const calls = [];
 const env = { ...(scenario.env || {}) };
 const cwd = scenario.cwd || process.cwd();
+let currentStep = scenario;
+let nowValue = scenario.now ?? 1000;
+
+function setting(name, fallback) {
+  if (currentStep && Object.prototype.hasOwnProperty.call(currentStep, name)) return currentStep[name];
+  if (Object.prototype.hasOwnProperty.call(scenario, name)) return scenario[name];
+  return fallback;
+}
 
 function page(pageId) {
   const id = String(pageId);
   if (id === '456') {
-    return { id, title: 'Operations Runbooks', space: { key: scenario.destinationSpace || 'ENG' } };
+    return { id, title: setting('destinationTitle', 'Operations Runbooks'), space: { key: setting('destinationSpace', 'ENG') } };
   }
-  return { id, title: scenario.pageTitle || 'Release Notes', space: { key: scenario.pageSpace || 'ENG' } };
+  return { id, title: setting('pageTitle', 'Release Notes'), space: { key: setting('pageSpace', 'ENG') } };
 }
 
 function identify(args) {
@@ -54,6 +69,7 @@ function identify(args) {
     comments: 'confluence_comments',
     'property-list': 'confluence_property_list',
     versions: 'confluence_versions',
+    'versions-purge': 'confluence_versions_purge',
     create: 'confluence_create',
     'create-child': 'confluence_create_child',
     update: 'confluence_update',
@@ -67,7 +83,11 @@ function identify(args) {
     'attachment-delete': 'confluence_attachment_delete',
     'version-delete': 'confluence_version_delete',
   };
-  return { toolName: map[command] || command, id: first, command };
+  let toolName = map[command] || command;
+  if (command === 'copy-tree') {
+    toolName = args.includes('--dry-run') ? 'confluence_copy_tree_preview' : 'confluence_copy_tree';
+  }
+  return { toolName, id: first, command };
 }
 
 function listResult(toolName, input) {
@@ -75,7 +95,13 @@ function listResult(toolName, input) {
   if (toolName === 'confluence_comments') return { pageId, results: [{ id: String(scenario.commentId || '88') }] };
   if (toolName === 'confluence_attachments') return { pageId, results: [{ id: String(scenario.attachmentId || '678') }] };
   if (toolName === 'confluence_property_list') return { pageId, results: [{ key: String(scenario.propertyKey || 'release-notes') }] };
-  if (toolName === 'confluence_versions') return { pageId, versions: [{ number: 1 }, { number: 2 }, { number: 3 }] };
+  if (toolName === 'confluence_versions') {
+    return {
+      pageId,
+      versions: setting('versions', [{ number: 1 }, { number: 2 }, { number: 3 }, { number: 4 }]),
+      currentVersion: setting('currentVersion', undefined),
+    };
+  }
   throw new Error('Unexpected list preflight ' + toolName);
 }
 
@@ -98,13 +124,19 @@ async function runCommand(options) {
   }
 
   if (!options.mutation) {
-    const phase = ordinaryWriteTools.has(scenario.toolName) ? 'preflight' : 'read';
+    const phase = allWriteTools.has(setting('toolName')) ? 'preflight' : 'read';
     events.push(phase + ':' + info.toolName + ':' + info.id);
     let json;
     if (info.toolName === 'confluence_info') {
       json = page(info.id);
     } else if (['confluence_comments', 'confluence_attachments', 'confluence_property_list', 'confluence_versions'].includes(info.toolName)) {
       json = listResult(info.toolName, { pageId: info.id });
+    } else if (info.toolName === 'confluence_copy_tree_preview') {
+      json = {
+        pageId: String(info.id),
+        rootTitle: setting('copyRootTitle', 'Release Notes (Copy)'),
+        childCount: setting('childCount', 13),
+      };
     } else {
       json = { ok: true, argv: options.args };
     }
@@ -112,11 +144,11 @@ async function runCommand(options) {
   }
 
   events.push('mutation:' + info.toolName + ':' + info.id);
-  if (scenario.mutationFails) {
-    const error = new Error('Confluence CLI failed: token=' + scenario.secret + ' server rejected update');
+  if (setting('mutationFails')) {
+    const error = new Error('Confluence CLI failed: token=' + setting('secret') + ' server rejected update');
     error.code = 'CLI_FAILED';
-    error.stdout = '{"error":"token=' + scenario.secret + ' stdout failure"}';
-    error.stderr = 'token=' + scenario.secret + ' stderr failure';
+    error.stdout = '{"error":"token=' + setting('secret') + ' stdout failure"}';
+    error.stderr = 'token=' + setting('secret') + ' stderr failure';
     error.truncated = false;
     throw error;
   }
@@ -128,17 +160,18 @@ function makeUi(controller) {
   return {
     async confirm(title, message) {
       events.push('confirm:' + message);
-      if (scenario.mutateEnvOnConfirm) env.CONFLUENCE_PI_WRITES = '';
-      if (scenario.mutateFileOnConfirm) fs.writeFileSync(scenario.mutateFileOnConfirm, 'changed after confirmation');
-      if (scenario.abortInConfirm) controller.abort();
-      return scenario.confirmResult !== undefined ? scenario.confirmResult : true;
+      if (setting('mutateEnvOnConfirm')) env.CONFLUENCE_PI_WRITES = '';
+      if (setting('mutateFileOnConfirm')) fs.writeFileSync(setting('mutateFileOnConfirm'), 'changed after confirmation');
+      if (setting('abortInConfirm')) controller.abort();
+      return setting('confirmResult', undefined) !== undefined ? setting('confirmResult') : true;
     },
     async input(message, placeholder) {
+      if (setting('recordInputMessage')) events.push('input-message:' + message);
       events.push('input:' + placeholder);
-      if (scenario.mutateEnvOnConfirm) env.CONFLUENCE_PI_WRITES = '';
-      if (scenario.mutateFileOnConfirm) fs.writeFileSync(scenario.mutateFileOnConfirm, 'changed after confirmation');
-      if (scenario.abortInConfirm) controller.abort();
-      return scenario.inputResult !== undefined ? scenario.inputResult : String(placeholder).replace('Type exactly: ', '');
+      if (setting('mutateEnvOnConfirm')) env.CONFLUENCE_PI_WRITES = '';
+      if (setting('mutateFileOnConfirm')) fs.writeFileSync(setting('mutateFileOnConfirm'), 'changed after confirmation');
+      if (setting('abortInConfirm')) controller.abort();
+      return setting('inputResult', undefined) !== undefined ? setting('inputResult') : String(placeholder).replace('Type exactly: ', '');
     },
   };
 }
@@ -146,26 +179,49 @@ function makeUi(controller) {
 const jiti = createJiti(import.meta.url);
 const extensionModule = await jiti.import(path.resolve(process.cwd(), '.pi/extensions/confluence-cli.ts'));
 const tools = [];
-extensionModule.createConfluenceExtension({ env, runCommand, now: () => 1000, randomId: () => 'approval-id' })({
+extensionModule.createConfluenceExtension({ env, runCommand, now: () => nowValue, randomId: () => 'approval-id' })({
   registerTool(tool) { tools.push(tool); },
 });
 
-let result;
-let error = null;
-if (scenario.toolName) {
-  const tool = tools.find((candidate) => candidate.name === scenario.toolName);
+function resolveStepInput(input, previousResult) {
+  if (!input || typeof input !== 'object') return input || {};
+  const resolved = { ...input };
+  if (resolved.approvalId === '$approvalId') {
+    resolved.approvalId = previousResult?.details?.approvalId;
+  }
+  return resolved;
+}
+
+async function executeStep(step, index, previousResult) {
+  currentStep = step;
+  nowValue = step.now ?? nowValue;
+  const tool = tools.find((candidate) => candidate.name === step.toolName);
   const controller = new AbortController();
-  if (scenario.abortBeforeExecute) controller.abort();
+  if (setting('abortBeforeExecute')) controller.abort();
   const ctx = {
     cwd,
-    hasUI: scenario.hasUI !== false,
+    hasUI: setting('hasUI', true) !== false,
     ui: makeUi(controller),
   };
   try {
-    result = await tool.execute('call-1', scenario.input || {}, controller.signal, undefined, ctx);
+    const stepResult = await tool.execute('call-' + (index + 1), resolveStepInput(step.input, previousResult), controller.signal, undefined, ctx);
+    return { result: stepResult, error: null };
   } catch (caught) {
-    error = { name: caught.name, code: caught.code, message: caught.message };
+    return { result: undefined, error: { name: caught.name, code: caught.code, message: caught.message } };
   }
+}
+
+let result;
+let error = null;
+const stepOutputs = [];
+const steps = Array.isArray(scenario.steps) ? scenario.steps : (scenario.toolName ? [scenario] : []);
+let lastApprovalResult;
+for (let index = 0; index < steps.length; index += 1) {
+  const output = await executeStep(steps[index], index, lastApprovalResult);
+  stepOutputs.push(output);
+  if (output.result?.details?.approvalId) lastApprovalResult = output.result;
+  result = output.result;
+  error = output.error;
 }
 
 process.stdout.write(JSON.stringify({
@@ -175,6 +231,7 @@ process.stdout.write(JSON.stringify({
   calls,
   result,
   error,
+  stepOutputs,
 }));
 `;
 
@@ -210,15 +267,12 @@ test('registers exactly thirteen working read tools when writes are not enabled'
   expect(output.registered).not.toContain('confluence_copy_tree_preview');
 });
 
-test('registers exactly twelve ordinary write tools only under a valid write gate', () => {
+test('registers exactly sixteen write tools only under a valid write gate', () => {
   const output = runHarness({ env: VALID_WRITE_ENV });
 
-  expect(output.registered).toEqual([...READ_TOOLS, ...ORDINARY_WRITE_TOOLS]);
-  expect(output.registered).toHaveLength(25);
-  expect(output.registered).not.toContain('confluence_copy_tree_preview');
-  expect(output.registered).not.toContain('confluence_copy_tree');
-  expect(output.registered).not.toContain('confluence_versions_purge_preview');
-  expect(output.registered).not.toContain('confluence_versions_purge');
+  expect(output.registered).toEqual([...READ_TOOLS, ...ORDINARY_WRITE_TOOLS, ...BULK_WRITE_TOOLS]);
+  expect(output.registered).toHaveLength(29);
+  expect(output.writeSchemas).toHaveLength(16);
 });
 
 test('read tools execute through the injected policy runner as non-mutating commands', () => {
@@ -281,6 +335,134 @@ test('destructive page delete requires the exact page phrase before building arg
     expectJson: true,
     mutation: true,
   });
+});
+
+test('copy tree preview issues a one-use approval and execution revalidates before mutating without dry-run', () => {
+  const output = runHarness({
+    env: VALID_WRITE_ENV,
+    copyRootTitle: 'Cloned Launch Plan',
+    steps: [
+      {
+        toolName: 'confluence_copy_tree_preview',
+        input: { sourcePageId: '123', targetParentId: '456', title: 'Launch Notes', maxDepth: 2, delayMs: 0, copySuffix: ' (Clone)' },
+      },
+      {
+        toolName: 'confluence_copy_tree',
+        input: { approvalId: '$approvalId' },
+        recordInputMessage: true,
+      },
+      {
+        toolName: 'confluence_copy_tree',
+        input: { approvalId: '$approvalId' },
+      },
+    ],
+  });
+
+  expect(output.stepOutputs[0].error).toBeNull();
+  expect(output.stepOutputs[0].result.details).toMatchObject({
+    approvalId: 'approval-id',
+    operation: 'confluence_copy_tree',
+    count: 14,
+    expiresInMs: 300000,
+  });
+  expect(output.stepOutputs[0].result.content[0].text).toContain('COPY 14 PAGES FROM 123 TO 456');
+  expect(output.stepOutputs[0].result.content[0].text).toContain('Release Notes');
+  expect(output.stepOutputs[0].result.content[0].text).toContain('Operations Runbooks');
+  expect(output.stepOutputs[0].result.content[0].text).toContain('Cloned Launch Plan');
+  expect(output.stepOutputs[1].error).toBeNull();
+  expect(output.stepOutputs[2].error).toMatchObject({ code: 'UNKNOWN_APPROVAL' });
+  expect(output.events).toEqual([
+    'preflight:confluence_info:123',
+    'preflight:confluence_info:456',
+    'preflight:confluence_copy_tree_preview:123',
+    'preflight:confluence_info:123',
+    'preflight:confluence_info:456',
+    'preflight:confluence_copy_tree_preview:123',
+    expect.stringContaining('input-message:Confluence destructive confirmation'),
+    'input:Type exactly: COPY 14 PAGES FROM 123 TO 456',
+    'mutation:confluence_copy_tree:123',
+  ]);
+  expect(output.events.find((event) => event.startsWith('input-message:'))).toContain('Release Notes');
+  expect(output.events.find((event) => event.startsWith('input-message:'))).toContain('Operations Runbooks');
+  expect(output.events.find((event) => event.startsWith('input-message:'))).toContain('Cloned Launch Plan');
+  expect(output.calls[2].args).toContain('--dry-run');
+  expect(output.calls[5].args).toContain('--dry-run');
+  expect(output.calls[6]).toMatchObject({
+    args: ['--json', 'copy-tree', '123', '456', 'Launch Notes', '--max-depth', '2', '--delay-ms', '0', '--copy-suffix', ' (Clone)', '--quiet'],
+    mutation: true,
+    timeoutMs: 300000,
+  });
+  expect(output.calls[6].args).not.toContain('--dry-run');
+});
+
+test('version purge preview approves only historical versions and execution requires the exact purge phrase', () => {
+  const output = runHarness({
+    env: VALID_WRITE_ENV,
+    steps: [
+      { toolName: 'confluence_versions_purge_preview', input: { pageId: '123', throttle: 0.25 } },
+      { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' }, recordInputMessage: true },
+    ],
+  });
+
+  expect(output.stepOutputs[0].error).toBeNull();
+  expect(output.stepOutputs[0].result.details).toMatchObject({
+    approvalId: 'approval-id',
+    operation: 'confluence_versions_purge',
+    count: 3,
+    expiresInMs: 300000,
+  });
+  expect(output.stepOutputs[0].result.content[0].text).toContain('PURGE 3 VERSIONS FROM 123');
+  expect(output.stepOutputs[0].result.content[0].text).toContain('Release Notes');
+  expect(output.stepOutputs[1].error).toBeNull();
+  expect(output.events).toEqual([
+    'preflight:confluence_info:123',
+    'preflight:confluence_versions:123',
+    'preflight:confluence_info:123',
+    'preflight:confluence_versions:123',
+    expect.stringContaining('input-message:Confluence destructive confirmation'),
+    'input:Type exactly: PURGE 3 VERSIONS FROM 123',
+    'mutation:confluence_versions_purge:123',
+  ]);
+  expect(output.events.find((event) => event.startsWith('input-message:'))).toContain('Release Notes');
+  expect(output.calls[4]).toMatchObject({
+    args: ['--json', 'versions-purge', '123', '--yes', '--throttle', '0.25'],
+    mutation: true,
+    timeoutMs: 300000,
+  });
+});
+
+test.each([
+  ['stale current version snapshot', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' }, currentVersion: 5, versions: [{ number: 1 }, { number: 2 }, { number: 3 }, { number: 4 }, { number: 5 }] }], 'STALE_PREFLIGHT'],
+  ['expired approval', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' }, now: 1000 }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' }, now: 301001 }], 'EXPIRED_APPROVAL'],
+  ['mismatched operation', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } }, { toolName: 'confluence_copy_tree', input: { approvalId: '$approvalId' } }], 'APPROVAL_OPERATION_MISMATCH'],
+  ['approval input with extra fields', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId', pageId: '123' } }], 'INVALID_APPROVAL_INPUT'],
+  ['unknown approval', [{ toolName: 'confluence_versions_purge', input: { approvalId: 'missing-approval' } }], 'UNKNOWN_APPROVAL'],
+  ['cancelled typed confirmation consumes approval', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' }, inputResult: false }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' } }], 'UNKNOWN_APPROVAL'],
+  ['changed configuration consumes approval', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' }, mutateEnvOnConfirm: true }], 'WRITE_DISABLED'],
+])('%s prevents bulk mutation', (_label, steps, expectedCode) => {
+  const output = runHarness({ env: VALID_WRITE_ENV, steps });
+
+  expect(hasMutation(output)).toBe(false);
+  expect(output.error).toMatchObject({ code: expectedCode });
+});
+
+test('bulk mutation failure is untrusted, requires a new preview, and does not restore approval', () => {
+  const output = runHarness({
+    env: { ...VALID_WRITE_ENV, CONFLUENCE_API_TOKEN: 'secret-token-123' },
+    secret: 'secret-token-123',
+    steps: [
+      { toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } },
+      { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' }, mutationFails: true },
+      { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' } },
+    ],
+  });
+
+  expect(output.stepOutputs[1].error).toBeNull();
+  expect(output.stepOutputs[1].result.content[0].text).toContain(UNTRUSTED_PREFIX);
+  expect(output.stepOutputs[1].result.content[0].text).toContain('A new preview is required before retry.');
+  expect(output.stepOutputs[1].result.content[0].text).toContain('[REDACTED]');
+  expect(JSON.stringify(output.stepOutputs[1].result)).not.toContain('secret-token-123');
+  expect(output.stepOutputs[2].error).toMatchObject({ code: 'UNKNOWN_APPROVAL' });
 });
 
 test.each([
