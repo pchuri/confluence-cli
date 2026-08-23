@@ -1,5 +1,8 @@
 # Pi Read-Only Package Integration Design
 
+> Historical note: the read-only boundary in this document is superseded by
+> `2026-08-23-pi-protected-write-tools-design.md` for protected write support.
+
 ## Goal
 
 Make a local checkout of `confluence-cli` installable with:

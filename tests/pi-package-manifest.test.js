@@ -19,6 +19,15 @@ test('publishes the Pi extension and declares Pi runtime peers', () => {
   expect(fs.existsSync(path.join(__dirname, '../.pi/extensions/confluence-cli.ts'))).toBe(true);
 });
 
+test('README documents Pi write registration separately from read-only execution blocking', () => {
+  const readme = fs.readFileSync(path.join(packageRoot, 'README.md'), 'utf8');
+
+  expect(readme).toContain('Write tool registration depends only on `CONFLUENCE_PI_WRITES=true` plus a valid non-empty `CONFLUENCE_PI_WRITE_SPACES` allowlist.');
+  expect(readme).toContain('`CONFLUENCE_READ_ONLY=true` does not hide registered write tools; it blocks every write execution even if those tools remain visible.');
+  expect(readme).toContain('Changing registration variables (`CONFLUENCE_PI_WRITES` or `CONFLUENCE_PI_WRITE_SPACES`) after Pi starts requires `/reload`');
+  expect(readme).not.toContain('and `CONFLUENCE_READ_ONLY` is false, Pi also registers');
+});
+
 test('includes Pi resources in the npm package tarball', () => {
   const packed = JSON.parse(execFileSync('npm', ['pack', '--dry-run', '--json'], {
     cwd: packageRoot,
@@ -29,7 +38,12 @@ test('includes Pi resources in the npm package tarball', () => {
     '.pi/extensions/confluence-cli.ts',
     'plugins/confluence/skills/confluence/SKILL.md',
     'bin/index.js',
-    'lib/pi/read-only-runner.js',
-    'lib/pi/tool-policy.js',
+    'lib/pi/command-runner.js',
+    'lib/pi/operation-policy.js',
+    'lib/pi/write-authorization.js',
+    'lib/pi/preflight.js',
+    'lib/pi/preflight-store.js',
   ]));
+  expect(names).not.toContain('lib/pi/read-only-runner.js');
+  expect(names).not.toContain('lib/pi/tool-policy.js');
 });
