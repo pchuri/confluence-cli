@@ -32,6 +32,12 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 brew install pchuri/tap/confluence-cli
 ```
 
+Homebrew 5.1.15+ warns that third-party taps are "not trusted". To trust the tap and silence the warning (required in a future Homebrew release):
+
+```bash
+brew trust pchuri/tap
+```
+
 ### npm
 
 ```bash
