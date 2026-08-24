@@ -16,7 +16,7 @@ A powerful command-line interface for Atlassian Confluence that allows you to re
 - 📎 **Attachments** - List, download, upload, or delete page attachments
 - 🏷️ **Properties** - List, get, set, and delete content properties (key-value metadata)
 - 💬 **Comments** - List, create, and delete page comments (footer or inline)
-- 📦 **Export** - Save a page and its attachments to a local folder
+- 📦 **Export** - Save a page and its attachments to a local folder, or a whole page tree/space with `--recursive`
 - 🛠️ **Edit workflow** - Export page content for editing and re-import
 - 🔀 **Profiles** - Manage multiple Confluence instances with named configuration profiles
 - 🔒 **Read-only mode** - Profile-level write protection for safe AI agent usage
@@ -574,6 +574,24 @@ confluence export 123456789 --format html --file content.html --pattern "*.png"
 confluence export 123456789 --skip-attachments
 ```
 
+### Export a Whole Page Tree (or Space)
+
+Add `--recursive` to export a page together with all of its descendants. Each page becomes a folder (named after the page title) containing `page.md` and its `attachments/`, nested to mirror the page hierarchy. Point it at a space's homepage to export the whole space:
+
+```bash
+# Export a page and all descendants
+confluence export 123456789 -r --dest ./my-space
+
+# Preview which pages would be exported, without writing files
+confluence export 123456789 -r --dry-run
+
+# Limit depth, skip pages by title glob, and slow down between requests
+confluence export 123456789 -r --max-depth 3 --exclude "Archive*,Draft*" --delay-ms 500
+
+# Re-export over a previous run (replaces content, removes stale files)
+confluence export 123456789 -r --overwrite
+```
+
 ### List Spaces
 ```bash
 # Default: up to 500 spaces (paginated automatically across requests)
@@ -899,7 +917,7 @@ confluence stats
 | `property-get <pageId_or_url> <key>` | Get a content property by key | `--json` |
 | `property-set <pageId_or_url> <key>` | Set a content property (create or update) | `--value <json>`, `--file <path>`, `--json` |
 | `property-delete <pageId_or_url> <key>` | Delete a content property by key | `--yes`, `--json` |
-| `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--referenced-only`, `--skip-attachments` |
+| `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--referenced-only`, `--skip-attachments`, `-r, --recursive`, `--max-depth <depth>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--dry-run`, `--overwrite` |
 | `profile list` | List all configuration profiles | |
 | `profile use <name>` | Set the active configuration profile | |
 | `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol`, `--read-only` |
