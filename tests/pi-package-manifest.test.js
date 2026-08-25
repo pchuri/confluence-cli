@@ -12,10 +12,11 @@ test('declares the bundled Confluence skill and Pi extension', () => {
   });
 });
 
-test('publishes the Pi extension and declares Pi runtime peers', () => {
+test('publishes the Pi extension and declares only its runtime peer', () => {
   expect(packageJson.files).toContain('.pi/');
-  expect(packageJson.peerDependencies['@earendil-works/pi-coding-agent']).toBe('*');
+  expect(packageJson.peerDependencies['@earendil-works/pi-coding-agent']).toBeUndefined();
   expect(packageJson.peerDependencies.typebox).toBe('*');
+  expect(packageJson.peerDependenciesMeta.typebox).toEqual({ optional: true });
   expect(fs.existsSync(path.join(__dirname, '../.pi/extensions/confluence-cli.ts'))).toBe(true);
 });
 

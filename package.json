@@ -39,11 +39,16 @@
     "axios-mock-adapter": "^2.1.0",
     "eslint": "^9.39.2",
     "jest": "^29.7.0",
-    "jiti": "^2.7.0"
+    "jiti": "^2.7.0",
+    "typebox": "*"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": "*",
     "typebox": "*"
+  },
+  "peerDependenciesMeta": {
+    "typebox": {
+      "optional": true
+    }
   },
   "pi": {
     "skills": ["./plugins/confluence/skills"],
