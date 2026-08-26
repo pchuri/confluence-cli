@@ -259,6 +259,19 @@ function registerExportCommand(program, { withClient }) {
       const contentExt = formatExt[format] || 'txt';
 
       const pageInfo = await client.getPageInfo(pageId);
+      const baseDir = path.resolve(options.dest || '.');
+      const folderName = sanitizeTitle(pageInfo.title || 'page');
+      const exportDir = path.join(baseDir, folderName);
+      const contentFile = options.file || `page.${contentExt}`;
+      const contentPath = path.join(exportDir, contentFile);
+
+      if (options.dryRun) {
+        console.log(chalk.yellow('Dry run — no files written.'));
+        console.log(`Title: ${chalk.blue(pageInfo.title)}`);
+        console.log(`Content: ${chalk.gray(contentPath)}`);
+        return;
+      }
+
       const content = await client.readPage(
         pageId,
         format,
@@ -268,9 +281,6 @@ function registerExportCommand(program, { withClient }) {
         ? (client._referencedAttachments || new Set())
         : null;
 
-      const baseDir = path.resolve(options.dest || '.');
-      const folderName = sanitizeTitle(pageInfo.title || 'page');
-      const exportDir = path.join(baseDir, folderName);
       if (options.overwrite && fs.existsSync(exportDir)) {
         if (!isExportDirectory(fs, path, exportDir)) {
           throw new Error(`Refusing to overwrite "${exportDir}" - it was not created by confluence-cli (missing ${EXPORT_MARKER}).`);
@@ -279,8 +289,6 @@ function registerExportCommand(program, { withClient }) {
       }
       fs.mkdirSync(exportDir, { recursive: true });
 
-      const contentFile = options.file || `page.${contentExt}`;
-      const contentPath = path.join(exportDir, contentFile);
       fs.writeFileSync(contentPath, content);
       writeExportMarker(fs, path, exportDir, { pageId, title: pageInfo.title });
 

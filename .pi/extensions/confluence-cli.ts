@@ -57,7 +57,8 @@ const {
   assertWriteEnabled,
   assertAllowedSpaces,
   resolveProjectInputFile,
-  resolveProjectOutputPath,
+  resolveProjectReadOutputPath,
+  resolveProjectNewOutputFile,
   validateAndNormalizePayload,
   verifyFileSnapshots,
   confirmWrite,
@@ -66,7 +67,8 @@ const {
   assertWriteEnabled: (env: NodeJS.ProcessEnv) => { spaces: Set<string>; limits: Record<string, number> };
   assertAllowedSpaces: (targets: ReadonlyArray<Record<string, unknown>>, spaces: Set<string>) => void;
   resolveProjectInputFile: (projectRoot: string, candidate: unknown) => string;
-  resolveProjectOutputPath: (projectRoot: string, candidate: unknown) => string;
+  resolveProjectReadOutputPath: (projectRoot: string, candidate: unknown) => string;
+  resolveProjectNewOutputFile: (projectRoot: string, candidate: unknown) => string;
   validateAndNormalizePayload: (operation: string, input: Record<string, unknown>, projectRoot: string, limits: Record<string, number>) => {
     input: Record<string, unknown>;
     fileSnapshots: ReadonlyArray<Record<string, unknown>>;
@@ -320,7 +322,7 @@ function requireExportBasename(candidate: unknown) {
 function normalizeReadInput(toolName: string, input: Record<string, unknown>, projectRoot: string) {
   const normalized = { ...input };
   if (toolName === 'confluence_export') {
-    normalized.destination = resolveProjectOutputPath(projectRoot, normalized.destination);
+    normalized.destination = resolveProjectReadOutputPath(projectRoot, normalized.destination);
     if (normalized.file !== undefined) {
       normalized.file = requireExportBasename(normalized.file);
     }
@@ -328,11 +330,11 @@ function normalizeReadInput(toolName: string, input: Record<string, unknown>, pr
   if (toolName === 'confluence_convert') {
     normalized.inputFile = resolveProjectInputFile(projectRoot, normalized.inputFile);
     if (normalized.outputFile !== undefined) {
-      normalized.outputFile = resolveProjectOutputPath(projectRoot, normalized.outputFile);
+      normalized.outputFile = resolveProjectNewOutputFile(projectRoot, normalized.outputFile);
     }
   }
   if (toolName === 'confluence_attachments' && normalized.download) {
-    normalized.destination = resolveProjectOutputPath(projectRoot, normalized.destination);
+    normalized.destination = resolveProjectReadOutputPath(projectRoot, normalized.destination);
   }
   return normalized;
 }

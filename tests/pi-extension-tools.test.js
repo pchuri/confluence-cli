@@ -372,6 +372,56 @@ test.each([
   }
 });
 
+test('real extension refuses an existing project output file before invoking the command runner', () => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-extension-existing-output-'));
+  fs.writeFileSync(path.join(projectRoot, 'input.md'), '# input');
+  fs.writeFileSync(path.join(projectRoot, 'package.json'), '{"name":"fixture"}\n');
+
+  try {
+    const output = runHarness({
+      cwd: projectRoot,
+      env: {},
+      toolName: 'confluence_convert',
+      input: {
+        inputFile: 'input.md',
+        outputFile: 'package.json',
+        inputFormat: 'markdown',
+        outputFormat: 'storage',
+      },
+    });
+
+    expect(output.calls).toHaveLength(0);
+    expect(output.error).toMatchObject({ code: 'PROJECT_PATH' });
+  } finally {
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
+test('real extension rejects convert output inside the project Git hooks directory before invoking the command runner', () => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-extension-git-hooks-output-'));
+  fs.mkdirSync(path.join(projectRoot, '.git', 'hooks'), { recursive: true });
+  fs.writeFileSync(path.join(projectRoot, 'inside.md'), '# inside');
+
+  try {
+    const output = runHarness({
+      cwd: projectRoot,
+      env: {},
+      toolName: 'confluence_convert',
+      input: {
+        inputFile: 'inside.md',
+        outputFile: '.git/hooks/pre-commit',
+        inputFormat: 'markdown',
+        outputFormat: 'storage',
+      },
+    });
+
+    expect(output.calls).toHaveLength(0);
+    expect(output.error).toMatchObject({ code: 'PROJECT_PATH' });
+  } finally {
+    fs.rmSync(projectRoot, { recursive: true, force: true });
+  }
+});
+
 test('update executes preflight before confirmation and mutation with canonical page title', () => {
   const output = runHarness({
     env: VALID_WRITE_ENV,

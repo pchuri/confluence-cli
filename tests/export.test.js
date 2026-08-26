@@ -1,4 +1,8 @@
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
+const { Command } = require('commander');
+const { PassThrough } = require('stream');
 
 const {
   EXPORT_MARKER,
@@ -211,6 +215,44 @@ describe('sanitizeTitle', () => {
 
   test('strips control characters', () => {
     expect(sanitizeTitle('foo\x00bar')).toBe('foo bar');
+  });
+});
+
+describe('registered non-recursive export command', () => {
+  test('dry-run avoids reading content, downloading attachments, and creating export artifacts', async () => {
+    const client = {
+      getPageInfo: jest.fn(async () => ({ id: '123', title: 'Dry Run Page' })),
+      readPage: jest.fn(async () => '# content'),
+      getAllAttachments: jest.fn(async () => [{ id: 'attachment-1', title: 'diagram.png' }]),
+      downloadAttachment: jest.fn(async () => {
+        const stream = new PassThrough();
+        stream.end('attachment');
+        return stream;
+      }),
+      matchesPattern: jest.fn(() => true),
+      _referencedAttachments: new Set(),
+    };
+    const analytics = { track: jest.fn() };
+    const program = new Command();
+    const registerExportCommand = require('../bin/commands/export.js');
+    registerExportCommand(program, {
+      withClient: (_command, handler) => async (...args) => handler({ client, analytics }, ...args),
+    });
+    const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-export-dry-run-'));
+    const destination = path.join(temporaryRoot, 'destination');
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      await program.parseAsync(['export', '123', '--dest', destination, '--dry-run'], { from: 'user' });
+
+      expect(client.readPage).not.toHaveBeenCalled();
+      expect(client.downloadAttachment).not.toHaveBeenCalled();
+      expect(fs.existsSync(destination)).toBe(false);
+      expect(fs.existsSync(path.join(destination, 'Dry Run Page', EXPORT_MARKER))).toBe(false);
+    } finally {
+      logSpy.mockRestore();
+      fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    }
   });
 });
 
