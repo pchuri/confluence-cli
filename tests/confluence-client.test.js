@@ -1268,6 +1268,32 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('logs only a safe HTTP status when display URL lookup fails', async () => {
+      const basicClient = new ConfluenceClient({
+        domain: 'test.atlassian.net',
+        email: 'config-user@example.com',
+        token: 'config-password',
+        authType: 'basic',
+      });
+      const mock = new MockAdapter(basicClient.client);
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const encodedCredentials = Buffer.from('config-user@example.com:config-password').toString('base64');
+
+      mock.onGet('/content').reply(401, { error: 'Unauthorized' });
+
+      try {
+        await expect(basicClient.extractPageId('https://test.atlassian.net/display/TEST/Private+Page'))
+          .rejects.toThrow(/Could not resolve page ID/);
+
+        expect(errorSpy).toHaveBeenCalledWith('Error resolving page ID from display URL (HTTP 401).');
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        expect(errorSpy.mock.calls.flat().join('\n')).not.toContain(encodedCredentials);
+      } finally {
+        errorSpy.mockRestore();
+        mock.restore();
+      }
+    });
+
     test('should resolve tiny links via redirect', async () => {
       const mock = new MockAdapter(client.client);
 

@@ -348,6 +348,93 @@ test('redacts tokens, cookies, emails, usernames, and private key paths', () => 
   expect(text).toBe('token=[REDACTED] password=[REDACTED] email=[REDACTED] username=[REDACTED] cookie=[REDACTED] key=[REDACTED]');
 });
 
+test('redacts Authorization values in parsed JSON output without environment credentials', async () => {
+  const basicCredentials = Buffer.from('config-user:config-password').toString('base64');
+  const packageRoot = fakePackage(`
+    process.stdout.write(JSON.stringify({ headers: { Authorization: 'Basic ${basicCredentials}' } }));
+  `);
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-project-'));
+
+  try {
+    const result = await runCommand({
+      packageRoot,
+      projectRoot,
+      env: { PATH: '' },
+      expectJson: true,
+      maxOutputBytes: 4096,
+    });
+
+    expect(result.json.headers.Authorization).toBe('[REDACTED]');
+    expect(result.stdout).not.toContain(basicCredentials);
+  } finally {
+    cleanup(packageRoot);
+    cleanup(projectRoot);
+  }
+});
+
+test('redacts Cookie secrets through four serialized JSON layers', async () => {
+  const packageRoot = fakePackage(`
+    const payload = {
+      v: JSON.stringify(JSON.stringify(JSON.stringify(JSON.stringify({ Cookie: 'session=deep-secret' })))),
+    };
+    process.stdout.write(JSON.stringify(payload));
+  `);
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pi-project-'));
+
+  try {
+    const result = await runCommand({
+      packageRoot,
+      projectRoot,
+      env: { PATH: '' },
+      expectJson: true,
+      maxOutputBytes: 4096,
+    });
+
+    expect(result.stdout).not.toContain('session=deep-secret');
+    expect(JSON.stringify(result.json)).not.toContain('session=deep-secret');
+  } finally {
+    cleanup(packageRoot);
+    cleanup(projectRoot);
+  }
+});
+
+test('redacts Basic and Bearer Authorization headers without environment credentials', () => {
+  const basicCredentials = Buffer.from('config-user:config-password').toString('base64');
+  const bearerToken = 'netrc-token-789';
+  const text = `headers: { Authorization: 'Basic ${basicCredentials}', authorization: "Bearer ${bearerToken}" }`;
+
+  const redacted = redactText(text, {});
+
+  expect(redacted).not.toContain(basicCredentials);
+  expect(redacted).not.toContain(bearerToken);
+  expect(redacted).toContain('[REDACTED]');
+});
+
+test('redacts Authorization headers across serialized forms', () => {
+  const basicCredentials = Buffer.from('config-user:config-password').toString('base64');
+  const values = [basicCredentials, 'dotted-bearer-token', 'delimited-bearer-token', 'escaped-bearer-token', 'array-bearer-token', 'template-bearer-token'];
+  const text = [
+    `headers.Authorization = 'Basic ${basicCredentials}'`,
+    'headers.Authorization = "Bearer dotted-bearer-token"',
+    ';authorization: Bearer delimited-bearer-token',
+    '{\\"Authorization\\":\\"Bearer escaped-bearer-token\\"}',
+    'Authorization: [\'Bearer array-bearer-token\']',
+    'Authorization: `Bearer template-bearer-token`',
+  ].join('\n');
+
+  const redacted = redactText(text, {});
+
+  for (const value of values) {
+    expect(redacted).not.toContain(value);
+  }
+});
+
+test('redacts every value in a multi-cookie header without environment credentials', () => {
+  const redacted = redactText('Cookie: session=first-secret; preference=second-secret', {});
+
+  expect(redacted).toBe('Cookie: [REDACTED]');
+});
+
 test('builds a minimal CLI environment from known config keys', () => {
   const env = {
     CONFLUENCE_DOMAIN: 'example.atlassian.net',

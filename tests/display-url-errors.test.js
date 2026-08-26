@@ -39,7 +39,7 @@ describe('display URL resolution failures', () => {
 
     expect(result.status).toBe(1);
     expect(result.stdout).toBe('');
-    expect(result.stderr).toContain('Error resolving page ID from display URL:');
+    expect(result.stderr).toContain('Error resolving page ID from display URL.');
     expect(result.stderr).toContain(`Error: Could not resolve page ID from display URL: ${DISPLAY_URL}`);
   });
 });
