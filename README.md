@@ -43,6 +43,8 @@ Or run directly with npx:
 npx confluence-cli
 ```
 
+> **Note:** npm does not automatically install the optional `typebox` dependency. Loading the bundled Pi extension from an npm-installed copy requires installing `typebox` alongside `confluence-cli`; the documented local-checkout `npm ci` already includes it.
+
 ### Pi Coding Agent: local package with protected writes
 
 Install this local checkout into Pi without globally installing `confluence`. Install the clone's dependencies first because Pi does not install dependencies for local-path packages:
