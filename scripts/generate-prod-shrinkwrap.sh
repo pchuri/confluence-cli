@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Generate an npm-shrinkwrap.json that locks only production dependencies.
 # We derive it by filtering the checked-in package-lock.json (removing
-# entries with "dev": true and clearing root.devDependencies) instead of
+# entries with "dev": true or "peer": true and clearing root.devDependencies) instead of
 # re-resolving from the registry. Re-resolving would let runtime packages
 # drift to newer semver-compatible versions than what CI verified, which
 # defeats the supply-chain hardening the shrinkwrap is meant to provide.
@@ -20,7 +20,7 @@ if (lock.lockfileVersion !== 3) {
 
 const packages = {};
 for (const [key, value] of Object.entries(lock.packages)) {
-  if (value.dev) continue;
+  if (value.dev || value.peer) continue;
   if (key === "") {
     const { devDependencies, ...rest } = value;
     packages[key] = rest;

@@ -970,6 +970,53 @@ describe('ConfluenceClient', () => {
       });
     });
 
+    test('getSpaceMetadata should fetch and normalize one space record', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/space/ENG').reply(200, {
+        key: 'ENG',
+        name: 'Engineering',
+        type: 'global',
+        id: 42,
+        description: 'Platform engineering',
+      });
+
+      await expect(client.getSpaceMetadata('ENG')).resolves.toEqual({
+        key: 'ENG',
+        name: 'Engineering',
+        type: 'global',
+      });
+      expect(mock.history.get).toHaveLength(1);
+      expect(mock.history.get[0].url).toBe('/space/ENG');
+
+      mock.restore();
+    });
+
+    test.each([
+      ['space', 'getSpaceMetadata', 'missing space', '/space/missing%20space'],
+      ['comment', 'getCommentMetadata', 'missing comment', '/content/missing%20comment'],
+      ['attachment', 'getAttachmentMetadata', 'missing attachment', '/content/missing%20attachment'],
+    ])('get%sMetadata returns null only when its direct lookup returns 404', async (_label, method, id, url) => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet(url).reply(404);
+
+      await expect(client[method](id)).resolves.toBeNull();
+
+      mock.restore();
+    });
+
+    test.each([
+      ['space', 'getSpaceMetadata', 'unavailable space', '/space/unavailable%20space'],
+      ['comment', 'getCommentMetadata', 'unavailable comment', '/content/unavailable%20comment'],
+      ['attachment', 'getAttachmentMetadata', 'unavailable attachment', '/content/unavailable%20attachment'],
+    ])('get%sMetadata propagates non-404 direct lookup failures', async (_label, method, id, url) => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet(url).reply(500, { message: 'service unavailable' });
+
+      await expect(client[method](id)).rejects.toMatchObject({ response: { status: 500 } });
+
+      mock.restore();
+    });
+
     test('getPageInfo should normalize machine-readable metadata', async () => {
       const mock = new MockAdapter(client.client);
       mock.onGet('/content/123').reply(config => {
@@ -1266,6 +1313,32 @@ describe('ConfluenceClient', () => {
       await expect(client.extractPageId(displayUrl)).rejects.toThrow(/Could not resolve page ID/);
 
       mock.restore();
+    });
+
+    test('logs only a safe HTTP status when display URL lookup fails', async () => {
+      const basicClient = new ConfluenceClient({
+        domain: 'test.atlassian.net',
+        email: 'config-user@example.com',
+        token: 'config-password',
+        authType: 'basic',
+      });
+      const mock = new MockAdapter(basicClient.client);
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const encodedCredentials = Buffer.from('config-user@example.com:config-password').toString('base64');
+
+      mock.onGet('/content').reply(401, { error: 'Unauthorized' });
+
+      try {
+        await expect(basicClient.extractPageId('https://test.atlassian.net/display/TEST/Private+Page'))
+          .rejects.toThrow(/Could not resolve page ID/);
+
+        expect(errorSpy).toHaveBeenCalledWith('Error resolving page ID from display URL (HTTP 401).');
+        expect(errorSpy).toHaveBeenCalledTimes(1);
+        expect(errorSpy.mock.calls.flat().join('\n')).not.toContain(encodedCredentials);
+      } finally {
+        errorSpy.mockRestore();
+        mock.restore();
+      }
     });
 
     test('should resolve tiny links via redirect', async () => {
@@ -2749,6 +2822,90 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('getCommentMetadata should return compact ownership metadata for a reply without body content', async () => {
+      expect(typeof client.getCommentMetadata).toBe('function');
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/reply-456').reply((config) => {
+        expect(config.params).toEqual({ expand: 'container,ancestors' });
+        return [200, {
+          id: 'reply-456',
+          type: 'comment',
+          title: 'A reply',
+          container: { id: '123', type: 'page' },
+          ancestors: [
+            { id: '123', type: 'page', title: 'Release Notes' },
+            { id: 'parent-123', type: 'comment', title: 'Parent comment' },
+          ],
+          body: { storage: { value: 'comment body must not be returned' } },
+        }];
+      });
+
+      const metadata = await client.getCommentMetadata('reply-456');
+      expect(metadata).toEqual({
+        id: 'reply-456',
+        pageId: '123',
+        parentId: 'parent-123',
+        title: 'A reply',
+      });
+      expect(metadata).not.toHaveProperty('body');
+      expect(metadata).not.toHaveProperty('bodyStorage');
+      expect(metadata).not.toHaveProperty('bodyText');
+
+      mock.restore();
+    });
+
+    test('getCommentMetadata encodes direct content IDs', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/reply%2Fwith%20space').reply(200, {
+        id: 'reply/with space',
+        type: 'comment',
+        title: 'Encoded reply',
+        container: { id: '123', type: 'page' },
+        ancestors: [],
+      });
+
+      await expect(client.getCommentMetadata('reply/with space')).resolves.toMatchObject({
+        id: 'reply/with space',
+        pageId: '123',
+      });
+
+      mock.restore();
+    });
+
+    test('getCommentMetadata returns null pageId instead of throwing for missing container metadata', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/reply-456').reply(200, {
+        id: 'reply-456',
+        type: 'comment',
+        title: 'Orphaned reply',
+        container: {},
+        ancestors: [],
+      });
+
+      await expect(client.getCommentMetadata('reply-456')).resolves.toMatchObject({
+        id: 'reply-456',
+        pageId: null,
+      });
+
+      mock.restore();
+    });
+
+    test('getCommentMetadata rejects attachment content so it cannot authorize comment deletion', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/attachment-141').reply(200, {
+        id: 'attachment-141',
+        type: 'attachment',
+        title: 'release.pdf',
+        container: { id: '123', type: 'page' },
+        ancestors: [],
+      });
+
+      await expect(client.getCommentMetadata('attachment-141'))
+        .rejects.toThrow(/comment content/i);
+
+      mock.restore();
+    });
+
     test('should delete a comment by ID', async () => {
       const mock = new MockAdapter(client.client);
       mock.onDelete('/content/456').reply(204);
@@ -2834,6 +2991,96 @@ describe('ConfluenceClient', () => {
         mock.restore();
         removeDirRecursive(tempDir);
       }
+    });
+
+    test('getAttachmentMetadata should return compact ownership metadata without a download URL', async () => {
+      expect(typeof client.getAttachmentMetadata).toBe('function');
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/attachment-141').reply((config) => {
+        expect(config.params).toEqual({ expand: 'container,version' });
+        return [200, {
+          id: 'attachment-141',
+          type: 'attachment',
+          title: 'release.pdf',
+          container: { id: '123', type: 'page' },
+          metadata: { mediaType: 'application/pdf' },
+          extensions: { fileSize: 204800 },
+          version: { number: 7 },
+          _links: { download: '/download/attachments/123/release.pdf' },
+          body: { storage: { value: 'attachment body must not be returned' } },
+        }];
+      });
+
+      const metadata = await client.getAttachmentMetadata('attachment-141');
+      expect(metadata).toEqual({
+        id: 'attachment-141',
+        pageId: '123',
+        title: 'release.pdf',
+        mediaType: 'application/pdf',
+        fileSize: 204800,
+        version: 7,
+      });
+      expect(metadata).not.toHaveProperty('body');
+      expect(metadata).not.toHaveProperty('downloadLink');
+      expect(metadata).not.toHaveProperty('url');
+
+      mock.restore();
+    });
+
+    test('getAttachmentMetadata encodes direct content IDs', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/attachment%2Fwith%20space').reply(200, {
+        id: 'attachment/with space',
+        type: 'attachment',
+        title: 'Encoded attachment',
+        container: { id: '123', type: 'page' },
+        metadata: { mediaType: 'application/pdf' },
+        extensions: { fileSize: 10 },
+        version: { number: 1 },
+      });
+
+      await expect(client.getAttachmentMetadata('attachment/with space')).resolves.toMatchObject({
+        id: 'attachment/with space',
+        pageId: '123',
+      });
+
+      mock.restore();
+    });
+
+    test('getAttachmentMetadata returns null pageId instead of throwing for missing container metadata', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/attachment-141').reply(200, {
+        id: 'attachment-141',
+        type: 'attachment',
+        title: 'Orphaned attachment',
+        container: {},
+        metadata: { mediaType: 'application/pdf' },
+        extensions: { fileSize: 10 },
+        version: { number: 1 },
+      });
+
+      await expect(client.getAttachmentMetadata('attachment-141')).resolves.toMatchObject({
+        id: 'attachment-141',
+        pageId: null,
+      });
+
+      mock.restore();
+    });
+
+    test('getAttachmentMetadata rejects comment content so it cannot authorize attachment deletion', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/reply-456').reply(200, {
+        id: 'reply-456',
+        type: 'comment',
+        title: 'A reply',
+        container: { id: '123', type: 'page' },
+        version: { number: 1 },
+      });
+
+      await expect(client.getAttachmentMetadata('reply-456'))
+        .rejects.toThrow(/attachment content/i);
+
+      mock.restore();
     });
 
     test('normalizeAttachment should return all fields needed for JSON output', () => {
