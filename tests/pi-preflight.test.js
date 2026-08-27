@@ -128,7 +128,7 @@ test('rejects canonical info records whose ID mismatches a requested page ID', a
   })).rejects.toMatchObject({ code: 'TARGET_MISMATCH' });
 });
 
-test('resolves create destination from one direct lookup without enumerating spaces', async () => {
+test('matches create keys case-insensitively and preserves server casing in final create input', async () => {
   const unusedSpaces = Array.from({ length: 501 }, (_, index) => ({
     key: `UNUSED-${index}`,
     name: `Unused Space ${index}`,
@@ -136,7 +136,7 @@ test('resolves create destination from one direct lookup without enumerating spa
   }));
   const invokeJson = jest.fn(async (toolName) => {
     if (toolName === 'confluence_space_lookup') {
-      return { key: 'ENG', name: 'Engineering', type: 'global' };
+      return { key: 'Eng', name: 'Engineering', type: 'global' };
     }
     if (toolName === 'confluence_spaces') {
       return { spaceCount: unusedSpaces.length, spaces: unusedSpaces };
@@ -146,15 +146,48 @@ test('resolves create destination from one direct lookup without enumerating spa
 
   const result = await runPreflight({
     operation: 'confluence_create',
-    input: { title: 'New Page', spaceKey: 'eng', content: 'body' },
+    input: { title: 'New Page', spaceKey: ' eng ', content: 'body' },
     invokeJson,
   });
 
-  expect(invokeJson).toHaveBeenCalledWith('confluence_space_lookup', { spaceKey: 'ENG' });
+  expect(invokeJson).toHaveBeenCalledWith('confluence_space_lookup', { spaceKey: 'eng' });
   expect(invokeJson).not.toHaveBeenCalledWith('confluence_spaces', expect.anything());
-  expect(result.input.spaceKey).toBe('ENG');
-  expect(result.targets).toEqual([{ role: 'destination', title: 'Engineering', spaceKey: 'ENG' }]);
-  expect(result.summary).toContain('Engineering (SPACE: ENG)');
+  expect(result.input.spaceKey).toBe('Eng');
+  expect(result.targets).toEqual([{ role: 'destination', title: 'Engineering', spaceKey: 'Eng' }]);
+  expect(result.summary).toContain('Engineering (SPACE: Eng)');
+});
+
+test('rejects a create lookup whose key differs from the requested key', async () => {
+  const invokeJson = jest.fn(async () => ({ key: '~Bob', name: 'Bob Personal Space', type: 'personal' }));
+
+  await expect(runPreflight({
+    operation: 'confluence_create',
+    input: { title: 'New Page', spaceKey: ' ~alice ', content: 'body' },
+    invokeJson,
+  })).rejects.toMatchObject({ code: 'TARGET_MISMATCH' });
+
+  expect(invokeJson).toHaveBeenCalledWith('confluence_space_lookup', { spaceKey: '~alice' });
+});
+
+test('preserves server casing in page target summaries', async () => {
+  const invokeJson = jest.fn(async (_toolName, input) => (
+    String(input.pageId) === '123'
+      ? page('123', 'Release Notes', 'eng', 7)
+      : page('456', 'Operations Runbooks', 'ENG', 3)
+  ));
+
+  const result = await runPreflight({
+    operation: 'confluence_move',
+    input: { pageId: '123', newParentId: '456' },
+    invokeJson,
+  });
+
+  expect(result.targets).toEqual([
+    { role: 'source', pageId: '123', title: 'Release Notes', spaceKey: 'eng' },
+    { role: 'destination', pageId: '456', title: 'Operations Runbooks', spaceKey: 'ENG' },
+  ]);
+  expect(result.summary).toContain('Release Notes (ID: 123, SPACE: eng)');
+  expect(result.summary).toContain('Operations Runbooks (ID: 456, SPACE: ENG)');
 });
 
 test('maps a missing direct create destination to TARGET_NOT_FOUND without space enumeration', async () => {

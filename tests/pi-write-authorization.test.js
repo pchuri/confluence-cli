@@ -150,6 +150,12 @@ test('requires every resolved target space to be allowed and normalizes Set entr
   ], new Set(['eng']))).not.toThrow();
 });
 
+test('keeps personal-space allowlists case-insensitive', () => {
+  expect(() => assertAllowedSpaces([
+    { role: 'destination', spaceKey: '~alice' },
+  ], new Set(['~ALICE']))).not.toThrow();
+});
+
 test('rejects project escapes for input and output paths', () => {
   const fixture = makeProjectFixture();
   try {

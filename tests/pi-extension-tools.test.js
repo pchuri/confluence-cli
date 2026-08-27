@@ -491,6 +491,40 @@ test('URL mutation input is rewritten to the canonical confirmed page ID before 
   expect(output.calls.at(-1).args).toEqual(['--json', 'delete', '123', '--yes']);
 });
 
+test('create lookup preserves the requested personal key and server casing in confirmation', () => {
+  const output = runHarness({
+    env: { ...VALID_WRITE_ENV, CONFLUENCE_PI_WRITE_SPACES: '~ALICE' },
+    createSpaceKey: '~Alice',
+    createSpaceName: 'Alice Personal Space',
+    toolName: 'confluence_create',
+    input: { title: 'Personal Notes', spaceKey: ' ~alice ', content: 'body' },
+  });
+
+  expect(output.error).toBeNull();
+  expect(output.events).toEqual([
+    'preflight:confluence_space_lookup:~alice',
+    'confirm:Create "Personal Notes" in Alice Personal Space (SPACE: ~Alice) [4 bytes; type: page]?',
+    'mutation:confluence_create:Personal Notes',
+  ]);
+  expect(output.calls[0].args).toEqual(['--json', 'space-lookup', '~alice']);
+});
+
+test('writes the server-returned create key unchanged into final argv', () => {
+  const output = runHarness({
+    env: { ...VALID_WRITE_ENV, CONFLUENCE_PI_WRITE_SPACES: '~ALICE' },
+    createSpaceKey: '~Alice',
+    createSpaceName: 'Alice Personal Space',
+    toolName: 'confluence_create',
+    input: { title: 'Personal Notes', spaceKey: '~ALICE', content: 'body' },
+  });
+
+  expect(output.error).toBeNull();
+  expect(output.calls[0].args).toEqual(['--json', 'space-lookup', '~ALICE']);
+  expect(output.calls[1].args).toEqual([
+    '--json', 'create', 'Personal Notes', '~Alice', '--content', 'body', '--format', 'storage', '--type', 'page',
+  ]);
+});
+
 test('destructive page delete requires the exact page phrase before building argv with --yes', () => {
   const output = runHarness({
     env: VALID_WRITE_ENV,
