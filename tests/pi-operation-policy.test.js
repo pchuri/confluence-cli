@@ -234,9 +234,54 @@ test('lists the exact allowed tool surface', () => {
   });
 });
 
+test('builds the hidden direct space lookup operation without registering a Pi tool', () => {
+  expect(buildArgs('confluence_space_lookup', { spaceKey: 'ENG' }))
+    .toEqual(['--json', 'space-lookup', 'ENG']);
+  expect(getOperation('confluence_space_lookup').maxOutputBytes).toBe(16 * 1024);
+  expect(listToolNames()).not.toContain('confluence_space_lookup');
+});
+
+test.each([
+  ['confluence_comment_lookup', { commentId: 'reply-456' }, ['--json', 'comment-lookup', 'reply-456']],
+  ['confluence_attachment_lookup', { attachmentId: 'attachment-141' }, ['--json', 'attachment-lookup', 'attachment-141']],
+])('builds hidden direct ownership lookup %s without registering a Pi tool', (toolName, input, expectedArgs) => {
+  expect(buildArgs(toolName, input)).toEqual(expectedArgs);
+  expect(getOperation(toolName)).toMatchObject({
+    maxOutputBytes: 16 * 1024,
+    risk: RISK.READ,
+    timeoutMs: 30_000,
+    mutation: false,
+    expectJson: true,
+  });
+  expect(listToolNames()).not.toContain(toolName);
+});
+
 test('uses the exact copy-tree timeout', () => {
   expect(getOperation('confluence_copy_tree').timeoutMs).toBe(300_000);
   expect(getOperation('confluence_copy_tree_preview').timeoutMs).toBe(30_000);
+});
+
+test('uses exact per-operation output budgets with a 48 KiB default', () => {
+  const expectedBudgets = {
+    confluence_read: 1024 * 1024,
+    confluence_search: 256 * 1024,
+    confluence_spaces: 256 * 1024,
+    confluence_children: 256 * 1024,
+    confluence_find: 256 * 1024,
+    confluence_versions: 256 * 1024,
+    confluence_comments: 256 * 1024,
+    confluence_attachments: 256 * 1024,
+    confluence_property_list: 256 * 1024,
+    confluence_convert: 1024 * 1024,
+    confluence_property_get: 1024 * 1024,
+    confluence_copy_tree_preview: 32 * 1024,
+    confluence_copy_tree: 1024 * 1024,
+  };
+
+  for (const [name, budget] of Object.entries(expectedBudgets)) {
+    expect(getOperation(name).maxOutputBytes).toBe(budget);
+  }
+  expect(getOperation('confluence_info').maxOutputBytes).toBe(48 * 1024);
 });
 
 test.each(CASES)('$toolName maps to fixed policy metadata and argv', ({ toolName, input, args, meta }) => {

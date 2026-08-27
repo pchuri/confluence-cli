@@ -73,9 +73,12 @@ function identify(args) {
   const map = {
     info: 'confluence_info',
     spaces: 'confluence_spaces',
+    'space-lookup': 'confluence_space_lookup',
     attachments: 'confluence_attachments',
     comments: 'confluence_comments',
     'property-list': 'confluence_property_list',
+    'comment-lookup': 'confluence_comment_lookup',
+    'attachment-lookup': 'confluence_attachment_lookup',
     versions: 'confluence_versions',
     'versions-purge': 'confluence_versions_purge',
     create: 'confluence_create',
@@ -137,6 +140,28 @@ async function runCommand(options) {
     let json;
     if (info.toolName === 'confluence_info') {
       json = page(info.id);
+    } else if (info.toolName === 'confluence_comment_lookup') {
+      json = {
+        id: info.id,
+        pageId: setting('commentPageId', '123'),
+        parentId: setting('commentParentId', 'parent-123'),
+        title: setting('commentTitle', 'A reply'),
+      };
+    } else if (info.toolName === 'confluence_attachment_lookup') {
+      json = {
+        id: info.id,
+        pageId: setting('attachmentPageId', '123'),
+        title: setting('attachmentTitle', 'release.pdf'),
+        mediaType: setting('attachmentMediaType', 'application/pdf'),
+        fileSize: setting('attachmentFileSize', 204800),
+        version: setting('attachmentVersion', 7),
+      };
+    } else if (info.toolName === 'confluence_space_lookup') {
+      json = {
+        key: setting('createSpaceKey', 'ENG'),
+        name: setting('createSpaceName', 'Engineering'),
+        type: 'global',
+      };
     } else if (info.toolName === 'confluence_spaces') {
       json = { spaceCount: 1, spaces: [{ key: setting('createSpaceKey', 'ENG'), name: setting('createSpaceName', 'Engineering') }] };
     } else if (['confluence_comments', 'confluence_attachments', 'confluence_property_list', 'confluence_versions'].includes(info.toolName)) {
@@ -150,10 +175,7 @@ async function runCommand(options) {
         targetParentVersion: setting('previewTargetVersion', setting('destinationVersion', 3)),
         rootTitle: setting('copyRootTitle', 'Release Notes (Copy)'),
         childCount,
-        plannedTree: Array.from({ length: childCount }, (_, index) => ({
-          id: String(200 + index), parentId: index === 0 ? '123' : String(199 + index),
-          title: 'Child ' + index, version: setting('plannedVersion', 4),
-        })),
+        plannedTreeFingerprint: setting('plannedTreeFingerprint', 'a'.repeat(64)),
       };
     } else {
       json = { ok: true, argv: options.args };
@@ -332,11 +354,23 @@ test('read tools execute through the injected policy runner as non-mutating comm
     args: ['--json', 'attachments', '123', '--limit', '5', '--pattern', '*.png', '--download', '--dest', path.resolve(__dirname, '../downloads')],
     env: { CONFLUENCE_DOMAIN: 'example.atlassian.net' },
     timeoutMs: 30000,
-    maxOutputBytes: 48 * 1024,
+    maxOutputBytes: 256 * 1024,
     expectJson: true,
     mutation: false,
   });
   expect(output.result.content[0].text).toContain(UNTRUSTED_PREFIX);
+});
+
+test('default-budget operations propagate the 48 KiB output limit', () => {
+  const output = runHarness({
+    env: { CONFLUENCE_DOMAIN: 'example.atlassian.net' },
+    toolName: 'confluence_info',
+    input: { pageId: '123' },
+  });
+
+  expect(output.error).toBeNull();
+  expect(output.calls).toHaveLength(1);
+  expect(output.calls[0].maxOutputBytes).toBe(48 * 1024);
 });
 
 test.each([
@@ -573,7 +607,7 @@ test('version purge preview approves only historical versions and execution requ
 
 test.each([
   ['stale current version snapshot', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' }, currentVersion: 5, versions: [{ number: 1 }, { number: 2 }, { number: 3 }, { number: 4 }, { number: 5 }] }], 'STALE_PREFLIGHT'],
-  ['stale copy descendant version snapshot', [{ toolName: 'confluence_copy_tree_preview', input: { sourcePageId: '123', targetParentId: '456' }, plannedVersion: 4 }, { toolName: 'confluence_copy_tree', input: { approvalId: '$approvalId' }, plannedVersion: 5 }], 'STALE_PREFLIGHT'],
+  ['stale copy-tree fingerprint snapshot', [{ toolName: 'confluence_copy_tree_preview', input: { sourcePageId: '123', targetParentId: '456' }, plannedTreeFingerprint: 'a'.repeat(64) }, { toolName: 'confluence_copy_tree', input: { approvalId: '$approvalId' }, plannedTreeFingerprint: 'b'.repeat(64) }], 'STALE_PREFLIGHT'],
   ['expired approval', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' }, now: 1000 }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId' }, now: 301001 }], 'EXPIRED_APPROVAL'],
   ['mismatched operation', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } }, { toolName: 'confluence_copy_tree', input: { approvalId: '$approvalId' } }], 'APPROVAL_OPERATION_MISMATCH'],
   ['approval input with extra fields', [{ toolName: 'confluence_versions_purge_preview', input: { pageId: '123' } }, { toolName: 'confluence_versions_purge', input: { approvalId: '$approvalId', pageId: '123' } }], 'INVALID_APPROVAL_INPUT'],
@@ -627,6 +661,37 @@ test.each([
   expect(confirmationIndex).toBeGreaterThanOrEqual(0);
   expect(hasMutation(output)).toBe(true);
   expect(confirmationIndex).toBeLessThan(output.events.findIndex((event) => event.startsWith('mutation:')));
+});
+
+test.each([
+  ['comment', 'confluence_comment_delete', 'reply-456', 'commentId', 'comment-lookup', 'commentPageId'],
+  ['attachment', 'confluence_attachment_delete', 'attachment-141', 'attachmentId', 'attachment-lookup', 'attachmentPageId'],
+])('destructive %s preflight uses its hidden direct lookup with a 16 KiB budget and no list enumeration', (_label, toolName, targetId, scenarioIdKey, command, ownershipKey) => {
+  const output = runHarness({
+    env: VALID_WRITE_ENV,
+    toolName,
+    input: { pageId: '123', [scenarioIdKey]: targetId },
+    [scenarioIdKey]: targetId,
+    [ownershipKey]: '123',
+  });
+
+  expect(output.error).toBeNull();
+  const lookupToolName = toolName === 'confluence_comment_delete'
+    ? 'confluence_comment_lookup'
+    : 'confluence_attachment_lookup';
+  const listToolName = toolName === 'confluence_comment_delete'
+    ? 'confluence_comments'
+    : 'confluence_attachments';
+  expect(output.events).toContain(`preflight:${lookupToolName}:${targetId}`);
+  expect(output.events.some((event) => event.startsWith(`preflight:${listToolName}:`))).toBe(false);
+  const lookupCall = output.calls.find((call) => call.args[1] === command);
+  expect(lookupCall).toMatchObject({
+    args: ['--json', command, targetId],
+    timeoutMs: 30_000,
+    maxOutputBytes: 16 * 1024,
+    expectJson: true,
+    mutation: false,
+  });
 });
 
 test('revalidates inline payloads against freshly tightened limits after confirmation', () => {

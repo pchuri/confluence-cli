@@ -118,6 +118,15 @@ function registerAttachmentCommands(program, { withClient }) {
     }));
 
   program
+    .command('attachment-lookup <attachmentId>')
+    .description('Look up compact metadata for one attachment')
+    .action(withClient('attachment_lookup', async ({ client, analytics, emitJson }, attachmentId) => {
+      const attachment = await client.getAttachmentMetadata(attachmentId);
+      emitJson(attachment === null ? { found: false, id: String(attachmentId) } : attachment);
+      analytics.track('attachment_lookup', true);
+    }));
+
+  program
     .command('attachment-upload <pageId>')
     .description('Upload one or more attachments to a page')
     .option('-f, --file <file>', 'File to upload (repeatable)', (value, previous) => {

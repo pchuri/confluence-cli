@@ -322,6 +322,15 @@ function registerCommentCommands(program, { withClient }) {
     }));
 
   program
+    .command('comment-lookup <commentId>')
+    .description('Look up compact metadata for one comment')
+    .action(withClient('comment_lookup', async ({ client, analytics, emitJson }, commentId) => {
+      const comment = await client.getCommentMetadata(commentId);
+      emitJson(comment === null ? { found: false, id: String(commentId) } : comment);
+      analytics.track('comment_lookup', true);
+    }));
+
+  program
     .command('comment-delete <commentId>')
     .description('Delete a comment by ID')
     .option('-y, --yes', 'Skip confirmation prompt')

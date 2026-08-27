@@ -18,6 +18,7 @@ const registerExportCommand = require('./commands/export');
 const registerApiCommand = require('./commands/api');
 const { readStdin } = require('../lib/stdin-utils');
 const { emitJson, emitJsonError, jsonRequested, setJsonMode } = require('../lib/output');
+const { fingerprintCopyPlan } = require('../lib/pi/copy-plan');
 
 const READ_ONLY_MESSAGE = 'This profile is in read-only mode. Write operations are not allowed.';
 const READ_ONLY_TIP = 'Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.';
@@ -155,8 +156,8 @@ function wantsJson(options) {
 // a usage error — fail loud instead of silently emitting human-readable output.
 const JSON_COMMANDS = new Set([
   // read / query
-  'info', 'search', 'spaces', 'find', 'children',
-  'versions', 'comments', 'attachments',
+  'info', 'search', 'spaces', 'space-lookup', 'find', 'children',
+  'versions', 'comments', 'comment-lookup', 'attachments', 'attachment-lookup',
   'property-list', 'property-get', 'property-set',
   'api', // already emits raw JSON
   // mutations
@@ -288,6 +289,16 @@ program
       console.log(`${chalk.green(space.key)} - ${space.name}`);
     });
     analytics.track('spaces', true);
+  }));
+
+// Look up one space command
+program
+  .command('space-lookup <spaceKey>')
+  .description('Look up one Confluence space')
+  .action(withClient('space_lookup', async ({ client, analytics, emitJson }, spaceKey) => {
+    const space = await client.getSpaceMetadata(spaceKey);
+    emitJson(space === null ? { found: false, key: String(spaceKey) } : space);
+    analytics.track('space_lookup', true);
   }));
 
 // Stats command
@@ -706,12 +717,12 @@ program
           targetParentId: canonicalTargetId,
           targetParentVersion: versionNumber(targetInfo.version),
           childCount: filtered.length,
-          plannedTree: filtered.map(page => ({
+          plannedTreeFingerprint: fingerprintCopyPlan(filtered.map(page => ({
             id: String(page.id),
             parentId: String(page.parentId),
             title: page.title,
             version: versionNumber(page.version),
-          })),
+          }))),
         });
         analytics.track('copy_tree_dry_run', true);
         return;

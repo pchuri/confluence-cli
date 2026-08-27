@@ -1,5 +1,7 @@
 const { runPreflight, stableFingerprint } = require('../lib/pi/preflight');
 
+const PLANNED_TREE_FINGERPRINT = 'a'.repeat(64);
+
 function page(id, title, spaceKey, versionNumber = 1) {
   return {
     id,
@@ -18,6 +20,14 @@ function makeInvokeJson() {
   return jest.fn(async (toolName, input) => {
     if (toolName === 'confluence_info') {
       return pages[String(input.pageId)];
+    }
+
+    if (toolName === 'confluence_comment_lookup') {
+      return { id: String(input.commentId), pageId: '123', parentId: null, title: 'Comment' };
+    }
+
+    if (toolName === 'confluence_attachment_lookup') {
+      return { id: String(input.attachmentId), pageId: '123', title: 'Attachment', mediaType: '', fileSize: 0, version: 1 };
     }
 
     if (toolName === 'confluence_comments') {
@@ -61,9 +71,7 @@ function makeInvokeJson() {
         targetParentVersion: 3,
         rootTitle: 'Release Notes (Copy)',
         childCount: 13,
-        plannedTree: Array.from({ length: 13 }, (_, index) => ({
-          id: String(200 + index), parentId: index === 0 ? '123' : String(199 + index), title: `Child ${index}`, version: 4,
-        })),
+        plannedTreeFingerprint: PLANNED_TREE_FINGERPRINT,
       };
     }
 
@@ -120,30 +128,64 @@ test('rejects canonical info records whose ID mismatches a requested page ID', a
   })).rejects.toMatchObject({ code: 'TARGET_MISMATCH' });
 });
 
-test('resolves create destination from one canonical accessible space', async () => {
+test('resolves create destination from one direct lookup without enumerating spaces', async () => {
+  const unusedSpaces = Array.from({ length: 501 }, (_, index) => ({
+    key: `UNUSED-${index}`,
+    name: `Unused Space ${index}`,
+    type: 'global',
+  }));
+  const invokeJson = jest.fn(async (toolName) => {
+    if (toolName === 'confluence_space_lookup') {
+      return { key: 'ENG', name: 'Engineering', type: 'global' };
+    }
+    if (toolName === 'confluence_spaces') {
+      return { spaceCount: unusedSpaces.length, spaces: unusedSpaces };
+    }
+    throw new Error(`unexpected tool ${toolName}`);
+  });
+
   const result = await runPreflight({
     operation: 'confluence_create',
     input: { title: 'New Page', spaceKey: 'eng', content: 'body' },
-    invokeJson: jest.fn(async () => ({
-      spaceCount: 2,
-      spaces: [{ key: 'ENG', name: 'Engineering' }, { key: 'OPS', name: 'Operations' }],
-    })),
+    invokeJson,
   });
 
+  expect(invokeJson).toHaveBeenCalledWith('confluence_space_lookup', { spaceKey: 'ENG' });
+  expect(invokeJson).not.toHaveBeenCalledWith('confluence_spaces', expect.anything());
   expect(result.input.spaceKey).toBe('ENG');
   expect(result.targets).toEqual([{ role: 'destination', title: 'Engineering', spaceKey: 'ENG' }]);
   expect(result.summary).toContain('Engineering (SPACE: ENG)');
 });
 
-test.each([
-  ['missing', [{ key: 'OPS', name: 'Operations' }]],
-  ['ambiguous', [{ key: 'ENG', name: 'Engineering' }, { key: 'eng', name: 'Duplicate' }]],
-])('rejects a %s create destination space', async (_label, spaces) => {
+test('maps a missing direct create destination to TARGET_NOT_FOUND without space enumeration', async () => {
+  const invokeJson = jest.fn(async (toolName) => {
+    if (toolName === 'confluence_space_lookup') {
+      return { found: false, key: 'ENG' };
+    }
+    if (toolName === 'confluence_spaces') {
+      throw new Error('space enumeration must not run');
+    }
+    throw new Error(`unexpected tool ${toolName}`);
+  });
+
   await expect(runPreflight({
     operation: 'confluence_create',
     input: { title: 'New Page', spaceKey: 'ENG', content: 'body' },
-    invokeJson: jest.fn(async () => ({ spaceCount: spaces.length, spaces })),
-  })).rejects.toMatchObject({ code: expect.stringMatching(/SPACE/) });
+    invokeJson,
+  })).rejects.toMatchObject({ code: 'TARGET_NOT_FOUND' });
+
+  expect(invokeJson).not.toHaveBeenCalledWith('confluence_spaces', expect.anything());
+});
+
+test.each([
+  ['missing key', { name: 'Operations', type: 'global' }],
+  ['missing name', { key: 'ENG', type: 'global' }],
+])('rejects malformed direct create destination lookup (%s)', async (_label, space) => {
+  await expect(runPreflight({
+    operation: 'confluence_create',
+    input: { title: 'New Page', spaceKey: 'ENG', content: 'body' },
+    invokeJson: jest.fn(async () => space),
+  })).rejects.toMatchObject({ code: 'MALFORMED_RESULT' });
 });
 
 test.each([
@@ -189,7 +231,7 @@ test('create confirmation includes canonical destination, title, type, format, a
   const result = await runPreflight({
     operation: 'confluence_create',
     input: { title: 'New Page', spaceKey: 'ENG', content: 'secret body', bodyBytes: 11, format: 'markdown', type: 'page' },
-    invokeJson: jest.fn(async () => ({ spaceCount: 1, spaces: [{ key: 'ENG', name: 'Engineering' }] })),
+    invokeJson: jest.fn(async () => ({ key: 'ENG', name: 'Engineering', type: 'global' })),
   });
 
   expect(result.summary).toContain('New Page');
@@ -200,7 +242,7 @@ test('create confirmation includes canonical destination, title, type, format, a
   expect(result.summary).not.toContain('secret body');
 });
 
-test('resolves comment, attachment, and property ownership through confluence_info before checking list JSON shapes', async () => {
+test('resolves comment, attachment, and property ownership through confluence_info before checking ownership response shapes', async () => {
   const invokeJson = makeInvokeJson();
 
   const comment = await runPreflight({
@@ -226,9 +268,147 @@ test('resolves comment, attachment, and property ownership through confluence_in
   expect(property.phrase).toBe('DELETE PROPERTY release-notes FROM 123');
   expect(property.summary).toContain('Release Notes (ID: 123, SPACE: ENG)');
   expect(invokeJson).toHaveBeenCalledWith('confluence_info', { pageId: '123' });
-  expect(invokeJson).toHaveBeenCalledWith('confluence_comments', expect.objectContaining({ pageId: '123', start: 0 }));
-  expect(invokeJson).toHaveBeenCalledWith('confluence_attachments', expect.objectContaining({ pageId: '123', start: 0 }));
+  expect(invokeJson).toHaveBeenCalledWith('confluence_comment_lookup', { commentId: '88' });
+  expect(invokeJson).toHaveBeenCalledWith('confluence_attachment_lookup', { attachmentId: '678' });
   expect(invokeJson).toHaveBeenCalledWith('confluence_property_list', expect.objectContaining({ pageId: '123', start: 0 }));
+});
+
+test('resolves reply-comment ownership through a direct lookup without enumerating comments', async () => {
+  const invokeJson = jest.fn(async (toolName, input) => {
+    if (toolName === 'confluence_info') return page('123', 'Release Notes', 'ENG', 7);
+    if (toolName === 'confluence_comment_lookup') {
+      expect(input).toEqual({ commentId: 'reply-456' });
+      return { id: 'reply-456', pageId: '123', parentId: 'parent-123', title: 'A reply' };
+    }
+    if (toolName === 'confluence_comments') {
+      return { pageId: '123', results: [{ id: 'reply-456' }] };
+    }
+    throw new Error(`unexpected tool ${toolName}`);
+  });
+
+  const result = await runPreflight({
+    operation: 'confluence_comment_delete',
+    input: { pageId: '123', commentId: 'reply-456' },
+    invokeJson,
+  });
+
+  expect(result.phrase).toBe('DELETE COMMENT reply-456 FROM 123');
+  expect(result.summary).toContain('Release Notes (ID: 123, SPACE: ENG)');
+  expect(invokeJson).toHaveBeenCalledWith('confluence_comment_lookup', { commentId: 'reply-456' });
+  expect(invokeJson).not.toHaveBeenCalledWith('confluence_comments', expect.anything());
+});
+
+test('rejects a reply-comment direct lookup whose page ownership does not match', async () => {
+  const invokeJson = jest.fn(async (toolName) => {
+    if (toolName === 'confluence_info') return page('123', 'Release Notes', 'ENG', 7);
+    if (toolName === 'confluence_comment_lookup') {
+      return { id: 'reply-456', pageId: '999', parentId: 'parent-999', title: 'A reply' };
+    }
+    if (toolName === 'confluence_comments') {
+      return { pageId: '123', results: [{ id: 'reply-456' }] };
+    }
+    throw new Error(`unexpected tool ${toolName}`);
+  });
+
+  await expect(runPreflight({
+    operation: 'confluence_comment_delete',
+    input: { pageId: '123', commentId: 'reply-456' },
+    invokeJson,
+  })).rejects.toMatchObject({ code: 'TARGET_MISMATCH' });
+
+  expect(invokeJson).toHaveBeenCalledWith('confluence_comment_lookup', { commentId: 'reply-456' });
+  expect(invokeJson).not.toHaveBeenCalledWith('confluence_comments', expect.anything());
+});
+
+test('resolves attachment ownership through a direct lookup without enumerating 141 attachments', async () => {
+  const attachments = Array.from({ length: 141 }, (_, index) => ({ id: `attachment-${index + 1}` }));
+  const invokeJson = jest.fn(async (toolName, input) => {
+    if (toolName === 'confluence_info') return page('123', 'Release Notes', 'ENG', 7);
+    if (toolName === 'confluence_attachment_lookup') {
+      expect(input).toEqual({ attachmentId: 'attachment-141' });
+      return {
+        id: 'attachment-141', pageId: '123', title: 'release.pdf',
+        mediaType: 'application/pdf', fileSize: 204800, version: 7,
+      };
+    }
+    if (toolName === 'confluence_attachments') {
+      return { pageId: '123', results: attachments };
+    }
+    throw new Error(`unexpected tool ${toolName}`);
+  });
+
+  const result = await runPreflight({
+    operation: 'confluence_attachment_delete',
+    input: { pageId: '123', attachmentId: 'attachment-141' },
+    invokeJson,
+  });
+
+  expect(result.phrase).toBe('DELETE ATTACHMENT attachment-141 FROM 123');
+  expect(result.summary).toContain('Release Notes (ID: 123, SPACE: ENG)');
+  expect(invokeJson).toHaveBeenCalledWith('confluence_attachment_lookup', { attachmentId: 'attachment-141' });
+  expect(invokeJson).not.toHaveBeenCalledWith('confluence_attachments', expect.anything());
+});
+
+test('rejects an attachment direct lookup whose page ownership does not match', async () => {
+  const invokeJson = jest.fn(async (toolName) => {
+    if (toolName === 'confluence_info') return page('123', 'Release Notes', 'ENG', 7);
+    if (toolName === 'confluence_attachment_lookup') {
+      return {
+        id: 'attachment-141', pageId: '999', title: 'release.pdf',
+        mediaType: 'application/pdf', fileSize: 204800, version: 7,
+      };
+    }
+    if (toolName === 'confluence_attachments') {
+      return { pageId: '123', results: [{ id: 'attachment-141' }] };
+    }
+    throw new Error(`unexpected tool ${toolName}`);
+  });
+
+  await expect(runPreflight({
+    operation: 'confluence_attachment_delete',
+    input: { pageId: '123', attachmentId: 'attachment-141' },
+    invokeJson,
+  })).rejects.toMatchObject({ code: 'TARGET_MISMATCH' });
+
+  expect(invokeJson).toHaveBeenCalledWith('confluence_attachment_lookup', { attachmentId: 'attachment-141' });
+  expect(invokeJson).not.toHaveBeenCalledWith('confluence_attachments', expect.anything());
+});
+
+test.each([
+  ['comment', 'confluence_comment_delete', 'commentId', 'reply-456', 'confluence_comment_lookup', 'confluence_comments'],
+  ['attachment', 'confluence_attachment_delete', 'attachmentId', 'attachment-141', 'confluence_attachment_lookup', 'confluence_attachments'],
+])('maps a missing direct %s target to TARGET_NOT_FOUND without enumeration', async (_label, operation, idKey, id, lookupTool, listTool) => {
+  const invokeJson = jest.fn(async (toolName) => {
+    if (toolName === 'confluence_info') return page('123', 'Release Notes', 'ENG', 7);
+    if (toolName === lookupTool) return { found: false, id };
+    if (toolName === listTool) throw new Error('target enumeration must not run');
+    throw new Error(`unexpected tool ${toolName}`);
+  });
+
+  await expect(runPreflight({
+    operation,
+    input: { pageId: '123', [idKey]: id },
+    invokeJson,
+  })).rejects.toMatchObject({ code: 'TARGET_NOT_FOUND' });
+
+  expect(invokeJson).not.toHaveBeenCalledWith(listTool, expect.anything());
+});
+
+test.each([
+  ['confluence_comment_delete', 'commentId', 'reply-456', 'confluence_comment_lookup'],
+  ['confluence_attachment_delete', 'attachmentId', 'attachment-141', 'confluence_attachment_lookup'],
+])('rejects missing direct ownership page metadata as MALFORMED_RESULT', async (operation, idKey, id, lookupTool) => {
+  const invokeJson = jest.fn(async (toolName) => {
+    if (toolName === 'confluence_info') return page('123', 'Release Notes', 'ENG', 7);
+    if (toolName === lookupTool) return { id, pageId: null };
+    throw new Error(`unexpected tool ${toolName}`);
+  });
+
+  await expect(runPreflight({
+    operation,
+    input: { pageId: '123', [idKey]: id },
+    invokeJson,
+  })).rejects.toMatchObject({ code: 'MALFORMED_RESULT' });
 });
 
 test('rejects missing ownership targets, missing property keys, current versions, malformed metadata, and truncated output', async () => {
@@ -303,20 +483,20 @@ test('rejects missing ownership targets, missing property keys, current versions
 
 test('rejects repeated pagination cursors and pagination loops', async () => {
   await expect(runPreflight({
-    operation: 'confluence_comment_delete',
-    input: { pageId: '123', commentId: '88' },
+    operation: 'confluence_property_delete',
+    input: { pageId: '123', key: 'missing-key' },
     invokeJson: jest.fn(async (_toolName, input) => ({
       id: '123',
       title: 'Release Notes',
       space: { key: 'ENG' },
-      results: input.start === 0 ? [{ id: '1' }] : [{ id: '2' }],
+      results: input.start === 0 ? [{ key: 'one' }] : [{ key: 'two' }],
       nextStart: 0,
     })),
   })).rejects.toThrow(/cursor|loop/i);
 
   await expect(runPreflight({
-    operation: 'confluence_comment_delete',
-    input: { pageId: '123', commentId: '88' },
+    operation: 'confluence_property_delete',
+    input: { pageId: '123', key: 'missing-key' },
     invokeJson: jest.fn(async (_toolName, input) => ({
       id: '123',
       title: 'Release Notes',
@@ -370,7 +550,7 @@ test('returns copy tree facts from the preview response rootTitle', async () => 
     totalCreateCount: 14,
     sourceVersion: 7,
     destinationVersion: 3,
-    plannedTreeFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+    plannedTreeFingerprint: PLANNED_TREE_FINGERPRINT,
   });
   expect(result.phrase).toBe('COPY 14 PAGES FROM 123 TO 456');
   expect(result.summary).toContain('Release Notes (ID: 123, SPACE: ENG)');
@@ -393,9 +573,7 @@ test('copy tree summary keeps canonical source and destination titles when plann
         sourcePageId: '123', sourceVersion: 7,
         targetParentId: '456', targetParentVersion: 3,
         rootTitle: 'Cloned Launch Plan', childCount: 13,
-        plannedTree: Array.from({ length: 13 }, (_, index) => ({
-          id: String(200 + index), parentId: index === 0 ? '123' : String(199 + index), title: `Child ${index}`, version: 4,
-        })),
+        plannedTreeFingerprint: PLANNED_TREE_FINGERPRINT,
       };
     }
     throw new Error(`unexpected tool ${toolName}`);
@@ -426,10 +604,34 @@ test.each([-1, 1.5, NaN, Infinity])('rejects invalid copy-tree child count %s', 
       return {
         sourcePageId: '123', sourceVersion: 7,
         targetParentId: '456', targetParentVersion: 3,
-        rootTitle: 'Copy', childCount, plannedTree: [],
+        rootTitle: 'Copy', childCount, plannedTreeFingerprint: PLANNED_TREE_FINGERPRINT,
       };
     }),
   })).rejects.toMatchObject({ code: 'MALFORMED_RESULT' });
+});
+
+test.each([
+  undefined,
+  'not-a-fingerprint',
+  'A'.repeat(64),
+  'a'.repeat(63),
+])('rejects invalid copy-tree planned fingerprint %p', async (plannedTreeFingerprint) => {
+  await expect(runPreflight({
+    operation: 'confluence_copy_tree_preview',
+    input: { sourcePageId: '123', targetParentId: '456' },
+    invokeJson: jest.fn(async (toolName, input) => {
+      if (toolName === 'confluence_info') {
+        return String(input.pageId) === '123'
+          ? page('123', 'Release Notes', 'ENG', 7)
+          : page('456', 'Operations Runbooks', 'OPS', 3);
+      }
+      return {
+        sourcePageId: '123', sourceVersion: 7,
+        targetParentId: '456', targetParentVersion: 3,
+        rootTitle: 'Copy', childCount: 1, plannedTreeFingerprint,
+      };
+    }),
+  })).rejects.toThrow(/fingerprint/i);
 });
 
 test('rejects copy preview identity that differs from canonical source or destination', async () => {
@@ -445,13 +647,13 @@ test('rejects copy preview identity that differs from canonical source or destin
       return {
         sourcePageId: '999', sourceVersion: 7,
         targetParentId: '456', targetParentVersion: 3,
-        rootTitle: 'Copy', childCount: 0, plannedTree: [],
+        rootTitle: 'Copy', childCount: 0, plannedTreeFingerprint: PLANNED_TREE_FINGERPRINT,
       };
     }),
   })).rejects.toMatchObject({ code: 'TARGET_MISMATCH' });
 });
 
-test('copy snapshot hash changes when a planned descendant version changes', async () => {
+test('copy snapshot hash changes when the supplied planned-tree fingerprint changes', async () => {
   const run = (version) => runPreflight({
     operation: 'confluence_copy_tree_preview',
     input: { sourcePageId: '123', targetParentId: '456' },
@@ -465,7 +667,7 @@ test('copy snapshot hash changes when a planned descendant version changes', asy
         sourcePageId: '123', sourceVersion: 7,
         targetParentId: '456', targetParentVersion: 3,
         rootTitle: 'Copy', childCount: 1,
-        plannedTree: [{ id: '200', parentId: '123', title: 'Child', version }],
+        plannedTreeFingerprint: version === 4 ? PLANNED_TREE_FINGERPRINT : 'b'.repeat(64),
       };
     }),
   });

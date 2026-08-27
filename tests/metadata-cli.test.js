@@ -30,6 +30,7 @@ describe('CLI metadata and storage output', () => {
       getChildFolders: jest.fn(async () => []),
       getAllDescendantPages: jest.fn(),
       isCloud: jest.fn(() => true),
+      shouldExcludePage: jest.fn(() => false),
       buildUrl: jest.fn((value) => value),
       webUrlPrefix: '/wiki',
       ...clientOverrides
@@ -116,6 +117,43 @@ describe('CLI metadata and storage output', () => {
       version: 7,
       url: 'https://test.atlassian.net/wiki/spaces/ENG/pages/123/Architecture+Overview'
     });
+  });
+
+  test('space-lookup --json prints direct space metadata', async () => {
+    const { program, client } = await loadCli({
+      getSpaceMetadata: jest.fn(async () => ({
+        key: 'ENG',
+        name: 'Engineering',
+        type: 'global',
+      }))
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {});
+
+    await runCli(program, ['--json', 'space-lookup', 'ENG']);
+
+    expect(exitSpy).not.toHaveBeenCalled();
+    expect(client.getSpaceMetadata).toHaveBeenCalledWith('ENG');
+    expect(JSON.parse(logSpy.mock.calls[0][0])).toEqual({
+      key: 'ENG',
+      name: 'Engineering',
+      type: 'global',
+    });
+  });
+
+  test.each([
+    ['space-lookup', 'ENG', 'getSpaceMetadata', { found: false, key: 'ENG' }],
+    ['comment-lookup', 'reply-456', 'getCommentMetadata', { found: false, id: 'reply-456' }],
+    ['attachment-lookup', 'attachment-141', 'getAttachmentMetadata', { found: false, id: 'attachment-141' }],
+  ])('%s --json serializes a missing direct lookup as compact JSON', async (command, id, method, expected) => {
+    const lookup = jest.fn(async () => null);
+    const { program, client } = await loadCli({ [method]: lookup });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['--json', command, id]);
+
+    expect(client[method]).toHaveBeenCalledWith(id);
+    expect(JSON.parse(logSpy.mock.calls[0][0])).toEqual(expected);
   });
 
   test('info default text output remains human-readable', async () => {
@@ -346,7 +384,7 @@ describe('CLI metadata and storage output', () => {
     expect(output).not.toContain('/Child+Page');
   });
 
-  test('copy-tree JSON dry-run returns canonical identities and a versioned complete plan', async () => {
+  test('copy-tree JSON dry-run returns canonical identities and a compact plan fingerprint', async () => {
     const getPageInfo = jest.fn(async (pageId) => (
       String(pageId) === '123'
         ? { id: '123', title: 'Source', version: 7, space: { key: 'ENG' } }
@@ -374,12 +412,37 @@ describe('CLI metadata and storage output', () => {
       targetParentId: '456',
       targetParentVersion: 3,
       childCount: 2,
-      plannedTree: [
-        { id: '200', parentId: '123', title: 'Child', version: 4 },
-        { id: '201', parentId: '200', title: 'Grandchild', version: 2 },
-      ],
+      plannedTreeFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
+    expect(output.plannedTree).toBeUndefined();
     expect(getPageInfo).toHaveBeenCalledWith('456');
+  });
+
+  test('copy-tree JSON dry-run stays below 32 KiB for 1000 descendants', async () => {
+    const descendants = Array.from({ length: 1000 }, (_, index) => ({
+      id: String(200 + index),
+      parentId: index === 0 ? '123' : String(199 + index),
+      title: `Child ${index}`,
+      version: 4,
+    }));
+    const { program } = await loadCli({
+      getPageInfo: jest.fn(async (pageId) => (
+        String(pageId) === '123'
+          ? { id: '123', title: 'Source', version: 7, space: { key: 'ENG' } }
+          : { id: '456', title: 'Destination', version: 3, space: { key: 'ENG' } }
+      )),
+      getAllDescendantPages: jest.fn(async () => descendants),
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['--json', 'copy-tree', '123', '456', '--dry-run', '--quiet']);
+
+    const json = logSpy.mock.calls[0][0];
+    const output = JSON.parse(json);
+    expect(Buffer.byteLength(json, 'utf8')).toBeLessThan(32 * 1024);
+    expect(output.childCount).toBe(1000);
+    expect(output.plannedTreeFingerprint).toMatch(/^[a-f0-9]{64}$/);
+    expect(output.plannedTree).toBeUndefined();
   });
 
   test('children rejects an invalid --type value', async () => {
