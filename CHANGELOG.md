@@ -1,3 +1,10 @@
+# [2.21.0](https://github.com/pchuri/confluence-cli/compare/v2.20.0...v2.21.0) (2026-08-27)
+
+
+### Features
+
+* add protected Pi Confluence tools ([#225](https://github.com/pchuri/confluence-cli/issues/225)) ([e328088](https://github.com/pchuri/confluence-cli/commit/e328088015a59a1e67092380250a3d5a8cb3902b))
+
 # [2.20.0](https://github.com/pchuri/confluence-cli/compare/v2.19.1...v2.20.0) (2026-08-06)
 
 

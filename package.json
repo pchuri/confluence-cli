@@ -1,6 +1,6 @@
 {
   "name": "confluence-cli",
-  "version": "2.20.0",
+  "version": "2.21.0",
   "description": "A command-line interface for Atlassian Confluence with page creation and editing capabilities",
   "main": "index.js",
   "bin": {
@@ -51,8 +51,12 @@
     }
   },
   "pi": {
-    "skills": ["./plugins/confluence/skills"],
-    "extensions": ["./.pi/extensions/confluence-cli.ts"]
+    "skills": [
+      "./plugins/confluence/skills"
+    ],
+    "extensions": [
+      "./.pi/extensions/confluence-cli.ts"
+    ]
   },
   "overrides": {
     "js-yaml": "^4.1.1",
