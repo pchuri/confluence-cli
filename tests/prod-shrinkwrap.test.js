@@ -28,7 +28,7 @@ describe('production shrinkwrap generation', () => {
   test('installs TypeBox for Pi extension tests as a development dependency', () => {
     const manifest = require('../package.json');
 
-    expect(manifest.devDependencies.typebox).toBe('*');
+    expect(manifest.devDependencies.typebox).toBe('^1.3.18');
   });
 
   test('excludes peer packages from the production shrinkwrap', () => {
