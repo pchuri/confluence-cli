@@ -1,3 +1,10 @@
+# [2.22.0](https://github.com/pchuri/confluence-cli/compare/v2.21.0...v2.22.0) (2026-08-28)
+
+
+### Features
+
+* **export:** add attachment exclude patterns ([#229](https://github.com/pchuri/confluence-cli/issues/229)) ([b1bb913](https://github.com/pchuri/confluence-cli/commit/b1bb913ebb25159199ef7e5ee911c68017513ffc))
+
 # [2.21.0](https://github.com/pchuri/confluence-cli/compare/v2.20.0...v2.21.0) (2026-08-27)
 
 
