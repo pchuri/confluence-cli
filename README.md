@@ -631,6 +631,11 @@ confluence export 123456789 --dest ./exports
 # Custom content format/filename and attachment filtering
 confluence export 123456789 --format html --file content.html --pattern "*.png"
 
+# Exclude matching attachments (comma-separated globs)
+confluence export 123456789 --exclude-attachments "*.mp4,*.mov"
+
+# Exclusions are applied after --pattern or --referenced-only when combined
+
 # Skip attachments if you only need the content file
 confluence export 123456789 --skip-attachments
 ```
@@ -978,7 +983,7 @@ confluence stats
 | `property-get <pageId_or_url> <key>` | Get a content property by key | `--json` |
 | `property-set <pageId_or_url> <key>` | Set a content property (create or update) | `--value <json>`, `--file <path>`, `--json` |
 | `property-delete <pageId_or_url> <key>` | Delete a content property by key | `--yes`, `--json` |
-| `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--referenced-only`, `--skip-attachments`, `-r, --recursive`, `--max-depth <depth>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--dry-run`, `--overwrite` |
+| `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--exclude-attachments <patterns>`, `--referenced-only`, `--skip-attachments`, `-r, --recursive`, `--max-depth <depth>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--dry-run`, `--overwrite` |
 | `profile list` | List all configuration profiles | |
 | `profile use <name>` | Set the active configuration profile | |
 | `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol`, `--read-only` |

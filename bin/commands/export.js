@@ -56,6 +56,39 @@ function sanitizeTitle(value) {
   return cleaned || fallback;
 }
 
+/**
+ * Filters attachments according to the export options.
+ *
+ * @param {ConfluenceClient} client - Confluence client instance.
+ * @param {Array} attachments - Attachments to filter.
+ * @param {Object} options - Export options.
+ * @param {Set} referencedAttachments - Referenced attachment filenames.
+ * @returns {Array} Filtered attachments.
+ */
+function filterAttachments(client, attachments, options, referencedAttachments = null) {
+  const pattern = options.pattern ? options.pattern.trim() : null;
+  const excludeAttachmentPatterns = options.excludeAttachments
+    ? options.excludeAttachments.split(',').map(p => p.trim()).filter(Boolean)
+    : [];
+
+  let filtered;
+  if (pattern) {
+    filtered = attachments.filter(att => client.matchesPattern(att.title, pattern));
+  } else if (options.referencedOnly) {
+    filtered = attachments.filter(att => referencedAttachments?.has(att.title));
+  } else {
+    filtered = attachments;
+  }
+
+  if (excludeAttachmentPatterns.length > 0) {
+    filtered = filtered.filter(
+      att => !client.matchesPattern(att.title, excludeAttachmentPatterns)
+    );
+  }
+
+  return filtered;
+}
+
 async function exportRecursive(client, fs, path, pageId, options) {
   const maxDepth = options.maxDepth || 10;
   const delayMs = options.delayMs != null ? options.delayMs : 100;
@@ -152,17 +185,8 @@ async function exportRecursive(client, fs, path, pageId, options) {
 
     // Download attachments
     if (!options.skipAttachments) {
-      const pattern = options.pattern ? options.pattern.trim() : null;
       const allAttachments = await client.getAllAttachments(page.id);
-
-      let filtered;
-      if (pattern) {
-        filtered = allAttachments.filter(att => client.matchesPattern(att.title, pattern));
-      } else if (options.referencedOnly) {
-        filtered = allAttachments.filter(att => referencedAttachments?.has(att.title));
-      } else {
-        filtered = allAttachments;
-      }
+      const filtered = filterAttachments(client, allAttachments, options, referencedAttachments);
 
       if (filtered.length > 0) {
         const attachmentsDirName = options.attachmentsDir || 'attachments';
@@ -239,6 +263,7 @@ function registerExportCommand(program, { withClient }) {
     .option('--file <filename>', 'Content filename (default: page.<ext>)')
     .option('--attachments-dir <name>', 'Subdirectory for attachments', 'attachments')
     .option('--pattern <glob>', 'Filter attachments by filename (e.g., "*.png")')
+    .option('--exclude-attachments <patterns>', 'Comma-separated attachment filename glob patterns to skip')
     .option('--referenced-only', 'Download only attachments referenced in the page content')
     .option('--skip-attachments', 'Do not download attachments')
     .option('-r, --recursive', 'Export page and all descendants')
@@ -297,17 +322,8 @@ function registerExportCommand(program, { withClient }) {
       console.log(`Content: ${chalk.gray(contentPath)}`);
 
       if (!options.skipAttachments) {
-        const pattern = options.pattern ? options.pattern.trim() : null;
         const allAttachments = await client.getAllAttachments(pageId);
-
-        let filtered;
-        if (pattern) {
-          filtered = allAttachments.filter(att => client.matchesPattern(att.title, pattern));
-        } else if (options.referencedOnly) {
-          filtered = allAttachments.filter(att => referencedAttachments?.has(att.title));
-        } else {
-          filtered = allAttachments;
-        }
+        const filtered = filterAttachments(client, allAttachments, options, referencedAttachments);
 
         if (filtered.length === 0) {
           console.log(chalk.yellow('No attachments to download.'));
@@ -341,4 +357,5 @@ module.exports.isExportDirectory = isExportDirectory;
 module.exports.uniquePathFor = uniquePathFor;
 module.exports.writeStream = writeStream;
 module.exports.sanitizeTitle = sanitizeTitle;
+module.exports.filterAttachments = filterAttachments;
 module.exports.exportRecursive = exportRecursive;
