@@ -11,6 +11,7 @@ const {
   uniquePathFor,
   exportRecursive,
   sanitizeTitle,
+  filterAttachments,
 } = require('../bin/commands/export.js');
 const { sanitizeFilename } = require('../lib/file-utils');
 
@@ -218,6 +219,85 @@ describe('sanitizeTitle', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Attachment filtering
+// ---------------------------------------------------------------------------
+describe('filterAttachments', () => {
+  const attachments = [
+    { id: '1', title: 'video.mp4' },
+    { id: '2', title: 'diagram.png' },
+    { id: '3', title: 'archive.zip' },
+  ];
+
+  function matchesPattern(value, patterns) {
+    const list = Array.isArray(patterns) ? patterns : [patterns];
+    return list.some((pattern) => {
+      if (pattern === '*') return true;
+      if (pattern === '*.mp4') return value.toLowerCase().endsWith('.mp4');
+      if (pattern === '*.png') return value.toLowerCase().endsWith('.png');
+      if (pattern === '*.zip') return value.toLowerCase().endsWith('.zip');
+      return value.toLowerCase() === pattern.toLowerCase();
+    });
+  }
+
+  test('preserves existing behavior when no attachment exclusions are provided', () => {
+    const client = { matchesPattern: jest.fn(matchesPattern) };
+
+    expect(filterAttachments(client, attachments, {})).toEqual(attachments);
+  });
+
+  test('ignores empty attachment exclusion patterns', () => {
+    const client = { matchesPattern: jest.fn(matchesPattern) };
+
+    expect(filterAttachments(client, attachments, {
+      excludeAttachments: ' ,  , ',
+    })).toEqual(attachments);
+  });
+
+  test('applies attachment exclusions after an include pattern', () => {
+    const client = { matchesPattern: jest.fn(matchesPattern) };
+
+    const filtered = filterAttachments(client, attachments, {
+      pattern: '*',
+      excludeAttachments: '*.mp4, *.zip',
+    });
+
+    expect(filtered).toEqual([{ id: '2', title: 'diagram.png' }]);
+  });
+
+  test('applies attachment exclusions after referenced-only filtering', () => {
+    const client = { matchesPattern: jest.fn(matchesPattern) };
+    const referenced = new Set(['video.mp4', 'diagram.png']);
+
+    const filtered = filterAttachments(client, attachments, {
+      referencedOnly: true,
+      excludeAttachments: '*.mp4',
+    }, referenced);
+
+    expect(filtered).toEqual([{ id: '2', title: 'diagram.png' }]);
+  });
+
+  test('supports multiple comma-separated exclusion patterns', () => {
+    const client = { matchesPattern: jest.fn(matchesPattern) };
+
+    const filtered = filterAttachments(client, attachments, {
+      excludeAttachments: '*.mp4, *.zip',
+    });
+
+    expect(filtered).toEqual([{ id: '2', title: 'diagram.png' }]);
+  });
+
+  test('can exclude every attachment', () => {
+    const client = { matchesPattern: jest.fn(matchesPattern) };
+
+    const filtered = filterAttachments(client, attachments, {
+      excludeAttachments: '*',
+    });
+
+    expect(filtered).toEqual([]);
+  });
+});
+
 describe('registered non-recursive export command', () => {
   test('dry-run avoids reading content, downloading attachments, and creating export artifacts', async () => {
     const client = {
@@ -249,6 +329,95 @@ describe('registered non-recursive export command', () => {
       expect(client.downloadAttachment).not.toHaveBeenCalled();
       expect(fs.existsSync(destination)).toBe(false);
       expect(fs.existsSync(path.join(destination, 'Dry Run Page', EXPORT_MARKER))).toBe(false);
+    } finally {
+      logSpy.mockRestore();
+      fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('exclude-attachments skips matching downloads without affecting other attachments', async () => {
+    const attachments = [
+      { id: 'attachment-1', title: 'video.mp4' },
+      { id: 'attachment-2', title: 'diagram.png' },
+      { id: 'attachment-3', title: 'recording.MOV' },
+    ];
+    const client = {
+      getPageInfo: jest.fn(async () => ({ id: '123', title: 'Export Page' })),
+      readPage: jest.fn(async () => '# content'),
+      getAllAttachments: jest.fn(async () => attachments),
+      downloadAttachment: jest.fn(async () => {
+        const stream = new PassThrough();
+        stream.end('attachment');
+        return stream;
+      }),
+      matchesPattern: jest.fn((value, patterns) => {
+        const list = Array.isArray(patterns) ? patterns : [patterns];
+        return list.some((pattern) => {
+          if (pattern === '*.mp4') return value.toLowerCase().endsWith('.mp4');
+          if (pattern === '*.mov') return value.toLowerCase().endsWith('.mov');
+          return false;
+        });
+      }),
+      _referencedAttachments: new Set(),
+    };
+    const analytics = { track: jest.fn() };
+    const program = new Command();
+    const registerExportCommand = require('../bin/commands/export.js');
+    registerExportCommand(program, {
+      withClient: (_command, handler) => async (...args) => handler({ client, analytics }, ...args),
+    });
+    const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-export-exclude-'));
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      await program.parseAsync([
+        'export',
+        '123',
+        '--dest', temporaryRoot,
+        '--exclude-attachments', '*.mp4, *.mov',
+      ], { from: 'user' });
+
+      expect(client.getAllAttachments).toHaveBeenCalledWith('123');
+      expect(client.downloadAttachment).toHaveBeenCalledTimes(1);
+      expect(client.downloadAttachment).toHaveBeenCalledWith('123', attachments[1]);
+      expect(fs.existsSync(path.join(temporaryRoot, 'Export Page', 'attachments', 'diagram.png'))).toBe(true);
+      expect(fs.existsSync(path.join(temporaryRoot, 'Export Page', 'attachments', 'video.mp4'))).toBe(false);
+      expect(fs.existsSync(path.join(temporaryRoot, 'Export Page', 'attachments', 'recording.MOV'))).toBe(false);
+    } finally {
+      logSpy.mockRestore();
+      fs.rmSync(temporaryRoot, { recursive: true, force: true });
+    }
+  });
+
+  test('skip-attachments still bypasses attachment listing when exclusions are also provided', async () => {
+    const client = {
+      getPageInfo: jest.fn(async () => ({ id: '123', title: 'Export Page' })),
+      readPage: jest.fn(async () => '# content'),
+      getAllAttachments: jest.fn(async () => []),
+      downloadAttachment: jest.fn(),
+      matchesPattern: jest.fn(),
+      _referencedAttachments: new Set(),
+    };
+    const analytics = { track: jest.fn() };
+    const program = new Command();
+    const registerExportCommand = require('../bin/commands/export.js');
+    registerExportCommand(program, {
+      withClient: (_command, handler) => async (...args) => handler({ client, analytics }, ...args),
+    });
+    const temporaryRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-export-skip-'));
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    try {
+      await program.parseAsync([
+        'export',
+        '123',
+        '--dest', temporaryRoot,
+        '--skip-attachments',
+        '--exclude-attachments', '*.mp4',
+      ], { from: 'user' });
+
+      expect(client.getAllAttachments).not.toHaveBeenCalled();
+      expect(client.downloadAttachment).not.toHaveBeenCalled();
     } finally {
       logSpy.mockRestore();
       fs.rmSync(temporaryRoot, { recursive: true, force: true });
@@ -403,6 +572,34 @@ describe('exportRecursive', () => {
     const marker = JSON.parse(fs._store[markerPath]);
     expect(marker.tool).toBe('confluence-cli');
     expect(marker.pageId).toBe('1');
+
+    consoleSpy.mockRestore();
+  });
+
+  test('exclude-attachments applies during recursive export', async () => {
+    const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    client.getAllDescendantPages.mockResolvedValue([]);
+    client.buildPageTree.mockReturnValue([]);
+    client.getAllAttachments.mockResolvedValue([
+      { id: 'attachment-1', title: 'video.mp4' },
+      { id: 'attachment-2', title: 'diagram.png' },
+    ]);
+    client.matchesPattern.mockImplementation((value, patterns) => {
+      const list = Array.isArray(patterns) ? patterns : [patterns];
+      return list.some(pattern => pattern === '*.mp4' && value.toLowerCase().endsWith('.mp4'));
+    });
+
+    await exportRecursive(client, fs, path, '1', {
+      dest: '/tmp/out',
+      delayMs: 0,
+      excludeAttachments: '*.mp4',
+    });
+
+    expect(client.downloadAttachment).toHaveBeenCalledTimes(1);
+    expect(client.downloadAttachment).toHaveBeenCalledWith(
+      '1',
+      expect.objectContaining({ title: 'diagram.png' })
+    );
 
     consoleSpy.mockRestore();
   });

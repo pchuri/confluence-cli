@@ -439,7 +439,7 @@ Only content with a storage body can be exported for editing. Folders and other 
 Export a page and its attachments to a local directory.
 
 ```sh
-confluence export <pageId> [--format html|text|markdown] [--dest <directory>] [--file <filename>] [--attachments-dir <name>] [--pattern <glob>] [--referenced-only] [--skip-attachments]
+confluence export <pageId> [--format html|text|markdown] [--dest <directory>] [--file <filename>] [--attachments-dir <name>] [--pattern <glob>] [--exclude-attachments <patterns>] [--referenced-only] [--skip-attachments]
 ```
 
 | Option | Default | Description |
@@ -449,13 +449,17 @@ confluence export <pageId> [--format html|text|markdown] [--dest <directory>] [-
 | `--file` | `page.<ext>` | Filename for the content file |
 | `--attachments-dir` | `attachments` | Subdirectory name for attachments |
 | `--pattern` | — | Glob filter for attachments (e.g. `*.png`) |
+| `--exclude-attachments` | — | Comma-separated attachment filename globs to skip (e.g. `*.mp4,*.mov`) |
 | `--referenced-only` | false | Only download attachments referenced in the page content |
 | `--skip-attachments` | false | Do not download attachments |
+
+When combined with `--pattern` or `--referenced-only`, `--exclude-attachments` is applied last.
 
 ```sh
 confluence export 123456789 --format markdown --dest ./docs
 confluence export 123456789 --format markdown --dest ./docs --skip-attachments
 confluence export 123456789 --pattern "*.png" --dest ./output
+confluence export 123456789 --exclude-attachments "*.mp4,*.mov" --dest ./output
 ```
 
 Creates a subdirectory named after the page title under `--dest`.
