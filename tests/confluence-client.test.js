@@ -326,6 +326,51 @@ describe('ConfluenceClient', () => {
       expect(cookieClient.client.defaults.headers.Cookie).toBe('JSESSIONID=abc; XSRF-TOKEN=xyz');
     });
 
+    test('combines Cookie with Bearer Authorization when both are configured', () => {
+      // Some reverse-proxy/SSO gateways (e.g. F5 BIG-IP APM) require their own
+      // session cookie in addition to the application-level credential.
+      const combinedClient = new ConfluenceClient({
+        domain: 'confluence.company.com',
+        authType: 'bearer',
+        token: 'my-pat',
+        cookie: 'MRHSession=abc123',
+        apiPath: '/rest/api'
+      });
+
+      expect(combinedClient.buildAuthHeaders()).toEqual({
+        Authorization: 'Bearer my-pat',
+        Cookie: 'MRHSession=abc123'
+      });
+    });
+
+    test('combines Cookie with Basic Authorization when both are configured', () => {
+      const combinedClient = new ConfluenceClient({
+        domain: 'confluence.company.com',
+        authType: 'basic',
+        email: 'user@example.com',
+        token: 'my-password',
+        cookie: 'MRHSession=abc123',
+        apiPath: '/rest/api'
+      });
+
+      const headers = combinedClient.buildAuthHeaders();
+      expect(headers.Cookie).toBe('MRHSession=abc123');
+      expect(headers.Authorization).toBe(
+        `Basic ${Buffer.from('user@example.com:my-password').toString('base64')}`
+      );
+    });
+
+    test('omits Cookie header when no cookie is configured for bearer auth', () => {
+      const bearerClient = new ConfluenceClient({
+        domain: 'confluence.company.com',
+        authType: 'bearer',
+        token: 'my-pat',
+        apiPath: '/rest/api'
+      });
+
+      expect(bearerClient.buildAuthHeaders()).toEqual({ Authorization: 'Bearer my-pat' });
+    });
+
     test('sends no Authorization or Cookie header when authType is none', () => {
       const noneClient = new ConfluenceClient({
         domain: 'confluence.internal',

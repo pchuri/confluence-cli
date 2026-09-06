@@ -257,7 +257,7 @@ confluence init --email "user@example.com" --token "your-api-token"
 - `-a, --auth-type <type>` - Authentication type: `basic`, `bearer`, `mtls`, `cookie`, or `none`
 - `-e, --email <email>` - Email or username for basic authentication
 - `-t, --token <token>` - API token or password
-- `-c, --cookie <cookie>` - Cookie for Enterprise SSO authentication (e.g., `"JSESSIONID=..."`)
+- `-c, --cookie <cookie>` - Cookie for Enterprise SSO authentication (e.g., `"JSESSIONID=..."`). Can also be combined with `--auth-type basic`/`bearer` for gateways that require both a session cookie and an application-level credential (see below).
 - `--tls-client-cert <path>` - Client certificate for mTLS authentication
 - `--tls-client-key <path>` - Client private key for mTLS authentication
 - `--tls-ca-cert <path>` - Optional CA certificate chain for mTLS authentication
@@ -440,6 +440,19 @@ For **read-only** usage, select at minimum the classic scopes `read:confluence-c
 **Enterprise SSO with Cookie Authentication:** For Confluence instances behind Enterprise SSO (SAML, OAuth, Okta, etc.) where API tokens or Basic/Bearer auth are not available, you can authenticate using session cookies. After logging in through your browser, extract the session cookie (typically `JSESSIONID` or similar) from your browser's dev tools and configure it via the `--cookie` flag or `CONFLUENCE_COOKIE` environment variable. The cookie is sent in the `Cookie` header instead of an `Authorization` header. Note that session cookies typically expire, so you'll need to refresh them periodically. For security, prefer `CONFLUENCE_COOKIE` env var or interactive prompt over `--cookie` flag since command-line arguments may be visible in shell history and process listings.
 
 **Reverse-proxy injected authentication:** For deployments where a local reverse proxy injects credentials on the wire (e.g. SPNEGO/Kerberos, mTLS terminated at the proxy edge, or header injection), set `authType=none`. In this mode the CLI sends no `Authorization` or `Cookie` header — authentication is entirely the proxy's responsibility. Point `CONFLUENCE_DOMAIN` at the proxy and ensure no credentials are configured on the CLI side.
+
+**Combining a gateway cookie with Bearer/Basic auth:** Some corporate reverse-proxy/SSO gateways (e.g. F5 BIG-IP APM) terminate the connection with their own access-policy session cookie *and* still forward the request to Confluence, which then requires its own application-level credential (a Personal Access Token or Basic auth) on top. Neither `authType=cookie` (sends only `Cookie`) nor a plain `authType=bearer`/`basic` (sends only `Authorization`) covers this by itself. Set `--cookie` (or `CONFLUENCE_COOKIE`) *alongside* `--auth-type bearer` (or `basic`) and both headers are sent together:
+
+```bash
+confluence --profile gateway init \
+  --domain "confluence.company.com" \
+  --api-path "/rest/api" \
+  --auth-type "bearer" \
+  --token "your-personal-access-token" \
+  --cookie "MRHSession=abc123..."
+```
+
+The gateway's session cookie is typically short-lived and will need refreshing periodically (re-extract it from your browser's dev tools and update the profile), independently of the token/password, which does not expire the same way.
 
 ## Usage
 
