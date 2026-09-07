@@ -1,3 +1,10 @@
+# [2.23.0](https://github.com/pchuri/confluence-cli/compare/v2.22.0...v2.23.0) (2026-09-07)
+
+
+### Features
+
+* **auth:** allow combining a session cookie with bearer/basic auth ([#230](https://github.com/pchuri/confluence-cli/issues/230)) ([a347bb8](https://github.com/pchuri/confluence-cli/commit/a347bb86dfdfc719cf2b23907a75df67385f492c))
+
 # [2.22.0](https://github.com/pchuri/confluence-cli/compare/v2.21.0...v2.22.0) (2026-08-28)
 
 
