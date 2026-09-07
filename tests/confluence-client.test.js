@@ -383,6 +383,18 @@ describe('ConfluenceClient', () => {
       expect(noneClient.client.defaults.headers.Cookie).toBeUndefined();
     });
 
+    test('omits Cookie header when authType is none even if a cookie is configured', () => {
+      const noneClient = new ConfluenceClient({
+        domain: 'confluence.internal',
+        authType: 'none',
+        cookie: 'MRHSession=abc123',
+        apiPath: '/rest/api'
+      });
+
+      expect(noneClient.buildAuthHeaders()).toEqual({});
+      expect(noneClient.client.defaults.headers.Cookie).toBeUndefined();
+    });
+
     test('buildAuthHeader returns null for none auth', () => {
       const noneClient = new ConfluenceClient({
         domain: 'confluence.internal',

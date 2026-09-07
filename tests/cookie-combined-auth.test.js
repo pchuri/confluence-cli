@@ -110,4 +110,21 @@ describe('combining a cookie with bearer/basic auth (init -> save -> read)', () 
     expect(errorSpy).toHaveBeenCalledWith(expect.stringMatching(/--cookie cannot be empty/));
     exitSpy.mockRestore();
   });
+
+  test('--cookie is rejected when combined with --auth-type none instead of being silently persisted', async () => {
+    const exitSpy = jest.spyOn(process, 'exit').mockImplementation(() => {
+      throw new Error('process.exit called');
+    });
+
+    await expect(config.initConfig({
+      domain: 'confluence.company.com',
+      authType: 'none',
+      cookie: 'MRHSession=abc123',
+      profile: 'combo',
+    })).rejects.toThrow('process.exit called');
+
+    expect(errorSpy).toHaveBeenCalledWith(expect.stringMatching(/--cookie cannot be combined with --auth-type "none"/));
+    expect(fs.existsSync(config.CONFIG_FILE)).toBe(false);
+    exitSpy.mockRestore();
+  });
 });
