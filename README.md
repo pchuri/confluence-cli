@@ -393,34 +393,16 @@ Valid values: `smart` (Cloud smart links), `plain` (standard `<a href>`), and `w
 
 **PlantUML macro format (`plantumlFormat`):**
 
-```` ```plantuml ```` fences are emitted as the plain `plantuml` macro by default. Sites running the PlantUML Diagrams for Confluence app render diagrams from the `plantumlcloud` macro instead, whose markup is URI-encoded, deflated and base64-encoded into a `data` parameter. Select that shape with:
+````` ```plantuml ````` fences become the plain `plantuml` macro by default. Sites running the PlantUML Diagrams for Confluence app need the `plantumlcloud` macro (URI-encoded, deflated and base64-encoded `data` parameter) — select it with `CONFLUENCE_PLANTUML_FORMAT=plantumlcloud`, the profile field `"plantumlFormat": "plantumlcloud"`, or `--plantuml-format plantumlcloud` on `convert`, `create`, `create-child` and `update`:
 
 ```bash
 export CONFLUENCE_PLANTUML_FORMAT=plantumlcloud
-```
-
-Or per-profile:
-
-```json
-{
-  "profiles": {
-    "default": {
-      "domain": "wiki.example.org",
-      "plantumlFormat": "plantumlcloud"
-    }
-  }
-}
-```
-
-Or per-command with `--plantuml-format` (works on `convert`, `create`, `create-child` and `update`):
-
-```bash
 confluence convert --input-format markdown --output-format storage --plantuml-format plantumlcloud -i page.md
 ```
 
-Valid values: `plantuml` (default — `<ac:plain-text-body>` CDATA) and `plantumlcloud` (compressed `data` parameter). The flag wins over the environment variable, which wins over the profile.
+Valid values: `plantuml` (default — `<ac:plain-text-body>` CDATA) and `plantumlcloud` (compressed `data` parameter). Flag > environment variable > profile. See [Programmatically adding PlantUML diagrams](https://stratus-addons.atlassian.net/wiki/spaces/PDFC/pages/1839333377/Programmatically+adding+PlantUML+diagrams).
 
-> **Note:** the `plantumlcloud` macro renders from `<filename>.svg` / `<filename>.png` attachments that the app expects on the page (`plantuml-diagram-1.svg`, `plantuml-diagram-2.svg`, … in document order). This CLI emits the macro only — those attachments must be produced by a PlantUML server you operate (for example the `plantuml/plantuml-server` Docker image) and uploaded separately. Reading pages back inflates the `data` parameter, so either format converts back to the same ` ```plantuml ` fence.
+> **Note:** `plantumlcloud` renders from `<filename>.svg` / `.png` attachments (`plantuml-diagram-1.svg`, … in document order) produced by a PlantUML server you operate. This CLI emits the macro only; upload those attachments separately. Both formats read back as the same ` ```plantuml ` fence.
 
 **Read-only mode** (recommended for AI agents):
 ```bash
@@ -1167,21 +1149,15 @@ Inline markdown inside the title (`*em*`, backtick code, links, `~~strike~~`) is
 
 ### ```` ```plantuml ```` — PlantUML diagram macro
 
-A fenced block tagged `plantuml` becomes a PlantUML macro. Two output shapes are supported (see [`plantumlFormat`](#plantuml-macro-format-plantumlformat)):
-
 ````markdown
 ```plantuml
 @startuml
 Alice -> Bob: Authentication Request
-Bob --> Alice: Authentication Response
 @enduml
 ```
 ````
 
-- **`plantuml`** (default): `<ac:structured-macro ac:name="plantuml">` with the source in `<ac:plain-text-body><![CDATA[…]]>`, which the built-in / legacy PlantUML macro renders directly.
-- **`plantumlcloud`**: `<ac:structured-macro ac:name="plantumlcloud">` with `data` (URI-encoded → raw-deflated → base64), `filename` (`plantuml-diagram-<n>.svg`, numbered per conversion), `compressed=true`, `revision=1` and `toolbar=bottom`.
-
-Both shapes convert back to the same ` ```plantuml ` fence when reading storage (`plantumlcloud` payloads are inflated with `zlib`), so pages round-trip regardless of which format produced them.
+Emitted as `ac:name="plantuml"` (source in CDATA) by default, or as `ac:name="plantumlcloud"` (compressed `data` parameter, `filename=plantuml-diagram-<n>.svg`, `compressed=true`, `revision=1`, `toolbar=bottom`) when `plantumlFormat` is `plantumlcloud` — see [PlantUML macro format](#plantuml-macro-format-plantumlformat). Both shapes read back as the same fence.
 
 ### `[text](#id)` — same-page anchor link
 
