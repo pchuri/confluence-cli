@@ -19,6 +19,7 @@ const registerApiCommand = require('./commands/api');
 const { readStdin } = require('../lib/stdin-utils');
 const { emitJson, emitJsonError, jsonRequested, setJsonMode } = require('../lib/output');
 const { fingerprintCopyPlan } = require('../lib/pi/copy-plan');
+const { VALID_PLANTUML_FORMATS } = require('../lib/plantuml-format');
 
 const READ_ONLY_MESSAGE = 'This profile is in read-only mode. Write operations are not allowed.';
 const READ_ONLY_TIP = 'Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.';
@@ -36,6 +37,22 @@ function assertNonEmpty(value, label) {
     throw new Error(`${label} is required and cannot be empty.`);
   }
 }
+
+// `--plantuml-format` wins over CONFLUENCE_PLANTUML_FORMAT. The flag is
+// validated here (hard error) while the env var is only honoured when valid —
+// config.js already warns and ignores a bad env value.
+function resolveCliPlantumlFormat(options) {
+  if (options.plantumlFormat) {
+    if (!VALID_PLANTUML_FORMATS.includes(options.plantumlFormat)) {
+      throw new Error(`Invalid --plantuml-format "${options.plantumlFormat}". Valid: ${VALID_PLANTUML_FORMATS.join(', ')}`);
+    }
+    return options.plantumlFormat;
+  }
+  const fromEnv = process.env.CONFLUENCE_PLANTUML_FORMAT;
+  return VALID_PLANTUML_FORMATS.includes(fromEnv) ? fromEnv : undefined;
+}
+
+const PLANTUML_FORMAT_OPTION = ['--plantuml-format <format>', `PlantUML macro format (${VALID_PLANTUML_FORMATS.join(', ')})`];
 
 const VALID_TYPES = ['page', 'folder'];
 
@@ -359,11 +376,14 @@ program
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
   .option('--type <type>', 'Content type (page, folder)', 'page')
+  .option(...PLANTUML_FORMAT_OPTION)
   .action(withClient('create', async ({ client, analytics, wantsJson, emitJson }, title, spaceKey, options) => {
     assertNonEmpty(title, 'title');
     assertNonEmpty(spaceKey, 'spaceKey');
     assertValidType(options.type);
     assertNoBodyForFolder(options.type, options);
+    const plantumlFormat = resolveCliPlantumlFormat(options);
+    if (plantumlFormat) client.setPlantumlFormat(plantumlFormat);
 
     let content = '';
 
@@ -410,11 +430,14 @@ program
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
   .option('--type <type>', 'Content type (page, folder)', 'page')
+  .option(...PLANTUML_FORMAT_OPTION)
   .action(withClient('create_child', async ({ client, analytics, wantsJson, emitJson }, title, parentId, options) => {
     assertNonEmpty(title, 'title');
     assertNonEmpty(parentId, 'parentId');
     assertValidType(options.type);
     assertNoBodyForFolder(options.type, options);
+    const plantumlFormat = resolveCliPlantumlFormat(options);
+    if (plantumlFormat) client.setPlantumlFormat(plantumlFormat);
 
     // Get parent page info to get space key
     const parentInfo = await client.getPageInfo(parentId);
@@ -467,6 +490,7 @@ program
   .option('-f, --file <file>', 'Read content from file')
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
+  .option(...PLANTUML_FORMAT_OPTION)
   .action(withClient('update', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
     // Check if at least one option is provided
     if (!options.title && !options.file && !options.content) {
@@ -476,6 +500,9 @@ program
     if (options.title !== undefined) {
       assertNonEmpty(options.title, '--title');
     }
+
+    const plantumlFormat = resolveCliPlantumlFormat(options);
+    if (plantumlFormat) client.setPlantumlFormat(plantumlFormat);
 
     let content = null; // Use null to indicate no content change
 
@@ -1036,6 +1063,7 @@ program
   .option('-o, --output-file <file>', 'Output file path (writes to stdout if omitted)')
   .option('--input-format <format>', `Input format (${VALID_INPUT_FORMATS.join(', ')})`)
   .option('--output-format <format>', `Output format (${VALID_OUTPUT_FORMATS.join(', ')})`)
+  .option(...PLANTUML_FORMAT_OPTION)
   .action(withLocal('convert', async ({ analytics }, options) => {
     if (!options.inputFormat) {
       console.error(chalk.red('Error: --input-format is required.'));
@@ -1069,7 +1097,9 @@ program
       input = await readStdin();
     }
 
-    const converter = ConfluenceClient.createLocalConverter();
+    const converter = ConfluenceClient.createLocalConverter({
+      plantumlFormat: resolveCliPlantumlFormat(options),
+    });
     let output;
 
     if (options.inputFormat === 'markdown' && options.outputFormat === 'storage') {
