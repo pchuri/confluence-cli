@@ -53,6 +53,7 @@ confluence --version   # verify install
 | `CONFLUENCE_READ_ONLY` | Block all write operations when `true` | `true` |
 | `CONFLUENCE_FORCE_CLOUD` | Force Cloud link format for custom domains | `true` |
 | `CONFLUENCE_LINK_STYLE` | Override link rendering: `smart`, `plain`, or legacy `wiki` | `plain` |
+| `CONFLUENCE_PLANTUML_FORMAT` | PlantUML macro format: `plantuml` (default) or `plantumlcloud` | `plantumlcloud` |
 
 **Global `--profile` flag (use a named profile for any command):**
 

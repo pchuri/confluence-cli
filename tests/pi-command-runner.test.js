@@ -453,6 +453,36 @@ test('builds a minimal CLI environment from known config keys', () => {
   expect(result.CONFLUENCE_TLS_CLIENT_KEY).toBe('/tmp/key.pem');
   expect(result.UNRELATED).toBeUndefined();
   expect(CONFIG_ENV_KEYS).toContain('CONFLUENCE_COOKIE');
+  expect(CONFIG_ENV_KEYS).toContain('CONFLUENCE_LINK_STYLE');
+});
+
+test('forwards every CONFLUENCE_* variable read by the config layer', () => {
+  for (const key of [
+    'CONFLUENCE_DOMAIN',
+    'CONFLUENCE_HOST',
+    'CONFLUENCE_CONFIG_DIR',
+    'CONFLUENCE_API_PATH',
+    'CONFLUENCE_PROTOCOL',
+    'CONFLUENCE_AUTH_TYPE',
+    'CONFLUENCE_EMAIL',
+    'CONFLUENCE_USERNAME',
+    'CONFLUENCE_API_TOKEN',
+    'CONFLUENCE_PASSWORD',
+    'CONFLUENCE_PROFILE',
+    'CONFLUENCE_READ_ONLY',
+    'CONFLUENCE_FORCE_CLOUD',
+    'CONFLUENCE_LINK_STYLE',
+    'CONFLUENCE_KEYCHAIN',
+    'CONFLUENCE_PLANTUML_FORMAT',
+  ]) {
+    expect(CONFIG_ENV_KEYS).toContain(key);
+  }
+});
+
+test('forwards CONFLUENCE_PLANTUML_FORMAT to the CLI environment', () => {
+  const result = buildCliEnvironment({ CONFLUENCE_PLANTUML_FORMAT: 'plantumlcloud', PATH: '/usr/bin' });
+
+  expect(result.CONFLUENCE_PLANTUML_FORMAT).toBe('plantumlcloud');
 });
 
 test('exports the custom error type', () => {
