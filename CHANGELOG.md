@@ -1,3 +1,10 @@
+# [2.24.0](https://github.com/pchuri/confluence-cli/compare/v2.23.0...v2.24.0) (2026-09-21)
+
+
+### Features
+
+* **plantuml:** add plantumlcloud macro format option ([#232](https://github.com/pchuri/confluence-cli/issues/232)) ([338ef04](https://github.com/pchuri/confluence-cli/commit/338ef040f9642c23bacce47451f498267659ff15))
+
 # [2.23.0](https://github.com/pchuri/confluence-cli/compare/v2.22.0...v2.23.0) (2026-09-07)
 
 
