@@ -6,11 +6,12 @@ const ConfluenceClient = require('../lib/confluence-client');
 
 const CLI = path.resolve(__dirname, '../bin/index.js');
 
-function run(args, input) {
+function run(args, input, env) {
   return execFileSync(process.execPath, [CLI, ...args], {
     encoding: 'utf8',
     input,
     timeout: 10000,
+    env: env ? { ...process.env, ...env } : undefined,
   });
 }
 
@@ -98,6 +99,65 @@ describe('convert command', () => {
     const output = fs.readFileSync(outputFile, 'utf-8');
     expect(output).toContain('<h1>');
     expect(output).toContain('Test');
+  });
+
+  test('markdown to storage emits the plain plantuml macro by default', () => {
+    const inputFile = writeInput('input.md', '```plantuml\nA -> B\n```\n');
+    const output = run(['convert', '--input-file', inputFile, '--input-format', 'markdown', '--output-format', 'storage']);
+    expect(output).toContain('<ac:structured-macro ac:name="plantuml">');
+    expect(output).not.toContain('plantumlcloud');
+  });
+
+  test('--plantuml-format plantumlcloud emits the cloud macro', () => {
+    const inputFile = writeInput('input.md', '```plantuml\nA -> B\n```\n');
+    const output = run([
+      'convert', '--input-file', inputFile,
+      '--input-format', 'markdown', '--output-format', 'storage',
+      '--plantuml-format', 'plantumlcloud',
+    ]);
+    expect(output).toContain('<ac:structured-macro ac:name="plantumlcloud">');
+    expect(output).toContain('<ac:parameter ac:name="filename">plantuml-diagram-1.svg</ac:parameter>');
+  });
+
+  test('CONFLUENCE_PLANTUML_FORMAT=plantumlcloud is honoured by convert', () => {
+    const inputFile = writeInput('input.md', '```plantuml\nA -> B\n```\n');
+    const output = run(
+      ['convert', '--input-file', inputFile, '--input-format', 'markdown', '--output-format', 'storage'],
+      undefined,
+      { CONFLUENCE_PLANTUML_FORMAT: 'plantumlcloud' }
+    );
+    expect(output).toContain('<ac:structured-macro ac:name="plantumlcloud">');
+  });
+
+  test('--plantuml-format overrides CONFLUENCE_PLANTUML_FORMAT', () => {
+    const inputFile = writeInput('input.md', '```plantuml\nA -> B\n```\n');
+    const output = run(
+      [
+        'convert', '--input-file', inputFile,
+        '--input-format', 'markdown', '--output-format', 'storage',
+        '--plantuml-format', 'plantuml',
+      ],
+      undefined,
+      { CONFLUENCE_PLANTUML_FORMAT: 'plantumlcloud' }
+    );
+    expect(output).toContain('<ac:structured-macro ac:name="plantuml">');
+    expect(output).not.toContain('plantumlcloud');
+  });
+
+  test('invalid --plantuml-format fails with the valid values listed', () => {
+    const inputFile = writeInput('input.md', '```plantuml\nA -> B\n```\n');
+    let thrown = null;
+    try {
+      run([
+        'convert', '--input-file', inputFile,
+        '--input-format', 'markdown', '--output-format', 'storage',
+        '--plantuml-format', 'puml',
+      ]);
+    } catch (error) {
+      thrown = error;
+    }
+    expect(thrown).not.toBeNull();
+    expect(thrown.stderr.toString()).toContain('Invalid --plantuml-format "puml". Valid: plantuml, plantumlcloud');
   });
 
   test('storage to markdown', () => {

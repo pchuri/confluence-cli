@@ -11,7 +11,8 @@ const ENV_KEYS = [
   'CONFLUENCE_PROTOCOL', 'CONFLUENCE_FORCE_CLOUD',
   'CONFLUENCE_LINK_STYLE',
   'CONFLUENCE_COOKIE',
-  'CONFLUENCE_TLS_CA_CERT', 'CONFLUENCE_TLS_CLIENT_CERT', 'CONFLUENCE_TLS_CLIENT_KEY'
+  'CONFLUENCE_TLS_CA_CERT', 'CONFLUENCE_TLS_CLIENT_CERT',
+  'CONFLUENCE_TLS_CLIENT_KEY', 'CONFLUENCE_PLANTUML_FORMAT'
 ];
 
 describe('getConfig env var aliases', () => {
@@ -185,6 +186,49 @@ describe('getConfig env var aliases', () => {
     } finally {
       errorSpy.mockRestore();
     }
+  });
+
+  test('CONFLUENCE_PLANTUML_FORMAT sets plantumlFormat in config', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_PLANTUML_FORMAT = 'plantumlcloud';
+
+    const config = getConfig();
+    expect(config.plantumlFormat).toBe('plantumlcloud');
+  });
+
+  test('plantumlFormat is undefined when CONFLUENCE_PLANTUML_FORMAT is not set', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+
+    const config = getConfig();
+    expect(config.plantumlFormat).toBeUndefined();
+  });
+
+  test('invalid CONFLUENCE_PLANTUML_FORMAT warns and falls back to undefined', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_PLANTUML_FORMAT = 'puml';
+
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const config = getConfig();
+      expect(config.plantumlFormat).toBeUndefined();
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringMatching(/Invalid plantumlFormat.*puml/)
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  test('CONFLUENCE_PLANTUML_FORMAT is case-insensitive and trimmed', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_PLANTUML_FORMAT = '  PlantUmlCloud  ';
+
+    const config = getConfig();
+    expect(config.plantumlFormat).toBe('plantumlcloud');
   });
 
   test('CONFLUENCE_LINK_STYLE is case-insensitive and trimmed', () => {

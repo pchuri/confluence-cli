@@ -29,7 +29,8 @@ const ENV_KEYS = [
   'CONFLUENCE_EMAIL', 'CONFLUENCE_USERNAME',
   'CONFLUENCE_AUTH_TYPE', 'CONFLUENCE_API_PATH',
   'CONFLUENCE_PROTOCOL', 'CONFLUENCE_PROFILE',
-  'CONFLUENCE_TLS_CA_CERT', 'CONFLUENCE_TLS_CLIENT_CERT', 'CONFLUENCE_TLS_CLIENT_KEY',
+  'CONFLUENCE_TLS_CA_CERT', 'CONFLUENCE_TLS_CLIENT_CERT',
+  'CONFLUENCE_TLS_CLIENT_KEY', 'CONFLUENCE_PLANTUML_FORMAT'
 ];
 
 // Helper to create a multi-profile config
@@ -178,6 +179,29 @@ describe('Profile management', () => {
       expect(config.email).toBe('user@staging.com');
       expect(config.authType).toBe('basic');
       expect(config.protocol).toBe('http');
+    });
+
+    test('reads plantumlFormat from the profile', () => {
+      const config = multiProfileConfig();
+      config.profiles.default.plantumlFormat = 'plantumlcloud';
+      mockConfigFile(config);
+
+      expect(getConfig().plantumlFormat).toBe('plantumlcloud');
+    });
+
+    test('plantumlFormat is undefined when the profile does not set it', () => {
+      mockConfigFile(multiProfileConfig());
+
+      expect(getConfig().plantumlFormat).toBeUndefined();
+    });
+
+    test('CONFLUENCE_PLANTUML_FORMAT overrides the profile value', () => {
+      const config = multiProfileConfig();
+      config.profiles.default.plantumlFormat = 'plantumlcloud';
+      mockConfigFile(config);
+      process.env.CONFLUENCE_PLANTUML_FORMAT = 'plantuml';
+
+      expect(getConfig().plantumlFormat).toBe('plantuml');
     });
 
     test('env vars still take priority over any profile', () => {

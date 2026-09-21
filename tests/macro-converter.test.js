@@ -1,4 +1,5 @@
 const MacroConverter = require('../lib/macro-converter');
+const { decodePlantuml, encodePlantuml } = require('../lib/plantuml-codec');
 
 describe('MacroConverter', () => {
   describe('linkStyle defaulting', () => {
@@ -1557,6 +1558,119 @@ describe('MacroConverter markdownToStorage plantuml code blocks', () => {
     expect(result).toContain('<ac:structured-macro ac:name="code">');
     expect(result).toContain('<ac:parameter ac:name="language">python</ac:parameter>');
     expect(result).not.toContain('ac:name="plantuml"');
+  });
+});
+
+describe('MacroConverter markdownToStorage plantuml format selection', () => {
+  const source = '@startuml\nA -> B: hello\n@enduml';
+
+  const paramValue = (storage, name) => {
+    const match = storage.match(new RegExp(`<ac:parameter ac:name="${name}">([\\s\\S]*?)</ac:parameter>`));
+    return match ? match[1] : null;
+  };
+
+  test('default format emits the plain-text plantuml macro', () => {
+    const converter = new MacroConverter({ isCloud: true });
+    const result = converter.markdownToStorage(`\u0060\u0060\u0060plantuml\n${source}\n\u0060\u0060\u0060`);
+    expect(result).toContain('<ac:structured-macro ac:name="plantuml">');
+    expect(result).toContain(`<![CDATA[${source}]]>`);
+    expect(result).not.toContain('plantumlcloud');
+  });
+
+  test('plantumlcloud format emits the parameter-based macro with decodable data', () => {
+    const converter = new MacroConverter({ isCloud: true, plantumlFormat: 'plantumlcloud' });
+    const result = converter.markdownToStorage(`\u0060\u0060\u0060plantuml\n${source}\n\u0060\u0060\u0060`);
+    expect(result).toContain('<ac:structured-macro ac:name="plantumlcloud">');
+    expect(result).not.toContain('ac:plain-text-body');
+    expect(paramValue(result, 'data')).toBeTruthy();
+    expect(decodePlantuml(paramValue(result, 'data'))).toBe(source);
+  });
+
+  test('plantumlcloud macro carries the documented parameter set', () => {
+    const converter = new MacroConverter({ isCloud: true, plantumlFormat: 'plantumlcloud' });
+    const result = converter.markdownToStorage('\u0060\u0060\u0060plantuml\nA -> B\n\u0060\u0060\u0060');
+    expect(paramValue(result, 'toolbar')).toBe('bottom');
+    expect(paramValue(result, 'filename')).toBe('plantuml-diagram-1.svg');
+    expect(paramValue(result, 'compressed')).toBe('true');
+    expect(paramValue(result, 'revision')).toBe('1');
+    expect(result).not.toContain('ac:name="originalWidth"');
+    expect(result).not.toContain('ac:name="originalHeight"');
+  });
+
+  test('diagram filenames increment per conversion', () => {
+    const converter = new MacroConverter({ isCloud: true, plantumlFormat: 'plantumlcloud' });
+    const result = converter.markdownToStorage(
+      '\u0060\u0060\u0060plantuml\nA -> B\n\u0060\u0060\u0060\n\ntext\n\n\u0060\u0060\u0060plantuml\nC -> D\n\u0060\u0060\u0060'
+    );
+    expect(result).toContain('>plantuml-diagram-1.svg<');
+    expect(result).toContain('>plantuml-diagram-2.svg<');
+  });
+
+  test('filenames restart at 1 for a new conversion', () => {
+    const converter = new MacroConverter({ isCloud: true, plantumlFormat: 'plantumlcloud' });
+    converter.markdownToStorage('\u0060\u0060\u0060plantuml\nA -> B\n\u0060\u0060\u0060');
+    const result = converter.markdownToStorage('\u0060\u0060\u0060plantuml\nA -> B\n\u0060\u0060\u0060');
+    expect(result).toContain('>plantuml-diagram-1.svg<');
+    expect(result).not.toContain('>plantuml-diagram-2.svg<');
+  });
+
+  test('surrounding content is preserved in plantumlcloud mode', () => {
+    const converter = new MacroConverter({ isCloud: true, plantumlFormat: 'plantumlcloud' });
+    const result = converter.markdownToStorage('Before\n\n\u0060\u0060\u0060plantuml\nA -> B\n\u0060\u0060\u0060\n\nAfter');
+    expect(result).toContain('Before');
+    expect(result).toContain('After');
+    expect(result).toContain('<ac:structured-macro ac:name="plantumlcloud">');
+  });
+
+  test('non-plantuml fences are unaffected by the plantumlcloud format', () => {
+    const converter = new MacroConverter({ isCloud: true, plantumlFormat: 'plantumlcloud' });
+    const result = converter.markdownToStorage('\u0060\u0060\u0060python\nx = 1\n\u0060\u0060\u0060');
+    expect(result).toContain('<ac:structured-macro ac:name="code">');
+    expect(result).toContain('<ac:parameter ac:name="language">python</ac:parameter>');
+  });
+});
+
+describe('MacroConverter storageToMarkdown plantumlcloud macros', () => {
+  const converter = new MacroConverter({ isCloud: true });
+
+  const cloudMacro = (data) => `<ac:structured-macro ac:name="plantumlcloud"><ac:parameter ac:name="toolbar">bottom</ac:parameter><ac:parameter ac:name="filename">plantuml-diagram-1.svg</ac:parameter><ac:parameter ac:name="data">${data}</ac:parameter><ac:parameter ac:name="compressed">true</ac:parameter><ac:parameter ac:name="revision">1</ac:parameter></ac:structured-macro>`;
+
+  test('compressed payload is inflated back into a plantuml fence', () => {
+    const source = '@startuml\nAlice -> Bob: Authentication Request\n@enduml';
+    expect(converter.storageToMarkdown(cloudMacro(encodePlantuml(source))))
+      .toBe(`\n\u0060\u0060\u0060plantuml\n${source}\n\u0060\u0060\u0060\n`.trim());
+  });
+
+  test('uncompressed-looking payload is preserved verbatim', () => {
+    const source = '@startuml\nX -> Y: plain\n@enduml';
+    expect(converter.storageToMarkdown(cloudMacro(source)))
+      .toBe(`\n\u0060\u0060\u0060plantuml\n${source}\n\u0060\u0060\u0060\n`.trim());
+  });
+
+  test('optional vendor parameters are ignored', () => {
+    const source = '@startuml\nA -> B\n@enduml';
+    const storage = `<ac:structured-macro ac:name="plantumlcloud"><ac:parameter ac:name="toolbar">none</ac:parameter><ac:parameter ac:name="filename">My FSM diagram.svg</ac:parameter><ac:parameter ac:name="originalHeight">913</ac:parameter><ac:parameter ac:name="data">${encodePlantuml(source)}</ac:parameter><ac:parameter ac:name="compressed">true</ac:parameter><ac:parameter ac:name="originalWidth">942</ac:parameter><ac:parameter ac:name="revision">1</ac:parameter></ac:structured-macro>`;
+    expect(converter.storageToMarkdown(storage))
+      .toBe(`\n\u0060\u0060\u0060plantuml\n${source}\n\u0060\u0060\u0060\n`.trim());
+  });
+
+  test('undecodable payload falls back to the raw value', () => {
+    expect(converter.storageToMarkdown(cloudMacro('not-a-valid-payload')))
+      .toBe('\n\u0060\u0060\u0060plantuml\nnot-a-valid-payload\n\u0060\u0060\u0060\n'.trim());
+  });
+
+  test('backtick-heavy content gets a longer fence', () => {
+    const source = '@startuml\n:``\u0060\u0060\u0060deep``;\n@enduml';
+    const result = converter.storageToMarkdown(cloudMacro(encodePlantuml(source)));
+    expect(result).toContain('\u0060\u0060\u0060\u0060plantuml');
+    expect(result).toContain(source);
+  });
+
+  test('surrounding content is preserved', () => {
+    const source = '@startuml\nA -> B\n@enduml';
+    const storage = `<p>Before</p>${cloudMacro(encodePlantuml(source))}<p>After</p>`;
+    expect(converter.storageToMarkdown(storage))
+      .toBe(`Before\n\n\u0060\u0060\u0060plantuml\n${source}\n\u0060\u0060\u0060\n\nAfter`.trim());
   });
 });
 

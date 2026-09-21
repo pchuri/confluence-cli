@@ -1,0 +1,4 @@
+<p>Vendor-shaped macro with optional dimensions:</p>
+<ac:structured-macro ac:name="plantumlcloud"><ac:parameter ac:name="toolbar">bottom</ac:parameter><ac:parameter ac:name="filename">My FSM diagram.svg</ac:parameter><ac:parameter ac:name="originalHeight">913</ac:parameter><ac:parameter ac:name="data">UzUxKC5JLCopzc1RNXB0zMlMTlU1MtBVNXYFUk75SarGjkCGY2lJRmpeSWZyYklmfh5QICi1sDS1uASoBaQGqAGqA2IALj3FBfl5xalATaomBql5KUA7AQ==</ac:parameter><ac:parameter ac:name="compressed">true</ac:parameter><ac:parameter ac:name="originalWidth">942</ac:parameter><ac:parameter ac:name="revision">1</ac:parameter></ac:structured-macro>
+<p>Mandatory parameters only:</p>
+<ac:structured-macro ac:name="plantumlcloud"><ac:parameter ac:name="data">UzUxKC5JLCopzc1RNXBUNXZUNTMAIt/EzDxVI4OAovzk1OJiiJiqsRNQiVd+cSpQRlfV2BVIReWngvQYGSQnpoGEVV2NVC0tVC1NQYaZGKTmpQANBgA=</ac:parameter><ac:parameter ac:name="compressed">true</ac:parameter></ac:structured-macro>

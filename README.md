@@ -391,6 +391,19 @@ Or per-profile:
 
 Valid values: `smart` (Cloud smart links), `plain` (standard `<a href>`), and `wiki` (legacy `ac:link` + `ri:url` output for explicit backward compatibility). When unset, the CLI picks `smart` for Cloud and `plain` for Server/Data Center and local conversions. New configurations should not use `wiki` for external links.
 
+**PlantUML macro format (`plantumlFormat`):**
+
+````` ```plantuml ````` fences become the plain `plantuml` macro by default. Sites running the PlantUML Diagrams for Confluence app need the `plantumlcloud` macro (URI-encoded, deflated and base64-encoded `data` parameter) — select it with `CONFLUENCE_PLANTUML_FORMAT=plantumlcloud`, the profile field `"plantumlFormat": "plantumlcloud"`, or `--plantuml-format plantumlcloud` on `convert`, `create`, `create-child` and `update`:
+
+```bash
+export CONFLUENCE_PLANTUML_FORMAT=plantumlcloud
+confluence convert --input-format markdown --output-format storage --plantuml-format plantumlcloud -i page.md
+```
+
+Valid values: `plantuml` (default — `<ac:plain-text-body>` CDATA) and `plantumlcloud` (compressed `data` parameter). Flag > environment variable > profile. See [Programmatically adding PlantUML diagrams](https://stratus-addons.atlassian.net/wiki/spaces/PDFC/pages/1839333377/Programmatically+adding+PlantUML+diagrams).
+
+> **Note:** `plantumlcloud` renders from `<filename>.svg` / `.png` attachments (`plantuml-diagram-1.svg`, … in document order) produced by a PlantUML server you operate. This CLI emits the macro only; upload those attachments separately. Both formats read back as the same ` ```plantuml ` fence.
+
 **Read-only mode** (recommended for AI agents):
 ```bash
 export CONFLUENCE_READ_ONLY=true
@@ -1133,6 +1146,18 @@ const x = 1;
 The body may contain any content that is converted earlier in the pipeline (code blocks, tables, callout blockquotes). The reverse direction emits the same `**EXPAND: title**` / `**EXPAND_END**` markers so the conversion round-trips.
 
 Inline markdown inside the title (`*em*`, backtick code, links, `~~strike~~`) is stripped at capture time — Confluence's storage normalizer treats macro titles as plain text and will silently truncate or reject HTML in a `<ac:parameter>`. Title-less expand macros created in the Confluence UI still convert to `<details>/<summary>` blocks.
+
+### ```` ```plantuml ```` — PlantUML diagram macro
+
+````markdown
+```plantuml
+@startuml
+Alice -> Bob: Authentication Request
+@enduml
+```
+````
+
+Emitted as `ac:name="plantuml"` (source in CDATA) by default, or as `ac:name="plantumlcloud"` (compressed `data` parameter, `filename=plantuml-diagram-<n>.svg`, `compressed=true`, `revision=1`, `toolbar=bottom`) when `plantumlFormat` is `plantumlcloud` — see [PlantUML macro format](#plantuml-macro-format-plantumlformat). Both shapes read back as the same fence.
 
 ### `[text](#id)` — same-page anchor link
 
