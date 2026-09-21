@@ -133,6 +133,16 @@ describe('lib/keychain', () => {
       errSpy.mockRestore();
     });
 
+    test('explains a locked keychain (exit 36) and falls through', () => {
+      const { keychain, spawnSync: spawn } = loadKeychain();
+      const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      spawn.mockReturnValue({ status: 36, stdout: '', stderr: 'security: SecKeychainSearchCopyNext: User interaction is not allowed.' });
+
+      expect(keychain.getKeychainToken({ host: 'wiki.example.com' })).toEqual({ token: undefined, attempted: true });
+      expect(errSpy).toHaveBeenCalledWith(expect.stringContaining('CONFLUENCE_KEYCHAIN=off'));
+      errSpy.mockRestore();
+    });
+
     test('warns about a timeout (locked keychain) and falls through', () => {
       const { keychain, spawnSync: spawn } = loadKeychain();
       const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -149,12 +159,14 @@ describe('lib/keychain', () => {
       const { keychain, spawnSync: spawn } = loadKeychain();
       const encoded = keychain.encodeToken('secret token');
       spawn
-        .mockReturnValueOnce({ status: 0, stdout: '', stderr: '' })
-        .mockReturnValueOnce({ status: 0, stdout: `${encoded}\n`, stderr: '' });
+        .mockReturnValueOnce({ status: 44, stdout: '', stderr: 'could not be found' }) // pre-check: no item yet
+        .mockReturnValueOnce({ status: 0, stdout: '', stderr: '' }) // security -i add
+        .mockReturnValueOnce({ status: 0, stdout: `${encoded}\n`, stderr: '' }); // read-back
 
-      keychain.setKeychainToken({ host: 'wiki.example.com', login: 'me@example.com', token: 'secret token' });
+      const outcome = keychain.setKeychainToken({ host: 'wiki.example.com', login: 'me@example.com', token: 'secret token' });
+      expect(outcome).toEqual({ replaced: false });
 
-      const [bin, args, opts] = spawn.mock.calls[0];
+      const [bin, args, opts] = spawn.mock.calls[1];
       expect(bin).toBe('/usr/bin/security');
       expect(args).toEqual(['-i']);
       expect(opts.input).toBe(
@@ -162,7 +174,18 @@ describe('lib/keychain', () => {
         + `-l "Confluence CLI (wiki.example.com)" -U -w ${encoded}\n`
       );
       expect(opts.input).not.toContain('secret token');
-      expect(spawn.mock.calls[1][1][0]).toBe('find-generic-password');
+      expect(spawn.mock.calls[2][1][0]).toBe('find-generic-password');
+    });
+
+    test('reports when an existing item with a different value was replaced', () => {
+      const { keychain, spawnSync: spawn } = loadKeychain();
+      const encoded = keychain.encodeToken('new');
+      spawn
+        .mockReturnValueOnce({ status: 0, stdout: 'b64:b2xk\n', stderr: '' }) // existing "old"
+        .mockReturnValueOnce({ status: 0, stdout: '', stderr: '' })
+        .mockReturnValueOnce({ status: 0, stdout: `${encoded}\n`, stderr: '' });
+
+      expect(keychain.setKeychainToken({ host: 'wiki.example.com', token: 'new' })).toEqual({ replaced: true });
     });
 
     test('quotes identifiers for the security tokenizer and rejects control characters', () => {
@@ -181,6 +204,7 @@ describe('lib/keychain', () => {
     test('throws when the read-back value differs', () => {
       const { keychain, spawnSync: spawn } = loadKeychain();
       spawn
+        .mockReturnValueOnce({ status: 44, stdout: '', stderr: 'could not be found' })
         .mockReturnValueOnce({ status: 0, stdout: '', stderr: '' })
         .mockReturnValueOnce({ status: 0, stdout: 'b64:b3RoZXI=\n', stderr: '' });
 
@@ -190,7 +214,9 @@ describe('lib/keychain', () => {
 
     test('throws when security fails', () => {
       const { keychain, spawnSync: spawn } = loadKeychain();
-      spawn.mockReturnValueOnce({ status: 36, stdout: '', stderr: 'User interaction is not allowed.' });
+      spawn
+        .mockReturnValueOnce({ status: 44, stdout: '', stderr: 'could not be found' })
+        .mockReturnValueOnce({ status: 36, stdout: '', stderr: 'User interaction is not allowed.' });
 
       expect(() => keychain.setKeychainToken({ host: 'wiki.example.com', token: 'secret' }))
         .toThrow(/User interaction is not allowed/);

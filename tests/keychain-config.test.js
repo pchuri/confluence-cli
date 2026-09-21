@@ -8,7 +8,7 @@ jest.mock('../lib/keychain', () => {
     ...actual,
     isKeychainSupported: jest.fn(() => true),
     getKeychainToken: jest.fn(() => ({ token: undefined, attempted: true })),
-    setKeychainToken: jest.fn(),
+    setKeychainToken: jest.fn(() => ({ replaced: false })),
   };
 });
 
@@ -47,7 +47,7 @@ describe('macOS Keychain token fallback in getConfig', () => {
     // Point NETRC at a non-existent file so the host machine's ~/.netrc never interferes.
     process.env.NETRC = path.join(configDir, 'no-netrc');
     keychain.getKeychainToken.mockReset().mockReturnValue({ token: undefined, attempted: true });
-    keychain.setKeychainToken.mockReset();
+    keychain.setKeychainToken.mockReset().mockReturnValue({ replaced: false });
     keychain.isKeychainSupported.mockReset().mockReturnValue(true);
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
@@ -142,7 +142,7 @@ describe('confluence init --keychain', () => {
     }
     configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-keychain-init-'));
     keychain.getKeychainToken.mockReset();
-    keychain.setKeychainToken.mockReset();
+    keychain.setKeychainToken.mockReset().mockReturnValue({ replaced: false });
     keychain.isKeychainSupported.mockReset().mockReturnValue(true);
     logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
     errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
