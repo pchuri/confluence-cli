@@ -145,28 +145,37 @@ describe('lib/keychain', () => {
   });
 
   describe('setKeychainToken', () => {
-    test('passes the encoded token twice on stdin, never on argv, and verifies the write', () => {
+    test('feeds the whole command to `security -i` on stdin, never on argv, and verifies the write', () => {
       const { keychain, spawnSync: spawn } = loadKeychain();
       const encoded = keychain.encodeToken('secret token');
       spawn
-        .mockReturnValueOnce({ status: 0, stdout: '', stderr: 'password data for new item: retype password for new item: ' })
+        .mockReturnValueOnce({ status: 0, stdout: '', stderr: '' })
         .mockReturnValueOnce({ status: 0, stdout: `${encoded}\n`, stderr: '' });
 
       keychain.setKeychainToken({ host: 'wiki.example.com', login: 'me@example.com', token: 'secret token' });
 
       const [bin, args, opts] = spawn.mock.calls[0];
       expect(bin).toBe('/usr/bin/security');
-      expect(args).toEqual([
-        'add-generic-password',
-        '-s', 'confluence-cli:wiki.example.com',
-        '-a', 'me@example.com',
-        '-l', 'Confluence CLI (wiki.example.com)',
-        '-U',
-        '-w',
-      ]);
-      expect(args.join(' ')).not.toContain('secret');
-      expect(opts.input).toBe(`${encoded}\n${encoded}\n`);
+      expect(args).toEqual(['-i']);
+      expect(opts.input).toBe(
+        'add-generic-password -s "confluence-cli:wiki.example.com" -a "me@example.com" '
+        + `-l "Confluence CLI (wiki.example.com)" -U -w ${encoded}\n`
+      );
+      expect(opts.input).not.toContain('secret token');
       expect(spawn.mock.calls[1][1][0]).toBe('find-generic-password');
+    });
+
+    test('quotes identifiers for the security tokenizer and rejects control characters', () => {
+      const { keychain, spawnSync: spawn } = loadKeychain();
+      expect(keychain.quoteForSecurity('a b')).toBe('"a b"');
+      expect(keychain.quoteForSecurity('-dash')).toBe('"-dash"');
+      expect(keychain.quoteForSecurity('q"uote\\back')).toBe('"q\\"uote\\\\back"');
+
+      expect(() => keychain.setKeychainToken({ host: 'wiki.example.com\nfind-generic-password', token: 'x' }))
+        .toThrow(/control characters/);
+      expect(() => keychain.setKeychainToken({ host: 'wiki.example.com', login: 'me\r@x', token: 'x' }))
+        .toThrow(/control characters/);
+      expect(spawn).not.toHaveBeenCalled();
     });
 
     test('throws when the read-back value differs', () => {

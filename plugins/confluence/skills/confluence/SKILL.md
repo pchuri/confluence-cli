@@ -175,7 +175,7 @@ confluence read "https://company.atlassian.net/wiki/spaces/MYSPACE/pages/1234567
 Initialize configuration. By default, saves credentials to `~/.config/confluence-cli/config.json`; an existing legacy `~/.confluence-cli/` directory or `CONFLUENCE_CONFIG_DIR` may change the location.
 
 ```sh
-confluence init [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>] [--read-only [--keychain]
+confluence init [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>] [--read-only] [--keychain]
 ```
 
 All flags are optional; omitting any flag triggers an interactive prompt for that field. Provide all flags to run fully non-interactive. Use the global `--profile` flag to save to a named profile:
@@ -662,7 +662,7 @@ confluence profile use staging
 Add a new configuration profile. Supports the same options as `init` (interactive, non-interactive, or hybrid).
 
 ```sh
-confluence profile add <name> [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>] [--protocol http|https] [--read-only [--keychain]
+confluence profile add <name> [--domain <domain>] [--api-path <path>] [--auth-type basic|bearer] [--email <email>] [--token <token>] [--protocol http|https] [--read-only] [--keychain]
 ```
 
 Profile names may contain letters, numbers, hyphens, and underscores only.

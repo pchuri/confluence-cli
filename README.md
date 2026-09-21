@@ -346,9 +346,9 @@ confluence init \
 The profile is written without a `token` field, and every command reads the token from the Keychain instead.
 
 - Items are generic passwords named `confluence-cli:<host>`; the account is your email for `basic` auth or the literal `bearer` for `bearer` auth. You can inspect them in Keychain Access.app or with `security find-generic-password -s confluence-cli:<host> -a <account>`.
-- The CLI talks to the Keychain through the built-in `/usr/bin/security` tool (the same approach as `jira-cli`), so there is no native dependency. The token is passed on stdin, never on the command line.
+- The CLI talks to the Keychain through the built-in `/usr/bin/security` tool (the same approach as `jira-cli`), so there is no native dependency. The token is passed to `security -i` on stdin, never on the command line.
 - Values are stored as `b64:` + base64 so that non-ASCII tokens round-trip; entries added by hand with a plain value are read as-is.
-- Re-running `confluence init --keychain` replaces both the profile and the Keychain item. To remove an item: `security delete-generic-password -s confluence-cli:<host> -a <account>`.
+- Re-running `confluence init --keychain` replaces both the profile and the Keychain item. Changing the host or email creates a new item and leaves the old one in place; remove items with `security delete-generic-password -s confluence-cli:<host> -a <account>`.
 - Set `CONFLUENCE_KEYCHAIN=off` to skip Keychain lookups (for example on a headless Mac where the login Keychain is locked and an access prompt would block). Lookups time out after 30 seconds and fall back to `.netrc`.
 - Not available on Linux or Windows; `--keychain` is rejected there and lookups are skipped.
 
