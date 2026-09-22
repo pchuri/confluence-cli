@@ -209,6 +209,7 @@ program
   .option('--tls-client-cert <path>', 'Client certificate for mTLS connections')
   .option('--tls-client-key <path>', 'Client private key for mTLS connections')
   .option('--read-only', 'Set profile to read-only mode (blocks write operations)')
+  .option('--keychain', 'Store the API token in the macOS Keychain instead of config.json (macOS only)')
   .action(async (options) => {
     const profile = getProfileName();
     await initConfig({ ...options, profile });

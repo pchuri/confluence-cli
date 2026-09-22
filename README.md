@@ -262,8 +262,9 @@ confluence init --email "user@example.com" --token "your-api-token"
 - `--tls-client-key <path>` - Client private key for mTLS authentication
 - `--tls-ca-cert <path>` - Optional CA certificate chain for mTLS authentication
 - `--read-only` - Enable read-only mode (blocks all write operations)
+- `--keychain` - Store the token in the macOS Keychain instead of `config.json` (macOS only, see Option 5)
 
-⚠️ **Security note:** While flags work, storing tokens in shell history is risky. Prefer environment variables (Option 3) for production environments.
+⚠️ **Security note:** While flags work, storing tokens in shell history is risky. Prefer environment variables (Option 3) for production environments, or the macOS Keychain (Option 5) for a workstation.
 
 ### Option 3: Environment Variables
 ```bash
@@ -315,7 +316,7 @@ export CONFLUENCE_API_TOKEN="your-scoped-token"
 
 ### Option 4: `.netrc` file
 
-To keep your API token out of `config.json`, store it in a standard [`.netrc`](https://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-file.html) file (the same mechanism used by `curl` and Git). Configure a profile as usual but omit the token, then add an entry to your `~/.netrc`:
+To keep your API token out of `config.json` on any platform, store it in a standard [`.netrc`](https://www.gnu.org/software/inetutils/manual/html_node/The-_002enetrc-file.html) file (the same mechanism used by `curl` and Git). Configure a profile as usual but omit the token, then add an entry to your `~/.netrc`:
 
 ```
 machine your-domain.atlassian.net
@@ -324,9 +325,32 @@ machine your-domain.atlassian.net
 ```
 
 - The `machine` must match the profile's domain, and `login` must match the profile's email (basic auth). For bearer auth (no email), only the `machine` is matched.
-- The token is resolved with this precedence: environment variable / `--token` → profile `token` in `config.json` → `.netrc`. A token from a higher-priority source wins.
+- The token is resolved with this precedence: environment variable / `--token` → profile `token` in `config.json` → macOS Keychain → `.netrc`. A token from a higher-priority source wins.
 - `.netrc` supplies the token for `basic` and `bearer` auth only (not `mtls`, `cookie`, or `none`).
 - The file location is `~/.netrc` (`~/_netrc` on Windows), or the path in the `NETRC` environment variable if set.
+- Note that `.netrc` is still plaintext on disk. On macOS, prefer the Keychain (Option 5).
+
+### Option 5: macOS Keychain
+
+On macOS you can keep the API token in the login Keychain instead of `config.json`. Pass `--keychain` to `confluence init` (or answer **yes** to the Keychain prompt in interactive mode):
+
+```bash
+confluence init \
+  --domain "your-domain.atlassian.net" \
+  --auth-type basic \
+  --email "your.email@example.com" \
+  --token "your-api-token" \
+  --keychain
+```
+
+The profile is written without a `token` field, and every command reads the token from the Keychain instead.
+
+- Items are generic passwords named `confluence-cli:<host>`; the account is your email for `basic` auth or the literal `bearer` for `bearer` auth. You can inspect them in Keychain Access.app or with `security find-generic-password -s confluence-cli:<host> -a <account>`.
+- The CLI talks to the Keychain through the built-in `/usr/bin/security` tool (the same approach as `jira-cli`), so there is no native dependency. The token is passed to `security -i` on stdin, never on the command line.
+- Values are stored as `b64:` + base64 so that non-ASCII tokens round-trip. Entries added by hand with a plain value are read as-is and must be printable ASCII (otherwise `security` prints them as hex). Profiles on the same host with the same auth type share one item.
+- Re-running `confluence init --keychain` replaces both the profile and the Keychain item. Changing the host or email creates a new item and leaves the old one in place; remove items with `security delete-generic-password -s confluence-cli:<host> -a <account>`.
+- Set `CONFLUENCE_KEYCHAIN=off` to skip Keychain lookups (for example on a headless Mac where the login Keychain is locked and an access prompt would block). Lookups time out after 30 seconds and fall back to `.netrc`.
+- Not available on Linux or Windows; `--keychain` is rejected there and lookups are skipped.
 
 **Config file location:**
 
@@ -982,7 +1006,7 @@ confluence stats
 
 | Command | Description | Options |
 |---|---|---|
-| `init` | Initialize CLI configuration | `--read-only` |
+| `init` | Initialize CLI configuration | `--read-only`, `--keychain` |
 | `read <pageId_or_url>` | Read page content | `--format <html\|text\|storage\|markdown>` |
 | `info <pageId_or_url>` | Get page information | `--json` |
 | `search <query>` | Search for pages | `--json`, `--limit <number>`, `--start <number>` |
@@ -1012,7 +1036,7 @@ confluence stats
 | `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--exclude-attachments <patterns>`, `--referenced-only`, `--skip-attachments`, `-r, --recursive`, `--max-depth <depth>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--dry-run`, `--overwrite` |
 | `profile list` | List all configuration profiles | |
 | `profile use <name>` | Set the active configuration profile | |
-| `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol`, `--read-only` |
+| `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol`, `--read-only`, `--keychain` |
 | `profile remove <name>` | Remove a configuration profile | |
 | `api <endpoint>` | Make an authenticated API request (relative path uses apiPath; absolute path bypasses it; full URL must be same-origin) | `-X, --method <method>`, `-f, --field <key=value>`, `-H, --header <key:value>`, `--input <file>`, `--jq <expression>`, `-i, --include`, `--silent` |
 | `convert` | Convert between content formats locally (no server required) | `--input-file <path>`, `--output-file <path>`, `--input-format <markdown\|storage\|html>`, `--output-format <markdown\|storage\|html\|text>` |
