@@ -1,3 +1,10 @@
+## [2.25.1](https://github.com/pchuri/confluence-cli/compare/v2.25.0...v2.25.1) (2026-09-22)
+
+
+### Bug Fixes
+
+* **pi:** forward CONFLUENCE_PLANTUML_FORMAT to CLI subprocess ([#236](https://github.com/pchuri/confluence-cli/issues/236)) ([8d39d37](https://github.com/pchuri/confluence-cli/commit/8d39d3774fa386dd406aa35f011b8f93ae0c7edc))
+
 # [2.25.0](https://github.com/pchuri/confluence-cli/compare/v2.24.0...v2.25.0) (2026-09-22)
 
 
