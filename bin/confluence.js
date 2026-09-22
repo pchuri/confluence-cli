@@ -19,7 +19,7 @@ const registerApiCommand = require('./commands/api');
 const { readStdin } = require('../lib/stdin-utils');
 const { emitJson, emitJsonError, jsonRequested, setJsonMode } = require('../lib/output');
 const { fingerprintCopyPlan } = require('../lib/pi/copy-plan');
-const { VALID_PLANTUML_FORMATS } = require('../lib/plantuml-format');
+const { VALID_PLANTUML_FORMATS, normalizePlantumlFormat } = require('../lib/plantuml-format');
 
 const READ_ONLY_MESSAGE = 'This profile is in read-only mode. Write operations are not allowed.';
 const READ_ONLY_TIP = 'Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.';
@@ -39,17 +39,22 @@ function assertNonEmpty(value, label) {
 }
 
 // `--plantuml-format` wins over CONFLUENCE_PLANTUML_FORMAT. The flag is
-// validated here (hard error) while the env var is only honoured when valid —
-// config.js already warns and ignores a bad env value.
-function resolveCliPlantumlFormat(options) {
-  if (options.plantumlFormat) {
-    if (!VALID_PLANTUML_FORMATS.includes(options.plantumlFormat)) {
+// validated here (hard error). The env var is only read for commands that run
+// without a profile (`convert`, via `readEnv`); `create`/`update` already get
+// env > profile from getConfig(), through the same normalizer, so reading it
+// again here would only duplicate warnings.
+function resolveCliPlantumlFormat(options, { readEnv = false } = {}) {
+  if (options.plantumlFormat !== undefined) {
+    const value = String(options.plantumlFormat).trim().toLowerCase();
+    if (!VALID_PLANTUML_FORMATS.includes(value)) {
       throw new Error(`Invalid --plantuml-format "${options.plantumlFormat}". Valid: ${VALID_PLANTUML_FORMATS.join(', ')}`);
     }
-    return options.plantumlFormat;
+    return value;
   }
-  const fromEnv = process.env.CONFLUENCE_PLANTUML_FORMAT;
-  return VALID_PLANTUML_FORMATS.includes(fromEnv) ? fromEnv : undefined;
+  if (!readEnv) {
+    return undefined;
+  }
+  return normalizePlantumlFormat(process.env.CONFLUENCE_PLANTUML_FORMAT, 'from CONFLUENCE_PLANTUML_FORMAT');
 }
 
 const PLANTUML_FORMAT_OPTION = ['--plantuml-format <format>', `PlantUML macro format (${VALID_PLANTUML_FORMATS.join(', ')})`];
@@ -1099,7 +1104,7 @@ program
     }
 
     const converter = ConfluenceClient.createLocalConverter({
-      plantumlFormat: resolveCliPlantumlFormat(options),
+      plantumlFormat: resolveCliPlantumlFormat(options, { readEnv: true }),
     });
     let output;
 

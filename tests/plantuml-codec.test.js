@@ -1,4 +1,5 @@
-const { encodePlantuml, decodePlantuml } = require('../lib/plantuml-codec');
+const { deflateRawSync } = require('zlib');
+const { encodePlantuml, decodePlantuml, MAX_INFLATED_BYTES } = require('../lib/plantuml-codec');
 
 // Payload published in the PlantUML Diagrams for Confluence documentation
 // ("Programmatically adding PlantUML diagrams").
@@ -51,6 +52,18 @@ describe('plantuml codec', () => {
 
     test('returns null for base64 that is not valid DEFLATE data', () => {
       expect(decodePlantuml(Buffer.from('hello world').toString('base64'))).toBeNull();
+    });
+
+    test('returns null when the payload would inflate past MAX_INFLATED_BYTES', () => {
+      // Highly compressible payload: 32 MiB of one byte deflates to under 100 KB.
+      const oversized = deflateRawSync(Buffer.alloc(MAX_INFLATED_BYTES * 2, 0x41)).toString('base64');
+      expect(oversized.length).toBeLessThan(100 * 1024);
+      expect(decodePlantuml(oversized)).toBeNull();
+    });
+
+    test('still decodes a large payload that stays under the cap', () => {
+      const source = 'A'.repeat(1024 * 1024);
+      expect(decodePlantuml(encodePlantuml(source))).toBe(source);
     });
 
     test('returns null for empty, null and undefined input', () => {
