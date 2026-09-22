@@ -177,6 +177,17 @@ describe('convert command', () => {
     expect(output).not.toContain('plantumlcloud');
   });
 
+  test('an empty --plantuml-format is rejected even when the env var is set', () => {
+    const inputFile = writeInput('input.md', '```plantuml\nA -> B\n```\n');
+    const result = spawnSync(
+      process.execPath,
+      [CLI, 'convert', '--input-file', inputFile, '--input-format', 'markdown', '--output-format', 'storage', '--plantuml-format', ''],
+      { encoding: 'utf8', timeout: 10000, env: { ...process.env, CONFLUENCE_PLANTUML_FORMAT: 'plantumlcloud' } }
+    );
+    expect(result.status).not.toBe(0);
+    expect(result.stderr).toContain('Invalid --plantuml-format "". Valid: plantuml, plantumlcloud');
+  });
+
   test('invalid --plantuml-format fails with the valid values listed', () => {
     const inputFile = writeInput('input.md', '```plantuml\nA -> B\n```\n');
     let thrown = null;

@@ -1564,6 +1564,37 @@ describe('ConfluenceClient', () => {
     });
   });
 
+  describe('plantumlFormat wiring', () => {
+    // create/create-child/update rely on getConfig() -> constructor for the
+    // env/profile value; the CLI only calls setPlantumlFormat for the flag.
+    test('constructor passes config.plantumlFormat to the converter', () => {
+      const client = new ConfluenceClient({
+        domain: 'wiki.example.org',
+        token: 'test-token',
+        plantumlFormat: 'plantumlcloud'
+      });
+      expect(client.converter.plantumlFormat).toBe('plantumlcloud');
+    });
+
+    test('converter defaults to "plantuml" when config has no plantumlFormat', () => {
+      const client = new ConfluenceClient({
+        domain: 'wiki.example.org',
+        token: 'test-token'
+      });
+      expect(client.converter.plantumlFormat).toBe('plantuml');
+    });
+
+    test('setPlantumlFormat overrides the config value', () => {
+      const client = new ConfluenceClient({
+        domain: 'wiki.example.org',
+        token: 'test-token',
+        plantumlFormat: 'plantumlcloud'
+      });
+      client.setPlantumlFormat('plantuml');
+      expect(client.converter.plantumlFormat).toBe('plantuml');
+    });
+  });
+
   describe('markdownToNativeStorage', () => {
     test('should act as an alias to htmlToConfluenceStorage via markdown render', () => {
       const markdown = '# Native Storage Test';

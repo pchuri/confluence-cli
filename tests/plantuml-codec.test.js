@@ -55,8 +55,8 @@ describe('plantuml codec', () => {
     });
 
     test('returns null when the payload would inflate past MAX_INFLATED_BYTES', () => {
-      // Highly compressible payload: ~64 MiB of one byte deflates to under 100 KB.
-      const oversized = deflateRawSync(Buffer.alloc(MAX_INFLATED_BYTES * 4, 0x41)).toString('base64');
+      // Highly compressible payload: 32 MiB of one byte deflates to under 100 KB.
+      const oversized = deflateRawSync(Buffer.alloc(MAX_INFLATED_BYTES * 2, 0x41)).toString('base64');
       expect(oversized.length).toBeLessThan(100 * 1024);
       expect(decodePlantuml(oversized)).toBeNull();
     });
