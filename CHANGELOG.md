@@ -1,3 +1,10 @@
+# [2.25.0](https://github.com/pchuri/confluence-cli/compare/v2.24.0...v2.25.0) (2026-09-22)
+
+
+### Features
+
+* **auth:** store API tokens in the macOS Keychain ([#235](https://github.com/pchuri/confluence-cli/issues/235)) ([eb395b2](https://github.com/pchuri/confluence-cli/commit/eb395b2516fff6b3eaac48db232cd6563242e682)), closes [#231](https://github.com/pchuri/confluence-cli/issues/231)
+
 # [2.24.0](https://github.com/pchuri/confluence-cli/compare/v2.23.0...v2.24.0) (2026-09-21)
 
 
