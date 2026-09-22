@@ -1,3 +1,10 @@
+## [2.25.2](https://github.com/pchuri/confluence-cli/compare/v2.25.1...v2.25.2) (2026-09-22)
+
+
+### Bug Fixes
+
+* **plantuml:** share the format normalizer across CLI paths and cap inflate size ([#237](https://github.com/pchuri/confluence-cli/issues/237)) ([c594d52](https://github.com/pchuri/confluence-cli/commit/c594d522c7ccfff59fb577ed4ac1b3219352a9e2)), closes [#234](https://github.com/pchuri/confluence-cli/issues/234)
+
 ## [2.25.1](https://github.com/pchuri/confluence-cli/compare/v2.25.0...v2.25.1) (2026-09-22)
 
 
