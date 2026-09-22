@@ -1,4 +1,4 @@
-const { execFileSync } = require('child_process');
+const { execFileSync, spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -126,6 +126,39 @@ describe('convert command', () => {
       undefined,
       { CONFLUENCE_PLANTUML_FORMAT: 'plantumlcloud' }
     );
+    expect(output).toContain('<ac:structured-macro ac:name="plantumlcloud">');
+  });
+
+  test('CONFLUENCE_PLANTUML_FORMAT is case-insensitive and trimmed for convert', () => {
+    const inputFile = writeInput('input.md', '```plantuml\nA -> B\n```\n');
+    const output = run(
+      ['convert', '--input-file', inputFile, '--input-format', 'markdown', '--output-format', 'storage'],
+      undefined,
+      { CONFLUENCE_PLANTUML_FORMAT: '  PlantUmlCloud  ' }
+    );
+    expect(output).toContain('<ac:structured-macro ac:name="plantumlcloud">');
+  });
+
+  test('invalid CONFLUENCE_PLANTUML_FORMAT warns once and falls back to plantuml for convert', () => {
+    const inputFile = writeInput('input.md', '```plantuml\nA -> B\n```\n');
+    const result = spawnSync(
+      process.execPath,
+      [CLI, 'convert', '--input-file', inputFile, '--input-format', 'markdown', '--output-format', 'storage'],
+      { encoding: 'utf8', timeout: 10000, env: { ...process.env, CONFLUENCE_PLANTUML_FORMAT: 'puml' } }
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('<ac:structured-macro ac:name="plantuml">');
+    expect(result.stdout).not.toContain('plantumlcloud');
+    expect(result.stderr.match(/Invalid plantumlFormat from CONFLUENCE_PLANTUML_FORMAT "puml"/g)).toHaveLength(1);
+  });
+
+  test('--plantuml-format is case-insensitive', () => {
+    const inputFile = writeInput('input.md', '```plantuml\nA -> B\n```\n');
+    const output = run([
+      'convert', '--input-file', inputFile,
+      '--input-format', 'markdown', '--output-format', 'storage',
+      '--plantuml-format', 'PlantUmlCloud',
+    ]);
     expect(output).toContain('<ac:structured-macro ac:name="plantumlcloud">');
   });
 

@@ -424,7 +424,7 @@ export CONFLUENCE_PLANTUML_FORMAT=plantumlcloud
 confluence convert --input-format markdown --output-format storage --plantuml-format plantumlcloud -i page.md
 ```
 
-Valid values: `plantuml` (default — `<ac:plain-text-body>` CDATA) and `plantumlcloud` (compressed `data` parameter). Flag > environment variable > profile. See [Programmatically adding PlantUML diagrams](https://stratus-addons.atlassian.net/wiki/spaces/PDFC/pages/1839333377/Programmatically+adding+PlantUML+diagrams).
+Valid values: `plantuml` (default — `<ac:plain-text-body>` CDATA) and `plantumlcloud` (compressed `data` parameter). Flag > environment variable > profile; `convert` runs locally without loading a profile, so the profile field only applies to `create`, `create-child` and `update`. Values are case-insensitive. See [Programmatically adding PlantUML diagrams](https://stratus-addons.atlassian.net/wiki/spaces/PDFC/pages/1839333377/Programmatically+adding+PlantUML+diagrams).
 
 > **Note:** `plantumlcloud` renders from `<filename>.svg` / `.png` attachments (`plantuml-diagram-1.svg`, … in document order) produced by a PlantUML server you operate. This CLI emits the macro only; upload those attachments separately. Both formats read back as the same ` ```plantuml ` fence.
 
