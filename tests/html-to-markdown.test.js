@@ -304,4 +304,10 @@ describe('htmlToMarkdown', () => {
       expect(htmlToMarkdown(html)).toBe('```objective-c\nint x;\n```');
     });
   });
+
+  test('LIST_INDENT fence handling does not change html-to-markdown (#238)', () => {
+    const out = htmlToMarkdown('<ul><li><pre><code>a  b</code></pre></li></ul><p>x</p><pre><code>q   r</code></pre>');
+    expect(out).toContain('```\nq   r\n```');
+    expect(out).toBe('- ``` a b ```\n\nx\n\n```\nq   r\n```');
+  });
 });

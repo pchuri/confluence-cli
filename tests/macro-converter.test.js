@@ -1686,3 +1686,185 @@ describe('markdown with HTML blocks', () => {
     expect(out).toContain('<![CDATA[<svg');
   });
 });
+
+describe('MacroConverter storageToMarkdown nested lists (#238)', () => {
+  const converter = new MacroConverter({ isCloud: true });
+  const codeMacro = (lang, body) =>
+    `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">${lang}</ac:parameter><ac:plain-text-body><![CDATA[${body}]]></ac:plain-text-body></ac:structured-macro>`;
+
+  test('issue repro: mixed ol/ul nesting from markdownToStorage output', () => {
+    const storage = '<ol>\n<li>Parent 1\n<ol>\n<li><p>Child 1.1</p></li>\n<li><p>Child 1.2</p></li>\n</ol>\n</li>\n'
+      + '<li>Parent 2\n<ul>\n<li><p>Child 2.1</p></li>\n<li><p>Child 2.2</p></li>\n</ul>\n</li>\n</ol>';
+    expect(converter.storageToMarkdown(storage)).toBe(
+      '1. Parent 1\n   1. Child 1.1\n   2. Child 1.2\n2. Parent 2\n   - Child 2.1\n   - Child 2.2',
+    );
+  });
+
+  test('Confluence editor shape: <li><p>Parent</p><ul>…</ul></li>', () => {
+    const storage = '<ul><li><p>Parent</p><ul><li><p>Child</p></li></ul></li><li><p>Next</p></li></ul>';
+    expect(converter.storageToMarkdown(storage)).toBe('- Parent\n  - Child\n- Next');
+  });
+
+  test('three levels indent to each content column', () => {
+    const storage = '<ul><li>L1<ul><li>L2<ol><li>L3</li></ol></li></ul></li></ul>';
+    expect(converter.storageToMarkdown(storage)).toBe('- L1\n  - L2\n    1. L3');
+  });
+
+  test('ordered marker width sets child indent (10. → 4 spaces)', () => {
+    const items = Array.from({ length: 9 }, (_, i) => `<li>i${i + 1}</li>`).join('');
+    const storage = `<ol>${items}<li>ten<ul><li>sub</li></ul></li></ol>`;
+    const head = Array.from({ length: 9 }, (_, i) => `${i + 1}. i${i + 1}`).join('\n');
+    expect(converter.storageToMarkdown(storage)).toBe(`${head}\n10. ten\n    - sub`);
+  });
+
+  test('pretty-printed storage whitespace does not leak into items', () => {
+    const storage = '<ul>\n  <li>\n    <p>Parent</p>\n    <ul>\n      <li><p>Child</p></li>\n    </ul>\n  </li>\n</ul>';
+    expect(converter.storageToMarkdown(storage)).toBe('- Parent\n  - Child');
+  });
+
+  test('paragraph after a nested list stays in the parent item', () => {
+    const storage = '<ul><li><p>Parent</p><ul><li>Child</li></ul><p>After</p></li></ul>';
+    expect(converter.storageToMarkdown(storage)).toBe('- Parent\n  - Child\n\n  After');
+  });
+
+  test('multiple paragraphs in one item become a loose item', () => {
+    const storage = '<ul><li><p>Para 1</p><p>Para 2</p></li><li><p>Next</p></li></ul>';
+    expect(converter.storageToMarkdown(storage)).toBe('- Para 1\n\n  Para 2\n- Next');
+  });
+
+  test('code macro inside a nested item keeps its body verbatim', () => {
+    const storage = `<ul><li>L1<ul><li><p>L2</p>${codeMacro('js', 'x  =  1\n    y')}</li></ul></li></ul>`;
+    expect(converter.storageToMarkdown(storage)).toBe(
+      '- L1\n  - L2\n\n    ```js\n    x  =  1\n        y\n    ```',
+    );
+  });
+
+  test('callout inside an item is indented as a block', () => {
+    const storage = '<ul><li><p>Step</p><ac:structured-macro ac:name="info"><ac:rich-text-body><p>Note</p></ac:rich-text-body></ac:structured-macro></li></ul>';
+    expect(converter.storageToMarkdown(storage)).toBe('- Step\n\n  > **INFO**\n  > Note');
+  });
+
+  test('nested list inside a callout keeps quote prefix and indent', () => {
+    const storage = '<ac:structured-macro ac:name="info"><ac:rich-text-body><ul><li>a<ul><li>b</li></ul></li></ul></ac:rich-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(storage)).toBe('> **INFO**\n> - a\n>   - b');
+  });
+
+  test('flat items keep inline whitespace collapse', () => {
+    expect(converter.storageToMarkdown('<ul><li>a\n  b <strong>c</strong></li></ul>')).toBe('- a b **c**');
+  });
+
+  test('list inside a table cell is still flattened to one line', () => {
+    const storage = '<table><tbody><tr><th>h</th></tr><tr><td><ul><li>a<ul><li>b</li></ul></li></ul></td></tr></tbody></table>';
+    expect(converter.storageToMarkdown(storage)).toBe('| h |\n| --- |\n| - a - b |');
+  });
+
+  test('markdown → storage → markdown round-trip preserves nesting', () => {
+    const md = '1. Parent 1\n   1. Child 1.1\n   2. Child 1.2\n2. Parent 2\n   - Child 2.1\n   - Child 2.2';
+    const storage1 = converter.markdownToStorage(md);
+    const md2 = converter.storageToMarkdown(storage1);
+    expect(md2).toBe(md);
+    expect(converter.markdownToStorage(md2)).toBe(storage1);
+  });
+
+  describe('code macro as the first block of an item', () => {
+    const roundTrip = (storage) => {
+      const md = converter.storageToMarkdown(storage);
+      const storage1 = converter.markdownToStorage(md);
+      const md2 = converter.storageToMarkdown(storage1);
+      expect(md2).toBe(md);
+      expect(converter.markdownToStorage(md2)).toBe(storage1);
+      return md;
+    };
+
+    test('flat item keeps the body byte-exact', () => {
+      const md = roundTrip(`<ul><li>${codeMacro('js', 'a  =  1\n\tb')}</li></ul>`);
+      expect(md).toBe('- ```js\n  a  =  1\n  \tb\n  ```');
+    });
+
+    test('nested item keeps the body byte-exact', () => {
+      const md = roundTrip(`<ul><li><p>P</p><ul><li>${codeMacro('js', 'a  =  1')}</li></ul></li></ul>`);
+      expect(md).toBe('- P\n  - ```js\n    a  =  1\n    ```');
+    });
+
+    test('10. marker indents the body by 4', () => {
+      const items = Array.from({ length: 9 }, (_, i) => `<li>i${i + 1}</li>`).join('');
+      const md = roundTrip(`<ol>${items}<li>${codeMacro('js', 'a  =  1')}</li></ol>`);
+      expect(md.split('\n').slice(-3).join('\n')).toBe('10. ```js\n    a  =  1\n    ```');
+    });
+  });
+
+  test('code in a nested item keeps blank, whitespace-only and tab lines', () => {
+    const storage = `<ul><li>P<ul><li><p>Q</p>${codeMacro('py', 'a\n\n   \n\tb  c')}</li></ul></li></ul>`;
+    expect(converter.storageToMarkdown(storage)).toBe(
+      '- P\n  - Q\n\n    ```py\n    a\n\n       \n    \tb  c\n    ```',
+    );
+  });
+
+  describe('literal U+E000 / U+E001 in content survive the list-indent sentinel', () => {
+    const E0 = '\uE000';
+    const E1 = '\uE001';
+
+    test('prose text, including an escape-lookalike sequence', () => {
+      expect(converter.storageToMarkdown(`<p>a${E0}b${E1}c${E1}s</p>`)).toBe(`a${E0}b${E1}c${E1}s`);
+    });
+
+    test('numeric entity references', () => {
+      expect(converter.storageToMarkdown('<p>&#xE000;&#57345;</p>')).toBe(`${E0}${E1}`);
+    });
+
+    test('code body', () => {
+      expect(converter.storageToMarkdown(codeMacro('', `x${E0}y${E1}e`))).toBe(`\`\`\`\nx${E0}y${E1}e\n\`\`\``);
+    });
+
+    test('table cell', () => {
+      expect(converter.storageToMarkdown(`<table><tr><td>t${E0}d</td></tr></table>`)).toBe(`| t${E0}d |\n| --- |`);
+    });
+
+    test('task body', () => {
+      const storage = `<ac:task-list><ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body>k${E0}${E1}</ac:task-body></ac:task></ac:task-list>`;
+      expect(converter.storageToMarkdown(storage)).toBe(`- [ ] k${E0}${E1}`);
+    });
+
+    test('nested list items', () => {
+      expect(converter.storageToMarkdown(`<ul><li>l${E0}i<ul><li>n${E1}</li></ul></li></ul>`))
+        .toBe(`- l${E0}i\n  - n${E1}`);
+    });
+
+    test('include page title in the URL is percent-encoded from the raw title', () => {
+      const storage = `<ac:structured-macro ac:name="include"><ac:parameter ac:name=""><ac:link><ri:page ri:space-key="~u" ri:content-title="T${E0}"/></ac:link></ac:parameter></ac:structured-macro>`;
+      expect(converter.storageToMarkdown(storage)).toContain(`[T${E0}](/display/~u/T%EE%80%80)`);
+    });
+
+    test('inflated plantumlcloud source', () => {
+      const data = encodePlantuml(`@startuml\nA${E0}B\n@enduml`);
+      const storage = `<ac:structured-macro ac:name="plantumlcloud"><ac:parameter ac:name="data">${data}</ac:parameter></ac:structured-macro>`;
+      expect(converter.storageToMarkdown(storage)).toBe(`\`\`\`plantuml\n@startuml\nA${E0}B\n@enduml\n\`\`\``);
+    });
+  });
+
+  test('inline anchor / status macros stay on the lead-in line', () => {
+    const storage = '<ul><li>Before <ac:structured-macro ac:name="anchor"><ac:parameter ac:name="">id1</ac:parameter></ac:structured-macro> mid '
+      + '<ac:structured-macro ac:name="status"><ac:parameter ac:name="title">OK</ac:parameter></ac:structured-macro> after</li></ul>';
+    expect(converter.storageToMarkdown(storage)).toBe('- Before **ANCHOR: id1** mid after');
+  });
+
+  test('item containing only a nested list', () => {
+    expect(converter.storageToMarkdown('<ul><li><ul><li>inner</li></ul></li></ul>')).toBe('- - inner');
+  });
+
+  test('ac:task-list nested in a list item', () => {
+    const storage = '<ul><li>P<ac:task-list><ac:task><ac:task-status>complete</ac:task-status><ac:task-body>T</ac:task-body></ac:task></ac:task-list></li></ul>';
+    expect(converter.storageToMarkdown(storage)).toBe('- P\n  - [x] T');
+  });
+
+  test('<hr/> as the first block uses *** so it stays inside the item', () => {
+    const md = converter.storageToMarkdown('<ul><li><hr/>x</li></ul>');
+    expect(md).toBe('- ***\n\n  x');
+    expect(converter.markdownToStorage(md)).toBe('<ul>\n<li>\n<hr />\n<p>x</p>\n</li>\n</ul>\n');
+  });
+
+  test('list wrapped in a non-block element is flattened without leaking indent', () => {
+    expect(converter.storageToMarkdown('<ul><li>A<div><ul><li>B<ul><li>C</li></ul></li></ul></div></li></ul>'))
+      .toBe('- A - B - C');
+  });
+});
