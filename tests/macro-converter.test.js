@@ -1907,6 +1907,43 @@ describe('MacroConverter storageToMarkdown nested lists (#238)', () => {
       expect(converter.storageToMarkdown(storage)).toBe('- [ ]\n  ***\n\n  x');
     });
 
+    test('body starting with a block that cannot interrupt a paragraph keeps the checkbox inline', () => {
+      expect(converter.storageToMarkdown(taskList(task('incomplete', '<pre>raw</pre>')))).toBe('- [ ] raw');
+      const expand = '<ac:structured-macro ac:name="expand"><ac:parameter ac:name="title">T</ac:parameter>'
+        + '<ac:rich-text-body><p>in</p></ac:rich-text-body></ac:structured-macro>';
+      expect(converter.storageToMarkdown(taskList(task('incomplete', expand))))
+        .toBe('- [ ] **EXPAND: T**\n\n  in\n\n  **EXPAND_END**');
+    });
+
+    describe('round-trip is stable for every kind of first block', () => {
+      const firstBlocks = {
+        code,
+        pre: '<pre>raw</pre>',
+        heading: '<h2>H</h2>',
+        table: '<table><tr><th>h</th></tr><tr><td>c</td></tr></table>',
+        blockquote: '<blockquote><p>q</p></blockquote>',
+        info: '<ac:structured-macro ac:name="info"><ac:rich-text-body><p>n</p></ac:rich-text-body></ac:structured-macro>',
+        hr: '<hr/>',
+        list: '<ul><li>b</li></ul>',
+        taskList: taskList(task('complete', 'B')),
+      };
+      for (const [kind, block] of Object.entries(firstBlocks)) {
+        for (const [shape, rest] of [['tight', ''], ['loose', '<p>after</p>']]) {
+          test(`${kind} (${shape})`, () => {
+            const md1 = converter.storageToMarkdown(taskList(task('incomplete', block + rest)));
+            const storage1 = converter.markdownToStorage(md1);
+            const md2 = converter.storageToMarkdown(storage1);
+            expect(md2).toBe(md1);
+            expect(converter.markdownToStorage(md2)).toBe(storage1);
+          });
+        }
+      }
+    });
+
+    test('bare `[ ]` paragraph before ordinary text in a plain list item is left alone', () => {
+      expect(converter.storageToMarkdown('<ul><li><p>[ ]</p><p>para</p></li></ul>')).toBe('- [ ]\n\n  para');
+    });
+
     test('multi-paragraph body becomes a loose item', () => {
       const storage = taskList(task('incomplete', '<p>Para  1</p><p>Para 2</p>'), task('complete', 'Next'));
       expect(converter.storageToMarkdown(storage)).toBe('- [ ] Para 1\n\n  Para 2\n- [x] Next');
@@ -1968,6 +2005,16 @@ describe('MacroConverter storageToMarkdown nested lists (#238)', () => {
       expect(md2).toBe(md);
       expect(converter.markdownToStorage(md2)).toBe(storage1);
     });
+  });
+
+  test('two lists in one item join as one tight list', () => {
+    expect(converter.storageToMarkdown('<ul><li>A<ul><li>b</li></ul><ul><li>c</li></ul></li></ul>'))
+      .toBe('- A\n  - b\n  - c');
+  });
+
+  test('list inside a paragraph in a list item is flattened without leaking indent', () => {
+    expect(converter.storageToMarkdown('<ul><li><p>x<ul><li>a<ul><li>b</li></ul></li></ul></p></li></ul>'))
+      .toBe('- x - a - b');
   });
 
   test('<hr/> as the first block uses *** so it stays inside the item', () => {

@@ -10,3 +10,7 @@
 
 - [x] Finished item
 - [ ] Pending item with *emphasis*
+
+- [ ] Top level task 1
+  - [x] Sub task 1
+- [ ] Top level task 2
