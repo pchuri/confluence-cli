@@ -1,9 +1,11 @@
 const {
   LIST_INDENT,
+  QUOTE_MARK,
   escapeSentinels,
-  finalizeListIndent,
+  finalizeSentinels,
   fenceLength,
   splitOnFences,
+  opensSentinelFence,
   cleanupOutsideFence,
   cleanupWithFences,
 } = require('../lib/markdown-cleanup');
@@ -100,6 +102,16 @@ describe('markdown-cleanup splitOnFences', () => {
     const text = 'see ``` here\nand ``` there';
     expect(splitOnFences(text)).toEqual([text]);
   });
+
+  test('a close line must follow \\n, not \\r or U+2028', () => {
+    expect(splitOnFences('```\na\u2028```\nb\n```')).toEqual(['', '```\na\u2028```\nb\n```', '']);
+    expect(splitOnFences('```\n\r```\n')).toEqual(['```\n\r```\n']);
+  });
+
+  test('a line whose info string contains backticks does not open a fence', () => {
+    const text = '``` `` ``` is two backticks\na     b\n```\nkeep    this\n```';
+    expect(splitOnFences(text)).toEqual(['``` `` ``` is two backticks\na     b\n', '```\nkeep    this\n```', '']);
+  });
 });
 
 describe('markdown-cleanup cleanupOutsideFence', () => {
@@ -193,11 +205,67 @@ describe('markdown-cleanup LIST_INDENT sentinel', () => {
 
   test('cleanupWithFences leaves sentinel-indented fence bodies untouched', () => {
     const text = `-${I}\`\`\`js\n${I}${I}a  =  1\n${I}${I}\`\`\``;
-    expect(finalizeListIndent(cleanupWithFences(text))).toBe('- ```js\n  a  =  1\n  ```');
+    expect(finalizeSentinels(cleanupWithFences(text))).toBe('- ```js\n  a  =  1\n  ```');
   });
 
-  test('escapeSentinels / finalizeListIndent round-trip literal codepoints', () => {
-    const literal = '\uE000a\uE001b\uE001s\uE001e';
-    expect(finalizeListIndent(`${I}${escapeSentinels(literal)}`)).toBe(` ${literal}`);
+  test('escapeSentinels / finalizeSentinels round-trip literal codepoints', () => {
+    const literal = '\uE000a\uE001b\uE001s\uE001e\uE002c\uE001q';
+    expect(finalizeSentinels(`${I}${QUOTE_MARK}${escapeSentinels(literal)}`)).toBe(` >${literal}`);
+  });
+});
+
+describe('markdown-cleanup QUOTE_MARK sentinel (#244)', () => {
+  const I = LIST_INDENT;
+  const Q = QUOTE_MARK;
+
+  test('recognises a quoted fence, with or without the space after the mark', () => {
+    for (const p of [`${Q} `, Q, `${Q} ${Q} `, `${Q}${Q}`]) {
+      const text = `${p}\`\`\`js\n${p}x   y\n${Q}\n${p}  z\n${p}\`\`\``;
+      expect(splitOnFences(`${Q} before\n${text}\n${Q} after`)).toEqual([`${Q} before\n`, text, `\n${Q} after`]);
+    }
+  });
+
+  test('recognises quote marks mixed with LIST_INDENT and a joined list marker', () => {
+    const cases = [
+      [`${Q} -${I}\`\`\``, `${Q} ${I}${I}\`\`\``],
+      [`${I}${I}${Q} \`\`\``, `${I}${I}${Q} \`\`\``],
+      [`-${I}${Q} \`\`\``, `${I}${I}${Q} \`\`\``],
+      [`${Q} ${I}${I}1.${I}\`\`\``, `${Q} ${I}${I}${I}${I}${I}\`\`\``],
+      [`-${I}-${I}\`\`\``, `${I}${I}${I}${I}\`\`\``],
+    ];
+    for (const [open, close] of cases) {
+      const text = `${open}\na   b\n${close}`;
+      expect(splitOnFences(text)).toEqual(['', text, '']);
+    }
+  });
+
+  test('a quoted fence only closes at the quote depth it opened at', () => {
+    const quotedOpen = `${Q} \`\`\`\n${Q} a   b\n\n\`\`\`\nc   d\n\`\`\``;
+    expect(splitOnFences(quotedOpen)).toEqual([`${Q} \`\`\`\n${Q} a   b\n\n`, '```\nc   d\n```', '']);
+    const topOpen = `\`\`\`\nx\n${Q} \`\`\`\n${Q} y\n\`\`\``;
+    expect(splitOnFences(topOpen)).toEqual(['', topOpen, '']);
+    const nested = `${Q} ${Q} \`\`\`\n${Q} ${Q} a\n${Q} \`\`\`\n${Q} ${Q} \`\`\``;
+    expect(splitOnFences(nested)).toEqual(['', nested, '']);
+  });
+
+  test('does NOT treat a literal `> ` prefix as a fence', () => {
+    expect(splitOnFences('> ```js\n> x  =  1\n> ```')).toHaveLength(1);
+    expect(splitOnFences('- > ```js\n  > x  =  1\n  > ```')).toHaveLength(1);
+  });
+
+  test('cleanupWithFences leaves quoted fence bodies untouched and finalizes the marks', () => {
+    const text = `${Q} **INFO**\n${Q} \`\`\`\n${Q} x   y\n${Q}   z\n${Q} \`\`\`\n${Q}\n${Q} a    b`;
+    expect(finalizeSentinels(cleanupWithFences(text))).toBe('> **INFO**\n> ```\n> x   y\n>   z\n> ```\n>\n> a b');
+  });
+
+  test('opensSentinelFence matches only sentinel-prefixed fence openings', () => {
+    expect(opensSentinelFence('```js')).toBe(true);
+    expect(opensSentinelFence(`${Q} \`\`\``)).toBe(true);
+    expect(opensSentinelFence(`-${I}${Q} \`\`\``)).toBe(true);
+    expect(opensSentinelFence(`${Q} 10.${I}\`\`\`js`)).toBe(true);
+    expect(opensSentinelFence(`${Q} **INFO**`)).toBe(false);
+    expect(opensSentinelFence('> ```')).toBe(false);
+    expect(opensSentinelFence('- ```')).toBe(false);
+    expect(opensSentinelFence('``')).toBe(false);
   });
 });
