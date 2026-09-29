@@ -79,6 +79,109 @@ describe('htmlToMarkdown', () => {
       const html = '<ul><li>kept</li><li>   </li><li>also kept</li></ul>';
       expect(htmlToMarkdown(html)).toBe('- kept\n- also kept');
     });
+
+    describe('nested lists (#243)', () => {
+      test('nested <ul> keeps structure and the following sibling marker', () => {
+        const html = '<ul><li>A<ul><li>A1</li><li>A2</li></ul></li><li>B</li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- A\n  - A1\n  - A2\n- B');
+      });
+
+      test('nested <ol> indents to the content column and numbers per level', () => {
+        const html = '<ol><li>one<ol><li>x</li><li>y</li></ol></li><li>two</li></ol>';
+        expect(htmlToMarkdown(html)).toBe('1. one\n   1. x\n   2. y\n2. two');
+      });
+
+      test('mixed <ol>/<ul> nesting three levels deep', () => {
+        const html = '<ul><li>a<ol><li>b<ul><li>c</li></ul></li></ol></li><li>d</li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- a\n  1. b\n     - c\n- d');
+      });
+
+      test('continuation indent follows a multi-digit ordered marker', () => {
+        const items = Array.from({ length: 9 }, (_, i) => `<li>${i + 1}</li>`).join('');
+        const html = `<ol>${items}<li>ten<ul><li>sub</li></ul></li></ol>`;
+        expect(htmlToMarkdown(html)).toBe(
+          '1. 1\n2. 2\n3. 3\n4. 4\n5. 5\n6. 6\n7. 7\n8. 8\n9. 9\n10. ten\n    - sub'
+        );
+      });
+
+      test('text after a nested list becomes a separate continuation paragraph', () => {
+        const html = '<ul><li>A<ul><li>A1</li></ul>tail</li><li>B</li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- A\n  - A1\n\n  tail\n- B');
+      });
+
+      test('item containing only a nested list', () => {
+        expect(htmlToMarkdown('<ul><li><ul><li>x</li></ul></li></ul>')).toBe('- - x');
+      });
+
+      test('nested items keep inline formatting and <p> flattening', () => {
+        const html = '<ul class="x"><li><p>Top <strong>bold</strong></p>'
+          + '<ul><li><p>child <code>c</code></p></li></ul></li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- Top **bold**\n  - child `c`');
+      });
+
+      test('list placed directly inside a list attaches to the preceding item', () => {
+        const html = '<ul><li>a</li><ul><li>b</li></ul><li>c</li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- a\n  - b\n- c');
+      });
+
+      test('omitted </li> is implicitly closed by the next <li>', () => {
+        expect(htmlToMarkdown('<ul><li>a<li>b</ul>')).toBe('- a\n- b');
+      });
+
+      test('an unclosed outer list is left to tag stripping; complete inner lists still convert', () => {
+        expect(htmlToMarkdown('<ul><li>a<ul><li>inner</li></ul>')).toBe('a\n- inner');
+      });
+
+      test('many unclosed lists are handled in linear time', () => {
+        const start = Date.now();
+        const out = htmlToMarkdown('<ul><li>x</li>'.repeat(20000));
+        expect(Date.now() - start).toBeLessThan(2000);
+        expect(out).toBe(Array(20000).fill('x').join(' '));
+      });
+
+      test('a </ol> closes the innermost open list regardless of type', () => {
+        expect(htmlToMarkdown('<ul><li>a</li></ol><ol><li>b</li></ul>')).toBe('- a\n\n1. b');
+      });
+
+      test('nested items that are all empty are dropped', () => {
+        expect(htmlToMarkdown('<ul><li>a<ul><li> </li></ul></li><li>b</li></ul>')).toBe('- a\n- b');
+      });
+
+      test('empty nested <ol> items do not consume a number', () => {
+        const html = '<ol><li>a<ol><li>x</li><li></li><li>y</li></ol></li></ol>';
+        expect(htmlToMarkdown(html)).toBe('1. a\n   1. x\n   2. y');
+      });
+
+      test('multi-line <pre> inside a nested item is flattened like a flat item', () => {
+        const html = '<ul><li>a<ul><li><pre><code class="language-js">x = 1;\ny = 2;</code></pre></li></ul></li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- a\n  - ```js x = 1; y = 2; ```');
+      });
+
+      test('nesting beyond 256 levels is flattened instead of overflowing the stack', () => {
+        const depth = 5000;
+        const html = '<ul><li>x'.repeat(depth) + '</li></ul>'.repeat(depth);
+        const lines = htmlToMarkdown(html).split('\n');
+        expect(lines).toHaveLength(256);
+        expect(lines[1]).toBe('  - x');
+        expect(lines[255]).toBe(' '.repeat(255 * 2) + '- ' + Array(depth - 255).fill('x').join(' '));
+      });
+
+      test('numeric entities for sentinel codepoints are not turned into indentation', () => {
+        const html = '<ul><li>a<ul><li>b</li></ul>&#57344;&#xE001;tail</li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- a\n  - b\n\n  \uE000\uE001tail');
+        expect(htmlToMarkdown('<p>&#57344;x &#57345;s</p>')).toBe('\uE000x \uE001s');
+      });
+
+      test('nested list is separated from surrounding paragraphs', () => {
+        const html = '<p>Intro</p><ul><li>A<ul><li>A1</li></ul></li></ul><p>Outro</p>';
+        expect(htmlToMarkdown(html)).toBe('Intro\n\n- A\n  - A1\n\nOutro');
+      });
+
+      test('literal sentinel codepoints in the input are preserved', () => {
+        const html = '<ul><li>a\uE000b\uE001c<ul><li>d</li></ul></li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- a\uE000b\uE001c\n  - d');
+      });
+    });
   });
 
   describe('tables', () => {
