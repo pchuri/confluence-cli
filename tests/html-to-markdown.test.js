@@ -474,6 +474,11 @@ describe('htmlToMarkdown', () => {
     });
   });
 
+  test('a line whose info string contains a backtick does not open a fence (#244)', () => {
+    const out = htmlToMarkdown('<p>```js `x`</p><p>a    b</p><pre><code>c    d</code></pre>');
+    expect(out).toBe('```js `x`\n\na b\n\n```\nc    d\n```');
+  });
+
   test('a fence in a list item does not disturb a later top-level fence (#238, #243)', () => {
     const out = htmlToMarkdown('<ul><li><pre><code>a  b</code></pre></li></ul><p>x</p><pre><code>q   r</code></pre>');
     expect(out).toContain('```\nq   r\n```');
