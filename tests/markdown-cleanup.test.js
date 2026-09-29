@@ -1,4 +1,7 @@
 const {
+  LIST_INDENT,
+  escapeSentinels,
+  finalizeListIndent,
   fenceLength,
   splitOnFences,
   cleanupOutsideFence,
@@ -164,5 +167,37 @@ describe('markdown-cleanup cleanupWithFences', () => {
   test('applies cleanup between two adjacent fenced blocks', () => {
     const text = '```js\na\n```\n\n\n\n   ```py\nb\n   ```';
     expect(cleanupWithFences(text)).toBe('```js\na\n```\n\n   ```py\nb\n   ```');
+  });
+});
+
+describe('markdown-cleanup LIST_INDENT sentinel', () => {
+  const I = LIST_INDENT;
+
+  test('recognises a fence indented with LIST_INDENT at any depth', () => {
+    const text = `- a\n${I}${I}${I}${I}\`\`\`js\n${I}${I}${I}${I}x  =  1\n${I}${I}${I}${I}\`\`\`\nafter`;
+    const segs = splitOnFences(text);
+    expect(segs).toHaveLength(3);
+    expect(segs[1]).toBe(`${I}${I}${I}${I}\`\`\`js\n${I}${I}${I}${I}x  =  1\n${I}${I}${I}${I}\`\`\``);
+  });
+
+  test('recognises a fence joined to a list marker with LIST_INDENT', () => {
+    for (const marker of ['-', '*', '+', '1.', '10.', '3)']) {
+      const text = `${I}${I}${marker}${I}\`\`\`js\n${I}${I}${I}${I}x  =  1\n${I}${I}${I}${I}\`\`\``;
+      expect(splitOnFences(text)).toEqual(['', text, '']);
+    }
+  });
+
+  test('does NOT treat a plain-space marker prefix as a fence', () => {
+    expect(splitOnFences('- ```js\nx  =  1\n```')).toHaveLength(1);
+  });
+
+  test('cleanupWithFences leaves sentinel-indented fence bodies untouched', () => {
+    const text = `-${I}\`\`\`js\n${I}${I}a  =  1\n${I}${I}\`\`\``;
+    expect(finalizeListIndent(cleanupWithFences(text))).toBe('- ```js\n  a  =  1\n  ```');
+  });
+
+  test('escapeSentinels / finalizeListIndent round-trip literal codepoints', () => {
+    const literal = '\uE000a\uE001b\uE001s\uE001e';
+    expect(finalizeListIndent(`${I}${escapeSentinels(literal)}`)).toBe(` ${literal}`);
   });
 });
