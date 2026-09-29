@@ -1,5 +1,6 @@
 const {
   LIST_INDENT,
+  HARD_BREAK,
   escapeSentinels,
   finalizeListIndent,
   fenceLength,
@@ -197,7 +198,11 @@ describe('markdown-cleanup LIST_INDENT sentinel', () => {
   });
 
   test('escapeSentinels / finalizeListIndent round-trip literal codepoints', () => {
-    const literal = '\uE000a\uE001b\uE001s\uE001e';
+    const literal = '\uE000a\uE001b\uE001s\uE001e\uE002\uE001b';
     expect(finalizeListIndent(`${I}${escapeSentinels(literal)}`)).toBe(` ${literal}`);
+  });
+
+  test('finalizeListIndent degrades an unresolved HARD_BREAK to a newline', () => {
+    expect(finalizeListIndent(`a${HARD_BREAK}b`)).toBe('a\nb');
   });
 });

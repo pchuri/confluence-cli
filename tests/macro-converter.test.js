@@ -1868,3 +1868,126 @@ describe('MacroConverter storageToMarkdown nested lists (#238)', () => {
       .toBe('- A - B - C');
   });
 });
+
+describe('MacroConverter storageToMarkdown <br/> in flattened contexts (#242)', () => {
+  const converter = new MacroConverter({ isCloud: true });
+  const task = (body, status = 'incomplete') =>
+    `<ac:task-list><ac:task><ac:task-status>${status}</ac:task-status><ac:task-body>${body}</ac:task-body></ac:task></ac:task-list>`;
+  const roundTrip = (storage) => {
+    const md = converter.storageToMarkdown(storage);
+    const storage1 = converter.markdownToStorage(md);
+    expect(converter.storageToMarkdown(storage1)).toBe(md);
+    return { md, storage1 };
+  };
+
+  test('issue repro: <br/> in a list item is a backslash hard break', () => {
+    expect(converter.storageToMarkdown('<ul><li>line1<br/>line2</li></ul>')).toBe('- line1\\\n  line2');
+  });
+
+  test('round-trips back to <br /> in storage', () => {
+    const { storage1 } = roundTrip('<ul><li>line1<br/>line2</li></ul>');
+    expect(storage1).toBe('<ul>\n<li>line1<br />\nline2</li>\n</ul>\n');
+  });
+
+  test('continuation is indented to the ordered-marker content column', () => {
+    expect(converter.storageToMarkdown('<ol><li>a<br/>b</li><li>c</li></ol>')).toBe('1. a\\\n   b\n2. c');
+  });
+
+  test('<br/> inside <li><p> (Confluence editor shape)', () => {
+    expect(converter.storageToMarkdown('<ul><li><p>a<br/>b</p><ul><li>c</li></ul></li></ul>'))
+      .toBe('- a\\\n  b\n  - c');
+  });
+
+  test('nested item continuation is indented to the nested content column', () => {
+    expect(converter.storageToMarkdown('<ul><li>P<ul><li>a<br/>b</li></ul></li></ul>')).toBe('- P\n  - a\\\n    b');
+  });
+
+  test('surrounding whitespace is dropped and consecutive breaks are kept', () => {
+    expect(converter.storageToMarkdown('<ul><li>a \n <br /> b<br/><br/>c</li></ul>')).toBe('- a\\\n  b\\\n  \\\n  c');
+  });
+
+  test('leading and trailing breaks are dropped', () => {
+    expect(converter.storageToMarkdown('<ul><li><br/>a<br/> </li><li><br/></li></ul>')).toBe('- a');
+  });
+
+  test('inline formatting spanning a break survives', () => {
+    const { md } = roundTrip('<ul><li><strong>a<br/>b</strong></li></ul>');
+    expect(md).toBe('- **a\\\n  b**');
+  });
+
+  describe('continuation lines that would start a block are escaped', () => {
+    const cases = [
+      ['- b', '\\- b'],
+      ['* b', '\\* b'],
+      ['+ b', '\\+ b'],
+      ['1. b', '1\\. b'],
+      ['2) b', '2\\) b'],
+      ['# b', '\\# b'],
+      ['&gt; b', '\\> b'],
+      ['---', '\\---'],
+      ['-', '\\-'],
+      ['===', '\\==='],
+      ['* * *', '\\* * *'],
+      ['```js', '\\```js'],
+      ['~~~', '\\~~~'],
+    ];
+    test.each(cases)('%s', (text, escaped) => {
+      const { md, storage1 } = roundTrip(`<ul><li>a<br/>${text}</li></ul>`);
+      expect(md).toBe(`- a\\\n  ${escaped}`);
+      expect(storage1).toMatch(/^<ul>\n<li>a<br \/>\n[^<]*<\/li>\n<\/ul>\n$/);
+    });
+
+    test('inline syntax at line start is left alone', () => {
+      expect(converter.storageToMarkdown('<ul><li>a<br/><strong>b</strong><br/><code>```x</code><br/>10 items</li></ul>'))
+        .toBe('- a\\\n  **b**\\\n  ```` ```x ````\\\n  10 items');
+    });
+  });
+
+  test('table cell renders <br/> as inline <br> and round-trips', () => {
+    const { md, storage1 } = roundTrip('<table><tr><th>h</th></tr><tr><td>a <br/> b<br/></td></tr></table>');
+    expect(md).toBe('| h |\n| --- |\n| a<br>b |');
+    expect(storage1).toContain('<td><p>a<br />b</p></td>');
+  });
+
+  test('list inside a table cell stays on one line with <br>', () => {
+    expect(converter.storageToMarkdown('<table><tr><td><ul><li>a<br/>b<ul><li>c<br/>d</li></ul></li></ul></td></tr></table>'))
+      .toBe('| - a<br>b - c<br>d |\n| --- |');
+  });
+
+  test('task body uses a hard break indented to the content column', () => {
+    const { md } = roundTrip(task('a<br/>- b', 'complete'));
+    expect(md).toBe('- [x] a\\\n  \\- b');
+  });
+
+  test('task list nested in a list item indents both levels', () => {
+    expect(converter.storageToMarkdown(`<ul><li>P${task('a<br/>b')}</li></ul>`)).toBe('- P\n  - [ ] a\\\n    b');
+  });
+
+  test('task body inside a table cell uses <br>', () => {
+    expect(converter.storageToMarkdown(`<table><tr><td>${task('a<br/>b')}</td></tr></table>`))
+      .toBe('| - [ ] a<br>b |\n| --- |');
+  });
+
+  test('<br/> inside a code span stays a space', () => {
+    expect(converter.storageToMarkdown('<ul><li>a<code>x<br/>- y</code></li></ul>')).toBe('- a`x - y`');
+    expect(converter.storageToMarkdown(task('<code>a<br/>b</code>'))).toBe('- [ ] `a b`');
+    expect(converter.storageToMarkdown('<table><tr><td><code>a<br/>b</code></td></tr></table>')).toBe('| `a b` |\n| --- |');
+  });
+
+  test('list nested in inline content is resolved once by the outer item', () => {
+    expect(converter.storageToMarkdown('<ul><li><span>x<ul><li>a<br/>b</li></ul></span></li></ul>')).toBe('- x - a\\\n  b');
+    expect(converter.storageToMarkdown('<ul><li><p>x<ul><li>a<br/>b</li></ul></p></li></ul>')).toBe('- x - a\\\n  b');
+    expect(converter.storageToMarkdown(`<ul><li><span>x${task('a<br/>b')}</span></li></ul>`)).toBe('- x - [ ] a\\\n  b');
+  });
+
+  test('top-level <br/> and blocks inside list items keep emitting a newline', () => {
+    expect(converter.storageToMarkdown('<p>a<br/>b</p>')).toBe('a\nb');
+    expect(converter.storageToMarkdown('<ul><li><blockquote><p>a<br/>b</p></blockquote></li></ul>')).toBe('- > a\n  > b');
+  });
+
+  test('literal U+E002 in content survives the hard-break sentinel', () => {
+    const E2 = '';
+    expect(converter.storageToMarkdown(`<ul><li>a${E2}b<br/>c</li></ul>`)).toBe(`- a${E2}b\\\n  c`);
+    expect(converter.storageToMarkdown('<table><tr><td>&#xE002;</td></tr></table>')).toBe(`| ${E2} |\n| --- |`);
+  });
+});

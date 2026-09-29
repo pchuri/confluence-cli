@@ -2,4 +2,4 @@
 | --- | --- | --- |
 | alpha | **done** | see [link](https://example.com) |
 | beta | *pending* | |
-| gamma | blocked | line one line two |
+| gamma | blocked | line one<br>line two |
