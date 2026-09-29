@@ -5,7 +5,7 @@ const {
   finalizeSentinels,
   fenceLength,
   splitOnFences,
-  opensSentinelFence,
+  isFenceOpenLine,
   cleanupOutsideFence,
   cleanupWithFences,
 } = require('../lib/markdown-cleanup');
@@ -220,7 +220,7 @@ describe('markdown-cleanup QUOTE_MARK sentinel (#244)', () => {
 
   test('recognises a quoted fence, with or without the space after the mark', () => {
     for (const p of [`${Q} `, Q, `${Q} ${Q} `, `${Q}${Q}`]) {
-      const text = `${p}\`\`\`js\n${p}x   y\n${Q}\n${p}  z\n${p}\`\`\``;
+      const text = `${p}\`\`\`js\n${p}x   y\n${p.trimEnd()}\n${p}  z\n${p}\`\`\``;
       expect(splitOnFences(`${Q} before\n${text}\n${Q} after`)).toEqual([`${Q} before\n`, text, `\n${Q} after`]);
     }
   });
@@ -234,7 +234,8 @@ describe('markdown-cleanup QUOTE_MARK sentinel (#244)', () => {
       [`-${I}-${I}\`\`\``, `${I}${I}${I}${I}\`\`\``],
     ];
     for (const [open, close] of cases) {
-      const text = `${open}\na   b\n${close}`;
+      // Body lines carry the same container prefix as the close line.
+      const text = `${open}\n${close.replace(/`+$/, '')}a   b\n${close}`;
       expect(splitOnFences(text)).toEqual(['', text, '']);
     }
   });
@@ -245,7 +246,23 @@ describe('markdown-cleanup QUOTE_MARK sentinel (#244)', () => {
     const topOpen = `\`\`\`\nx\n${Q} \`\`\`\n${Q} y\n\`\`\``;
     expect(splitOnFences(topOpen)).toEqual(['', topOpen, '']);
     const nested = `${Q} ${Q} \`\`\`\n${Q} ${Q} a\n${Q} \`\`\`\n${Q} ${Q} \`\`\``;
-    expect(splitOnFences(nested)).toEqual(['', nested, '']);
+    expect(splitOnFences(nested)).toEqual([nested]);
+  });
+
+  test('a quoted fence never closes past the end of its blockquote', () => {
+    const text = `${Q} \`\`\`\n\nmid     text\n\n${Q} **NOTE**\n${Q} \`\`\`js\n${Q} keep   1\n${Q} \`\`\``;
+    expect(splitOnFences(text)).toEqual([
+      `${Q} \`\`\`\n\nmid     text\n\n${Q} **NOTE**\n`,
+      `${Q} \`\`\`js\n${Q} keep   1\n${Q} \`\`\``,
+      '',
+    ]);
+    const shallower = `${Q} ${Q} \`\`\`\n${Q} ${Q} a\n${Q} b\n${Q} ${Q} \`\`\``;
+    expect(splitOnFences(shallower)).toEqual([shallower]);
+  });
+
+  test('blockquote end is found with list-indent and marker prefixes too', () => {
+    const text = `${Q} -${I}\`\`\`\n${Q} ${I}${I}a   b\n${I}${I}c\n${Q} ${I}${I}\`\`\``;
+    expect(splitOnFences(text)).toEqual([text]);
   });
 
   test('does NOT treat a literal `> ` prefix as a fence', () => {
@@ -258,14 +275,15 @@ describe('markdown-cleanup QUOTE_MARK sentinel (#244)', () => {
     expect(finalizeSentinels(cleanupWithFences(text))).toBe('> **INFO**\n> ```\n> x   y\n>   z\n> ```\n>\n> a b');
   });
 
-  test('opensSentinelFence matches only sentinel-prefixed fence openings', () => {
-    expect(opensSentinelFence('```js')).toBe(true);
-    expect(opensSentinelFence(`${Q} \`\`\``)).toBe(true);
-    expect(opensSentinelFence(`-${I}${Q} \`\`\``)).toBe(true);
-    expect(opensSentinelFence(`${Q} 10.${I}\`\`\`js`)).toBe(true);
-    expect(opensSentinelFence(`${Q} **INFO**`)).toBe(false);
-    expect(opensSentinelFence('> ```')).toBe(false);
-    expect(opensSentinelFence('- ```')).toBe(false);
-    expect(opensSentinelFence('``')).toBe(false);
+  test('isFenceOpenLine matches only sentinel-prefixed fence openings', () => {
+    expect(isFenceOpenLine('```js')).toBe(true);
+    expect(isFenceOpenLine(`${Q} \`\`\``)).toBe(true);
+    expect(isFenceOpenLine(`-${I}${Q} \`\`\``)).toBe(true);
+    expect(isFenceOpenLine(`${Q} 10.${I}\`\`\`js`)).toBe(true);
+    expect(isFenceOpenLine(`${Q} **INFO**`)).toBe(false);
+    expect(isFenceOpenLine('> ```')).toBe(false);
+    expect(isFenceOpenLine('- ```')).toBe(false);
+    expect(isFenceOpenLine('``')).toBe(false);
+    expect(isFenceOpenLine(`${Q} \`\`\` \`\` \`\`\``)).toBe(false);
   });
 });

@@ -1961,6 +1961,26 @@ describe('MacroConverter storageToMarkdown code inside quotes and callouts (#244
       .toBe('> **INFO**\n> ```\n\n```\none   1\n```\n\nx y\n\n```\ntwo   2\n```');
   });
 
+  test('a bare ``` paragraph in a callout does not pair with a fence in a later callout', () => {
+    const storage = macro('info', '<p>```</p>') + '<p>mid     text</p>' + macro('note', codeMacro('js', 'keep   1'));
+    expect(converter.storageToMarkdown(storage))
+      .toBe('> **INFO**\n> ```\n\nmid text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
+  });
+
+  test('indented loose text between callouts is cleaned, not turned into code on write-back', () => {
+    const storage = macro('info', '<p>```</p>') + 'loose\n        indented    text\n' + macro('note', codeMacro('js', 'keep   1'));
+    const md = converter.storageToMarkdown(storage);
+    expect(md).toBe('> **INFO**\n> ```\nloose\nindented text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
+    const storage1 = converter.markdownToStorage(md);
+    expect(storage1).toContain('<p>loose\nindented text</p>');
+    expect(storage1).toContain('<![CDATA[keep   1]]>');
+  });
+
+  test('consecutive blank paragraphs inside a callout collapse to one blank quote line', () => {
+    expect(converter.storageToMarkdown(macro('info', '<p>a</p><p>&nbsp;</p><p>b</p>')))
+      .toBe('> **INFO**\n> a\n>\n> b');
+  });
+
   test('prose inside a quote keeps the historical whitespace collapse', () => {
     expect(converter.storageToMarkdown('<blockquote><p>foo    bar</p><p>baz</p></blockquote>'))
       .toBe('> foo bar\n>\n> baz');

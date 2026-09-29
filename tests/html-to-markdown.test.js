@@ -305,6 +305,11 @@ describe('htmlToMarkdown', () => {
     });
   });
 
+  test('a line whose info string contains a backtick does not open a fence (#244)', () => {
+    const out = htmlToMarkdown('<p>```js `x`</p><p>a    b</p><pre><code>c    d</code></pre>');
+    expect(out).toBe('```js `x`\n\na b\n\n```\nc    d\n```');
+  });
+
   test('LIST_INDENT fence handling does not change html-to-markdown (#238)', () => {
     const out = htmlToMarkdown('<ul><li><pre><code>a  b</code></pre></li></ul><p>x</p><pre><code>q   r</code></pre>');
     expect(out).toContain('```\nq   r\n```');
