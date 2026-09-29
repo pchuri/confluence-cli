@@ -1,3 +1,10 @@
+## [2.25.3](https://github.com/pchuri/confluence-cli/compare/v2.25.2...v2.25.3) (2026-09-29)
+
+
+### Bug Fixes
+
+* **storage-walker:** preserve nested list structure in storage → markdown ([#239](https://github.com/pchuri/confluence-cli/issues/239)) ([cb429b1](https://github.com/pchuri/confluence-cli/commit/cb429b189b2edebd6f377b11002cc33a2bbffcea)), closes [#238](https://github.com/pchuri/confluence-cli/issues/238)
+
 ## [2.25.2](https://github.com/pchuri/confluence-cli/compare/v2.25.1...v2.25.2) (2026-09-22)
 
 
