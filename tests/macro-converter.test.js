@@ -1,5 +1,6 @@
 const MacroConverter = require('../lib/macro-converter');
 const { decodePlantuml, encodePlantuml } = require('../lib/plantuml-codec');
+const { HARD_BREAK } = require('../lib/markdown-cleanup');
 
 describe('MacroConverter', () => {
   describe('linkStyle defaulting', () => {
@@ -1876,7 +1877,9 @@ describe('MacroConverter storageToMarkdown <br/> in flattened contexts (#242)', 
   const roundTrip = (storage) => {
     const md = converter.storageToMarkdown(storage);
     const storage1 = converter.markdownToStorage(md);
-    expect(converter.storageToMarkdown(storage1)).toBe(md);
+    const md2 = converter.storageToMarkdown(storage1);
+    expect(md2).toBe(md);
+    expect(converter.markdownToStorage(md2)).toBe(storage1);
     return { md, storage1 };
   };
 
@@ -1891,6 +1894,21 @@ describe('MacroConverter storageToMarkdown <br/> in flattened contexts (#242)', 
 
   test('continuation is indented to the ordered-marker content column', () => {
     expect(converter.storageToMarkdown('<ol><li>a<br/>b</li><li>c</li></ol>')).toBe('1. a\\\n   b\n2. c');
+  });
+
+  test('10. marker indents the continuation by 4', () => {
+    const items = Array.from({ length: 9 }, (_, i) => `<li>i${i + 1}</li>`).join('');
+    const { md } = roundTrip(`<ol>${items}<li>ten<br/>more</li></ol>`);
+    expect(md.split('\n').slice(-2).join('\n')).toBe('10. ten\\\n    more');
+  });
+
+  test('trailing backslash before a break is doubled so the break survives', () => {
+    const { md, storage1 } = roundTrip('<ul><li>C:\\temp\\<br/>next</li></ul>');
+    expect(md).toBe('- C:\\temp\\\\\\\n  next');
+    expect(storage1).toBe('<ul>\n<li>C:\\temp\\<br />\nnext</li>\n</ul>\n');
+    // An even run is already literal and needs no extra backslash.
+    expect(roundTrip('<ul><li>a\\\\<br/>b</li></ul>').md).toBe('- a\\\\\\\n  b');
+    expect(roundTrip(task('C:\\temp\\<br/>next')).md).toBe('- [ ] C:\\temp\\\\\\\n  next');
   });
 
   test('<br/> inside <li><p> (Confluence editor shape)', () => {
@@ -1915,6 +1933,24 @@ describe('MacroConverter storageToMarkdown <br/> in flattened contexts (#242)', 
     expect(md).toBe('- **a\\\n  b**');
   });
 
+  test('break inside a link label and inline HTML tags', () => {
+    const { md, storage1 } = roundTrip('<ul><li><a href="https://e.com">x<br/>y</a> <u>p<br/>q</u> <sup>r<br/>s</sup></li></ul>');
+    expect(md).toBe('- [x\\\n  y](https://e.com) <u>p\\\n  q</u> <sup>r\\\n  s</sup>');
+    expect(storage1).toBe('<ul>\n<li><p><a href="https://e.com" data-card-appearance="inline">x<br />\ny</a> '
+      + '<u>p<br />\nq</u> <sup>r<br />\ns</sup></p></li>\n</ul>\n');
+  });
+
+  test('break inside an ac:link-body', () => {
+    const { md } = roundTrip('<ul><li><ac:link><ri:page ri:content-title="T"/><ac:link-body>l1<br/>l2</ac:link-body></ac:link></li></ul>');
+    expect(md).toBe('- l1\\\n  l2');
+  });
+
+  test('list inside a callout or blockquote keeps the quote prefix on the continuation', () => {
+    const info = '<ac:structured-macro ac:name="info"><ac:rich-text-body><ul><li>a<br/>b</li></ul></ac:rich-text-body></ac:structured-macro>';
+    expect(roundTrip(info).md).toBe('> **INFO**\n> - a\\\n>   b');
+    expect(roundTrip('<blockquote><ul><li>a<br/>b</li></ul></blockquote>').md).toBe('> - a\\\n>   b');
+  });
+
   describe('continuation lines that would start a block are escaped', () => {
     const cases = [
       ['- b', '\\- b'],
@@ -1930,11 +1966,19 @@ describe('MacroConverter storageToMarkdown <br/> in flattened contexts (#242)', 
       ['* * *', '\\* * *'],
       ['```js', '\\```js'],
       ['~~~', '\\~~~'],
+      ['--- | ---', '\\--- | ---'],
+      ['|:---|---:|', '\\|:---|---:|'],
     ];
     test.each(cases)('%s', (text, escaped) => {
       const { md, storage1 } = roundTrip(`<ul><li>a<br/>${text}</li></ul>`);
       expect(md).toBe(`- a\\\n  ${escaped}`);
-      expect(storage1).toMatch(/^<ul>\n<li>a<br \/>\n[^<]*<\/li>\n<\/ul>\n$/);
+      expect(storage1).toBe(`<ul>\n<li>a<br />\n${text}</li>\n</ul>\n`);
+    });
+
+    test('a GFM delimiter row after a header-like line does not become a table', () => {
+      const { md, storage1 } = roundTrip('<ul><li>x<br/>a | b<br/>--- | ---</li></ul>');
+      expect(md).toBe('- x\\\n  a | b\\\n  \\--- | ---');
+      expect(storage1).toBe('<ul>\n<li>x<br />\na | b<br />\n--- | ---</li>\n</ul>\n');
     });
 
     test('inline syntax at line start is left alone', () => {
@@ -1946,7 +1990,17 @@ describe('MacroConverter storageToMarkdown <br/> in flattened contexts (#242)', 
   test('table cell renders <br/> as inline <br> and round-trips', () => {
     const { md, storage1 } = roundTrip('<table><tr><th>h</th></tr><tr><td>a <br/> b<br/></td></tr></table>');
     expect(md).toBe('| h |\n| --- |\n| a<br>b |');
-    expect(storage1).toContain('<td><p>a<br />b</p></td>');
+    expect(storage1).toBe('<table>\n<thead>\n<tr>\n<th><p>h</p></th>\n</tr>\n</thead>\n'
+      + '<tbody>\n<tr>\n<td><p>a<br />b</p></td>\n</tr>\n</tbody>\n</table>\n');
+  });
+
+  test('header cell and multi-cell rows', () => {
+    const { md } = roundTrip('<table><tr><th>h1<br/>h2</th><th>k</th></tr><tr><td>a<br/>b</td><td>c<br/>d</td></tr></table>');
+    expect(md).toBe('| h1<br>h2 | k |\n| --- | --- |\n| a<br>b | c<br>d |');
+  });
+
+  test('<pre> inside a cell is flattened with <br>', () => {
+    expect(converter.storageToMarkdown('<table><tr><td><pre>x<br/>y</pre></td></tr></table>')).toBe('| x<br>y |\n| --- |');
   });
 
   test('list inside a table cell stays on one line with <br>', () => {
@@ -1985,9 +2039,9 @@ describe('MacroConverter storageToMarkdown <br/> in flattened contexts (#242)', 
     expect(converter.storageToMarkdown('<ul><li><blockquote><p>a<br/>b</p></blockquote></li></ul>')).toBe('- > a\n  > b');
   });
 
-  test('literal U+E002 in content survives the hard-break sentinel', () => {
-    const E2 = '';
-    expect(converter.storageToMarkdown(`<ul><li>a${E2}b<br/>c</li></ul>`)).toBe(`- a${E2}b\\\n  c`);
-    expect(converter.storageToMarkdown('<table><tr><td>&#xE002;</td></tr></table>')).toBe(`| ${E2} |\n| --- |`);
+  test('literal U+E003 in content survives the hard-break sentinel', () => {
+    const E3 = HARD_BREAK;
+    expect(converter.storageToMarkdown(`<ul><li>a${E3}b<br/>c</li></ul>`)).toBe(`- a${E3}b\\\n  c`);
+    expect(converter.storageToMarkdown('<table><tr><td>&#xE003;</td></tr></table>')).toBe(`| ${E3} |\n| --- |`);
   });
 });

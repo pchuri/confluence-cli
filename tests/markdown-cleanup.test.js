@@ -198,7 +198,7 @@ describe('markdown-cleanup LIST_INDENT sentinel', () => {
   });
 
   test('escapeSentinels / finalizeListIndent round-trip literal codepoints', () => {
-    const literal = '\uE000a\uE001b\uE001s\uE001e\uE002\uE001b';
+    const literal = '\uE000a\uE001b\uE001s\uE001e\uE003\uE001b';
     expect(finalizeListIndent(`${I}${escapeSentinels(literal)}`)).toBe(` ${literal}`);
   });
 
