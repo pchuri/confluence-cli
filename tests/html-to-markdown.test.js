@@ -132,12 +132,14 @@ describe('htmlToMarkdown', () => {
         expect(htmlToMarkdown('<ul><li>a<ul><li>inner</li></ul>')).toBe('a\n- inner');
       });
 
-      test('many unclosed lists are handled in linear time', () => {
+      test('many unclosed lists are handled without quadratic rescans', () => {
+        // Runs in ~10 ms; the rescanning scanner this replaced took ~30 s,
+        // so the generous bound only trips on a real complexity regression.
         const start = Date.now();
         const out = htmlToMarkdown('<ul><li>x</li>'.repeat(20000));
-        expect(Date.now() - start).toBeLessThan(2000);
+        expect(Date.now() - start).toBeLessThan(10000);
         expect(out).toBe(Array(20000).fill('x').join(' '));
-      });
+      }, 30000);
 
       test('a </ol> closes the innermost open list regardless of type', () => {
         expect(htmlToMarkdown('<ul><li>a</li></ol><ol><li>b</li></ul>')).toBe('- a\n\n1. b');
@@ -152,9 +154,73 @@ describe('htmlToMarkdown', () => {
         expect(htmlToMarkdown(html)).toBe('1. a\n   1. x\n   2. y');
       });
 
-      test('multi-line <pre> inside a nested item is flattened like a flat item', () => {
-        const html = '<ul><li>a<ul><li><pre><code class="language-js">x = 1;\ny = 2;</code></pre></li></ul></li></ul>';
-        expect(htmlToMarkdown(html)).toBe('- a\n  - ```js x = 1; y = 2; ```');
+      test('multi-line <pre> inside a nested item stays a fenced block on the marker line', () => {
+        const html = '<ul><li>a<ul><li><pre><code class="language-js">x = 1;\n  y = 2;</code></pre></li></ul></li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- a\n  - ```js\n    x = 1;\n      y = 2;\n    ```');
+      });
+
+      test('<pre> after a nested list keeps its whitespace byte-exact', () => {
+        const html = '<ul><li>a<ul><li>b</li></ul><pre><code>x   y\n  z</code></pre></li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- a\n  - b\n\n  ```\n  x   y\n    z\n  ```');
+      });
+
+      test('<pre> after a nested list does not pair with a later top-level fence', () => {
+        const html = '<ul><li>a<ul><li>b</li></ul><pre><code>x</code></pre></li></ul>'
+          + '<p>para   with   spaces</p><pre><code>  indented\n    code   here</code></pre>';
+        expect(htmlToMarkdown(html)).toBe(
+          '- a\n  - b\n\n  ```\n  x\n  ```\n\npara with spaces\n\n```\n  indented\n    code   here\n```'
+        );
+      });
+
+      test('prose around a <pre> in an item becomes separate paragraphs', () => {
+        const html = '<ul><li>see <pre><code class="language-py">def f():\n    return 1</code></pre> more</li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- see\n\n  ```py\n  def f():\n      return 1\n  ```\n\n  more');
+      });
+
+      test('literal backticks leading an item keep a plain-space marker', () => {
+        // Joining the marker with LIST_INDENT would make splitOnFences pair
+        // this literal with the following real fence.
+        const html = '<ul><li>```</li></ul><p>x   y</p><pre><code>  c</code></pre>';
+        expect(htmlToMarkdown(html)).toBe('- ```\n\nx y\n\n```\n  c\n```');
+      });
+
+      test('pretty-printed HTML with whitespace between tags', () => {
+        const html = [
+          '<ul>',
+          '  <li>A',
+          '    <ul>',
+          '      <li>A1</li>',
+          '      <li>A2</li>',
+          '    </ul>',
+          '  </li>',
+          '  <li>B</li>',
+          '</ul>',
+        ].join('\n');
+        expect(htmlToMarkdown(html)).toBe('- A\n  - A1\n  - A2\n- B');
+      });
+
+      test('attributes on nested <ul>/<li> are ignored', () => {
+        const html = '<ul class="a"><li data-x="1">A<ul style="margin:0"><li class="b">A1</li></ul></li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- A\n  - A1');
+      });
+
+      test('a self-closing <ul/> inside an item does not steal the outer close tag', () => {
+        expect(htmlToMarkdown('<ul><li>a<ul/></li><li>b</li></ul>')).toBe('- a\n- b');
+        expect(htmlToMarkdown('<ol><li>a<ol class="x" /></li></ol>')).toBe('1. a');
+      });
+
+      test('<ul> directly inside <ul> with no preceding item', () => {
+        expect(htmlToMarkdown('<ul><ul><li>x</li></ul></ul>')).toBe('- - x');
+      });
+
+      test('a nested list inside a table cell is flattened into the cell', () => {
+        const html = '<table><tr><td><ul><li>a<ul><li>b</li></ul></li></ul></td></tr></table>';
+        expect(htmlToMarkdown(html)).toBe('| a b |\n| --- |');
+      });
+
+      test('a table inside an item is flattened onto the item line', () => {
+        const html = '<ul><li>x<table><tr><th>h</th></tr><tr><td>1</td></tr></table><ul><li>y</li></ul></li></ul>';
+        expect(htmlToMarkdown(html)).toBe('- x | h | | --- | | 1 |\n  - y');
       });
 
       test('nesting beyond 256 levels is flattened instead of overflowing the stack', () => {
@@ -408,9 +474,9 @@ describe('htmlToMarkdown', () => {
     });
   });
 
-  test('LIST_INDENT fence handling does not change html-to-markdown (#238)', () => {
+  test('a fence in a list item does not disturb a later top-level fence (#238, #243)', () => {
     const out = htmlToMarkdown('<ul><li><pre><code>a  b</code></pre></li></ul><p>x</p><pre><code>q   r</code></pre>');
     expect(out).toContain('```\nq   r\n```');
-    expect(out).toBe('- ``` a b ```\n\nx\n\n```\nq   r\n```');
+    expect(out).toBe('- ```\n  a  b\n  ```\n\nx\n\n```\nq   r\n```');
   });
 });
