@@ -1,3 +1,10 @@
+## [2.25.6](https://github.com/pchuri/confluence-cli/compare/v2.25.5...v2.25.6) (2026-09-30)
+
+
+### Bug Fixes
+
+* **storage-walker:** honor <ol start> in storage → markdown ([#246](https://github.com/pchuri/confluence-cli/issues/246)) ([b115d36](https://github.com/pchuri/confluence-cli/commit/b115d36160feaac972fe654fc0134d3ef24111af)), closes [#241](https://github.com/pchuri/confluence-cli/issues/241)
+
 ## [2.25.5](https://github.com/pchuri/confluence-cli/compare/v2.25.4...v2.25.5) (2026-09-30)
 
 
