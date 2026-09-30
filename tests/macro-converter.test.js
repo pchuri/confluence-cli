@@ -1992,3 +1992,214 @@ describe('MacroConverter storageToMarkdown code inside quotes and callouts (#244
       .toBe(`> a${E2}b\n>\n> \`\`\`\`js\n> ${E2} \`\`\`\n> \`\`\`\``);
   });
 });
+
+describe('MacroConverter ordered list start (#241)', () => {
+  const converter = new MacroConverter({ isCloud: true });
+  const roundTrip = (storage) => {
+    const md = converter.storageToMarkdown(storage);
+    const storage1 = converter.markdownToStorage(md);
+    const md2 = converter.storageToMarkdown(storage1);
+    expect(md2).toBe(md);
+    expect(converter.markdownToStorage(md2)).toBe(storage1);
+    return { md, storage1 };
+  };
+
+  test('issue repro: numbering starts at the start attribute', () => {
+    expect(converter.storageToMarkdown('<ol start="3"><li>three</li><li>four</li></ol>'))
+      .toBe('3. three\n4. four');
+  });
+
+  test('start="0" is a valid CommonMark start', () => {
+    expect(converter.storageToMarkdown('<ol start="0"><li>zero</li><li>one</li></ol>'))
+      .toBe('0. zero\n1. one');
+  });
+
+  test('surrounding whitespace and leading zeros are ignored', () => {
+    expect(converter.storageToMarkdown('<ol start=" 5 "><li>x</li></ol>')).toBe('5. x');
+    expect(converter.storageToMarkdown('<ol start="03"><li>x</li></ol>')).toBe('3. x');
+  });
+
+  test.each([
+    ['negative', '-2'],
+    ['signed', '+3'],
+    ['non-numeric', 'abc'],
+    ['decimal', '3.5'],
+    ['empty', ''],
+    ['over nine digits', '1000000000'],
+  ])('%s start falls back to 1', (_, start) => {
+    expect(converter.storageToMarkdown(`<ol start="${start}"><li>a</li><li>b</li></ol>`))
+      .toBe('1. a\n2. b');
+  });
+
+  test('a run that would outgrow a nine-digit marker falls back to 1', () => {
+    expect(converter.storageToMarkdown('<ol start="999999999"><li>a</li></ol>')).toBe('999999999. a');
+    expect(converter.storageToMarkdown('<ol start="999999999"><li>a</li><li>b</li></ol>'))
+      .toBe('1. a\n2. b');
+  });
+
+  test('empty items are not counted toward the nine-digit limit', () => {
+    expect(converter.storageToMarkdown('<ol start="999999998"><li>a</li><li></li><li>b</li></ol>'))
+      .toBe('999999998. a\n999999999. b');
+    expect(converter.storageToMarkdown('<ol start="999999998"><li>a</li><li>b</li><li>c</li></ol>'))
+      .toBe('1. a\n2. b\n3. c');
+  });
+
+  test('empty items do not consume a number', () => {
+    expect(converter.storageToMarkdown('<ol start="3"><li></li><li>a</li><li>b</li></ol>'))
+      .toBe('3. a\n4. b');
+  });
+
+  test('start is ignored on <ul>', () => {
+    expect(converter.storageToMarkdown('<ul start="3"><li>a</li></ul>')).toBe('- a');
+  });
+
+  test('marker widening past 9 indents nested content', () => {
+    expect(converter.storageToMarkdown('<ol start="9"><li>nine</li><li>ten<ul><li>sub</li></ul></li></ol>'))
+      .toBe('9. nine\n10. ten\n    - sub');
+  });
+
+  test('nested list not starting at 1 is separated from the lead-in by a blank line', () => {
+    expect(converter.storageToMarkdown('<ul><li>Parent<ol start="3"><li>Child</li></ol></li></ul>'))
+      .toBe('- Parent\n\n  3. Child');
+  });
+
+  test('nested list starting at 1 stays tight', () => {
+    expect(converter.storageToMarkdown('<ul><li>Parent<ol start="1"><li>Child</li></ol></li></ul>'))
+      .toBe('- Parent\n  1. Child');
+  });
+
+  test('nested list not starting at 1 stays tight after a heading or code fence', () => {
+    expect(converter.storageToMarkdown('<ul><li><h2>h</h2><ol start="3"><li>c</li></ol></li><li>other</li></ul>'))
+      .toBe('- ## h\n  3. c\n- other');
+    const code = '<ac:structured-macro ac:name="code"><ac:plain-text-body><![CDATA[x]]></ac:plain-text-body></ac:structured-macro>';
+    expect(converter.storageToMarkdown(`<ul><li>${code}<ol start="3"><li>c</li></ol></li><li>other</li></ul>`))
+      .toBe('- ```\n  x\n  ```\n  3. c\n- other');
+  });
+
+  test('nested list not starting at 1 is separated after a <pre> rendered as text', () => {
+    expect(converter.storageToMarkdown('<ul><li><pre>x</pre><ol start="3"><li>c</li></ol></li></ul>'))
+      .toBe('- x\n\n  3. c');
+  });
+
+  test('callout body opening with a list not starting at 1 is separated from the header', () => {
+    const callout = (body) => `<ac:structured-macro ac:name="info"><ac:rich-text-body>${body}</ac:rich-text-body></ac:structured-macro>`;
+    expect(converter.storageToMarkdown(callout('\n  <ol start="3"><li>a</li></ol>'))).toBe('> **INFO**\n>\n> 3. a');
+    expect(converter.storageToMarkdown(callout('<!-- c --><p/><p>&nbsp;</p><br/><ol start="3"><li>a</li></ol>')))
+      .toBe('> **INFO**\n>\n> 3. a');
+    expect(converter.storageToMarkdown(callout('<div><ol start="3"><li>a</li></ol></div>'))).toBe('> **INFO**\n>\n> 3. a');
+    expect(converter.storageToMarkdown(callout('<p><ol start="3"><li>a</li></ol></p>'))).toBe('> **INFO**\n>\n> 3. a');
+    expect(converter.storageToMarkdown(callout('<span><ol start="3"><li>a</li></ol></span>'))).toBe('> **INFO**\n>\n> 3. a');
+    expect(converter.storageToMarkdown(callout('<ol><li>a</li></ol>'))).toBe('> **INFO**\n> 1. a');
+    expect(converter.storageToMarkdown(callout('<p>3. a</p>'))).toBe('> **INFO**\n> 3. a');
+  });
+
+  test('list not starting at 1 after inline text is separated by a blank line', () => {
+    expect(converter.storageToMarkdown('<div>Steps:<ol start="3"><li>a</li></ol></div>'))
+      .toBe('Steps:\n\n3. a');
+  });
+
+  test('markdown → storage emits start for lists not beginning at 1', () => {
+    expect(converter.markdownToStorage('3. three\n4. four'))
+      .toBe('<ol start="3">\n<li><p>three</p></li>\n<li><p>four</p></li>\n</ol>\n');
+    expect(converter.markdownToStorage('1. one')).toBe('<ol>\n<li><p>one</p></li>\n</ol>\n');
+  });
+
+  test('markdown → storage → markdown round-trip keeps the start', () => {
+    const md = '3. three\n4. four\n\n   7. seven\n   8. eight';
+    const storage1 = converter.markdownToStorage(md);
+    expect(storage1).toContain('<ol start="3">');
+    expect(storage1).toContain('<ol start="7">');
+    const md2 = converter.storageToMarkdown(storage1);
+    expect(md2).toBe(md);
+    expect(converter.markdownToStorage(md2)).toBe(storage1);
+  });
+
+  test.each([
+    [
+      'top-level list',
+      '<ol start="3"><li>three</li><li>four</li></ol>',
+      '3. three\n4. four',
+      '<ol start="3">\n<li><p>three</p></li>\n<li><p>four</p></li>\n</ol>\n',
+    ],
+    [
+      'nested list',
+      '<ul><li>Parent<ol start="3"><li>Child</li></ol></li></ul>',
+      '- Parent\n\n  3. Child',
+      '<ul>\n<li>\n<p>Parent</p>\n<ol start="3">\n<li><p>Child</p></li>\n</ol>\n</li>\n</ul>\n',
+    ],
+    [
+      'list after inline text',
+      '<div>Steps:<ol start="3"><li>a</li></ol></div>',
+      'Steps:\n\n3. a',
+      '<p>Steps:</p>\n<ol start="3">\n<li><p>a</p></li>\n</ol>\n',
+    ],
+    [
+      'widened marker',
+      '<ol start="9"><li>a</li><li>b<ul><li>s</li></ul></li></ol>',
+      '9. a\n10. b\n    - s',
+      '<ol start="9">\n<li><p>a</p></li>\n<li>b\n<ul>\n<li><p>s</p></li>\n</ul>\n</li>\n</ol>\n',
+    ],
+  ])('storage → markdown → storage is stable: %s', (_, storage, expectedMd, expectedStorage) => {
+    const { md, storage1 } = roundTrip(storage);
+    expect(md).toBe(expectedMd);
+    expect(storage1).toBe(expectedStorage);
+  });
+
+  describe('code macro as the first block of an item', () => {
+    const codeMacro = '<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">js</ac:parameter>'
+      + '<ac:plain-text-body><![CDATA[a  =  1]]></ac:plain-text-body></ac:structured-macro>';
+
+    test('non-1 start keeps the body byte-exact', () => {
+      const { md, storage1 } = roundTrip(`<ol start="3"><li>${codeMacro}</li></ol>`);
+      expect(md).toBe('3. ```js\n   a  =  1\n   ```');
+      expect(storage1).toBe(`<ol start="3">\n<li>\n${codeMacro}\n</li>\n</ol>\n`);
+    });
+
+    test('nine-digit marker indents the body by 11', () => {
+      const { md, storage1 } = roundTrip(`<ol start="999999999"><li>${codeMacro}</li></ol>`);
+      expect(md).toBe('999999999. ```js\n           a  =  1\n           ```');
+      expect(storage1).toBe(`<ol start="999999999">\n<li>\n${codeMacro}\n</li>\n</ol>\n`);
+    });
+  });
+
+  test('storage → markdown → storage is stable: tight list after a heading', () => {
+    const { md, storage1 } = roundTrip('<ul><li><h2>h</h2><ol start="3"><li>c</li></ol></li><li>other</li></ul>');
+    expect(md).toBe('- ## h\n  3. c\n- other');
+    expect(storage1).toBe(
+      '<ul>\n<li>\n<h2>h</h2>\n<ol start="3">\n<li><p>c</p></li>\n</ol>\n</li>\n<li><p>other</p></li>\n</ul>\n',
+    );
+  });
+
+  test('storage → markdown → storage is stable: tight list after a code fence', () => {
+    const code = '<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">js</ac:parameter>'
+      + '<ac:plain-text-body><![CDATA[x]]></ac:plain-text-body></ac:structured-macro>';
+    const { md, storage1 } = roundTrip(`<ul><li>${code}<ol start="3"><li>c</li></ol></li><li>other</li></ul>`);
+    expect(md).toBe('- ```js\n  x\n  ```\n  3. c\n- other');
+    expect(storage1).toBe(
+      `<ul>\n<li>\n${code}\n<ol start="3">\n<li><p>c</p></li>\n</ol>\n</li>\n<li><p>other</p></li>\n</ul>\n`,
+    );
+  });
+
+  test('storage → markdown → storage is stable: start="0"', () => {
+    const { md, storage1 } = roundTrip('<ol start="0"><li>zero</li><li>one<ul><li>s</li></ul></li></ol>');
+    expect(md).toBe('0. zero\n1. one\n   - s');
+    expect(storage1).toBe(
+      '<ol start="0">\n<li><p>zero</p></li>\n<li>one\n<ul>\n<li><p>s</p></li>\n</ul>\n</li>\n</ol>\n',
+    );
+  });
+
+  test('storage → markdown → storage is stable: callout list inside a <p> wrapper', () => {
+    const { md } = roundTrip('<ac:structured-macro ac:name="info"><ac:rich-text-body><p><ol start="3"><li>a</li></ol></p></ac:rich-text-body></ac:structured-macro>');
+    expect(md).toBe('> **INFO**\n>\n> 3. a');
+  });
+
+  test('storage → markdown → storage is stable: callout opening with prose before a list', () => {
+    const { md } = roundTrip('<ac:structured-macro ac:name="info"><ac:rich-text-body>3. fake<ol start="5"><li>a</li></ol></ac:rich-text-body></ac:structured-macro>');
+    expect(md).toBe('> **INFO**\n> 3. fake\n>\n> 5. a');
+  });
+
+  test('storage → markdown → storage is stable: callout opening with the list', () => {
+    const { md } = roundTrip('<ac:structured-macro ac:name="info"><ac:rich-text-body><ol start="3"><li>a</li></ol></ac:rich-text-body></ac:structured-macro>');
+    expect(md).toBe('> **INFO**\n>\n> 3. a');
+  });
+});
