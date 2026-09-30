@@ -1,3 +1,10 @@
+## [2.25.7](https://github.com/pchuri/confluence-cli/compare/v2.25.6...v2.25.7) (2026-09-30)
+
+
+### Bug Fixes
+
+* **storage-walker:** preserve nested task lists in storage → markdown ([#245](https://github.com/pchuri/confluence-cli/issues/245)) ([8698e72](https://github.com/pchuri/confluence-cli/commit/8698e726790f1405cec8098824c7667210310e35)), closes [#239](https://github.com/pchuri/confluence-cli/issues/239) [#240](https://github.com/pchuri/confluence-cli/issues/240)
+
 ## [2.25.6](https://github.com/pchuri/confluence-cli/compare/v2.25.5...v2.25.6) (2026-09-30)
 
 
