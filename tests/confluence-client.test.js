@@ -521,6 +521,107 @@ describe('ConfluenceClient', () => {
       expect(retryClient.retryDelayMs({ headers: {} }, 2)).toBe(4000);
       expect(retryClient.retryDelayMs(undefined, 0)).toBe(1000);
     });
+
+    describe('Retry-After that carries no usable wait time', () => {
+      // Confluence Data Center rate limiting sends `Retry-After: 0` on 429
+      // responses as well (and on 200s). It is whole seconds, so at most it says
+      // the next token is under a second away; retrying at once fails again.
+      const dataCenterRateLimitHeaders = {
+        'retry-after': '0',
+        'x-ratelimit-limit': '3',
+        'x-ratelimit-fillrate': '3',
+        'x-ratelimit-interval-seconds': '1'
+      };
+
+      const makeBackoffClient = () => {
+        const retryClient = makeClient();
+        retryClient.retryBaseDelayMs = 1000;
+        return retryClient;
+      };
+
+      test.each([
+        ['"0"', '0'],
+        ['a numeric 0', 0],
+        ['"00"', '00'],
+        ['whitespace only', '   '],
+        ['negative seconds', '-5'],
+        ['unparsable text', 'soon'],
+        ['an empty string', '']
+      ])('retryDelayMs falls back to exponential backoff for Retry-After %s', (_label, value) => {
+        const retryClient = makeBackoffClient();
+        const response = { headers: { 'retry-after': value } };
+
+        expect(retryClient.retryDelayMs(response, 0)).toBe(1000);
+        expect(retryClient.retryDelayMs(response, 1)).toBe(2000);
+        expect(retryClient.retryDelayMs(response, 2)).toBe(4000);
+      });
+
+      test('retryDelayMs falls back to backoff for an HTTP-date that is not in the future', () => {
+        const retryClient = makeBackoffClient();
+        const past = new Date(Date.now() - 60000).toUTCString();
+        // HTTP-dates have whole-second resolution, so this is never after "now".
+        const now = new Date().toUTCString();
+
+        expect(retryClient.retryDelayMs({ headers: { 'retry-after': past } }, 0)).toBe(1000);
+        expect(retryClient.retryDelayMs({ headers: { 'retry-after': now } }, 1)).toBe(2000);
+      });
+
+      test('retryDelayMs keeps honoring a positive Retry-After, capped at the maximum delay', () => {
+        const retryClient = makeBackoffClient();
+
+        // Honored as sent, even when it is shorter than the backoff for that attempt.
+        expect(retryClient.retryDelayMs({ headers: { 'retry-after': '1' } }, 2)).toBe(1000);
+        expect(retryClient.retryDelayMs({ headers: { 'retry-after': '5' } }, 0)).toBe(5000);
+        expect(retryClient.retryDelayMs({ headers: { 'retry-after': 5 } }, 0)).toBe(5000);
+        expect(retryClient.retryDelayMs({ headers: { 'retry-after': '120' } }, 0)).toBe(60000);
+
+        // A future HTTP-date is honored too (far from the 1000 ms backoff, so the two cannot be confused).
+        const inThirtySeconds = new Date(Date.now() + 30000).toUTCString();
+        const dateDelay = retryClient.retryDelayMs({ headers: { 'retry-after': inThirtySeconds } }, 0);
+        expect(dateDelay).toBeGreaterThan(28000);
+        expect(dateDelay).toBeLessThanOrEqual(30000);
+      });
+
+      test('the backoff used for an unusable Retry-After is capped at the maximum delay', () => {
+        const retryClient = makeBackoffClient();
+
+        expect(retryClient.retryDelayMs({ headers: { 'retry-after': '0' } }, 10)).toBe(60000);
+      });
+
+      test('a 429 with Retry-After: 0 waits for the backoff delay instead of retrying at once', async () => {
+        const retryClient = makeBackoffClient();
+        const sleepSpy = jest.spyOn(retryClient, 'sleep').mockResolvedValue();
+        const mock = new MockAdapter(retryClient.client);
+        mock
+          .onGet(/\/content\/123/).replyOnce(429, {}, dataCenterRateLimitHeaders)
+          .onGet(/\/content\/123/).replyOnce(429, {}, dataCenterRateLimitHeaders)
+          .onGet(/\/content\/123/).replyOnce(200, {
+            body: { storage: { value: '<p>hi</p>' } }
+          }, { 'retry-after': '0' });
+
+        await expect(retryClient.readPage('123', 'storage')).resolves.toBe('<p>hi</p>');
+
+        expect(mock.history.get.length).toBe(3);
+        expect(sleepSpy.mock.calls.map(([ms]) => ms)).toEqual([1000, 2000]);
+        mock.restore();
+      });
+
+      test('a 429 with a positive Retry-After still waits exactly that long', async () => {
+        const retryClient = makeBackoffClient();
+        const sleepSpy = jest.spyOn(retryClient, 'sleep').mockResolvedValue();
+        const mock = new MockAdapter(retryClient.client);
+        mock
+          .onGet(/\/content\/123/).replyOnce(429, {}, { 'retry-after': '3' })
+          .onGet(/\/content\/123/).replyOnce(200, {
+            body: { storage: { value: '<p>hi</p>' } }
+          });
+
+        await expect(retryClient.readPage('123', 'storage')).resolves.toBe('<p>hi</p>');
+
+        expect(sleepSpy.mock.calls.map(([ms]) => ms)).toEqual([3000]);
+        mock.restore();
+      });
+    });
   });
 
   describe('401 error handling (cookie auth)', () => {
