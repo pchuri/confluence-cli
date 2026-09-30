@@ -2089,8 +2089,6 @@ describe('MacroConverter ordered list start (#241)', () => {
     expect(converter.storageToMarkdown(callout('<div><ol start="3"><li>a</li></ol></div>'))).toBe('> **INFO**\n>\n> 3. a');
     expect(converter.storageToMarkdown(callout('<p><ol start="3"><li>a</li></ol></p>'))).toBe('> **INFO**\n>\n> 3. a');
     expect(converter.storageToMarkdown(callout('<span><ol start="3"><li>a</li></ol></span>'))).toBe('> **INFO**\n>\n> 3. a');
-    expect(converter.storageToMarkdown(callout('3. fake<ol start="5"><li>a</li></ol>')))
-      .toBe('> **INFO**\n> 3. fake\n>\n> 5. a');
     expect(converter.storageToMarkdown(callout('<ol><li>a</li></ol>'))).toBe('> **INFO**\n> 1. a');
     expect(converter.storageToMarkdown(callout('<p>3. a</p>'))).toBe('> **INFO**\n> 3. a');
   });
@@ -2193,6 +2191,11 @@ describe('MacroConverter ordered list start (#241)', () => {
   test('storage → markdown → storage is stable: callout list inside a <p> wrapper', () => {
     const { md } = roundTrip('<ac:structured-macro ac:name="info"><ac:rich-text-body><p><ol start="3"><li>a</li></ol></p></ac:rich-text-body></ac:structured-macro>');
     expect(md).toBe('> **INFO**\n>\n> 3. a');
+  });
+
+  test('storage → markdown → storage is stable: callout opening with prose before a list', () => {
+    const { md } = roundTrip('<ac:structured-macro ac:name="info"><ac:rich-text-body>3. fake<ol start="5"><li>a</li></ol></ac:rich-text-body></ac:structured-macro>');
+    expect(md).toBe('> **INFO**\n> 3. fake\n>\n> 5. a');
   });
 
   test('storage → markdown → storage is stable: callout opening with the list', () => {
