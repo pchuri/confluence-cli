@@ -1,6 +1,6 @@
 {
   "name": "confluence-cli",
-  "version": "2.25.3",
+  "version": "2.25.5",
   "description": "A command-line interface for Atlassian Confluence with page creation and editing capabilities",
   "main": "index.js",
   "bin": {
@@ -32,7 +32,7 @@
     "html-to-text": "^9.0.5",
     "htmlparser2": "^9.1.0",
     "inquirer": "^8.2.6",
-    "markdown-it": "^14.1.0"
+    "markdown-it": "^14.3.2"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
