@@ -1,3 +1,10 @@
+## [2.25.8](https://github.com/pchuri/confluence-cli/compare/v2.25.7...v2.25.8) (2026-09-30)
+
+
+### Bug Fixes
+
+* **storage-walker:** keep <br/> inside list items as a hard line break ([#248](https://github.com/pchuri/confluence-cli/issues/248)) ([a087c64](https://github.com/pchuri/confluence-cli/commit/a087c6452afebd3a1f82b6c5008217e6b4bffbdf)), closes [#242](https://github.com/pchuri/confluence-cli/issues/242)
+
 ## [2.25.7](https://github.com/pchuri/confluence-cli/compare/v2.25.6...v2.25.7) (2026-09-30)
 
 
