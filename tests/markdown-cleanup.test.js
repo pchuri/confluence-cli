@@ -1,6 +1,7 @@
 const {
   LIST_INDENT,
   QUOTE_MARK,
+  HARD_BREAK,
   escapeSentinels,
   finalizeSentinels,
   fenceLength,
@@ -285,5 +286,14 @@ describe('markdown-cleanup QUOTE_MARK sentinel (#244)', () => {
     expect(isFenceOpenLine('- ```')).toBe(false);
     expect(isFenceOpenLine('``')).toBe(false);
     expect(isFenceOpenLine(`${Q} \`\`\` \`\` \`\`\``)).toBe(false);
+  });
+
+  test('finalizeSentinels degrades an unresolved HARD_BREAK to a newline', () => {
+    expect(finalizeSentinels(`a${HARD_BREAK}b`)).toBe('a\nb');
+  });
+
+  test('escapeSentinels / finalizeSentinels round-trip literal U+E003 next to the other sentinels', () => {
+    const literal = '\uE003\uE001b\uE002\uE000';
+    expect(finalizeSentinels(`${I}${HARD_BREAK}${escapeSentinels(literal)}`)).toBe(` \n${literal}`);
   });
 });
