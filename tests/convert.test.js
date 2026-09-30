@@ -230,6 +230,13 @@ describe('convert command', () => {
     expect(output).toMatch(/```js\nconst x = 1;\nconst y = 2;\n```/);
   });
 
+  test('html to markdown preserves nested lists (#243)', () => {
+    const html = '<ul><li>A<ul><li>A1</li><li>A2</li></ul></li><li>B</li></ul>';
+    const inputFile = writeInput('input.html', html);
+    const output = run(['convert', '--input-file', inputFile, '--input-format', 'html', '--output-format', 'markdown']);
+    expect(output.trim()).toBe('- A\n  - A1\n  - A2\n- B');
+  });
+
   test('storage to text', () => {
     const inputFile = writeInput('input.xml', '<h1>Title</h1><p>Content</p>');
     const output = run(['convert', '--input-file', inputFile, '--input-format', 'storage', '--output-format', 'text']);

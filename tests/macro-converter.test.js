@@ -1869,6 +1869,130 @@ describe('MacroConverter storageToMarkdown nested lists (#238)', () => {
   });
 });
 
+describe('MacroConverter storageToMarkdown code inside quotes and callouts (#244)', () => {
+  const converter = new MacroConverter({ isCloud: true });
+  const codeMacro = (lang, body) =>
+    `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">${lang}</ac:parameter><ac:plain-text-body><![CDATA[${body}]]></ac:plain-text-body></ac:structured-macro>`;
+  const macro = (name, body, params = '') =>
+    `<ac:structured-macro ac:name="${name}">${params}<ac:rich-text-body>${body}</ac:rich-text-body></ac:structured-macro>`;
+  const roundTrip = (storage) => {
+    const md = converter.storageToMarkdown(storage);
+    const storage1 = converter.markdownToStorage(md);
+    const md2 = converter.storageToMarkdown(storage1);
+    expect(md2).toBe(md);
+    expect(converter.markdownToStorage(md2)).toBe(storage1);
+    return md;
+  };
+
+  test('issue repro: code in an info callout keeps the body byte-exact', () => {
+    const md = roundTrip(macro('info', codeMacro('py', 'x   y\n  z')));
+    expect(md).toBe('> **INFO**\n> ```py\n> x   y\n>   z\n> ```');
+  });
+
+  test.each(['warning', 'note'])('%s callout keeps the body byte-exact', (name) => {
+    const md = roundTrip(macro(name, `<p>Lead</p>${codeMacro('js', 'a  =  1\n\tb')}`));
+    expect(md).toBe(`> **${name.toUpperCase()}**\n> Lead\n>\n> \`\`\`js\n> a  =  1\n> \tb\n> \`\`\``);
+  });
+
+  test('plain blockquote keeps the body byte-exact', () => {
+    const md = roundTrip(`<blockquote>${codeMacro('js', 'a  =  1\n    b')}</blockquote>`);
+    expect(md).toBe('> ```js\n> a  =  1\n>     b\n> ```');
+  });
+
+  test('blank, whitespace-only and tab lines in a quoted body survive', () => {
+    expect(converter.storageToMarkdown(`<blockquote>${codeMacro('py', 'a\n\n   \n\tb  c')}</blockquote>`))
+      .toBe('> ```py\n> a\n>\n>    \n> \tb  c\n> ```');
+  });
+
+  test('nested blockquote keeps the body byte-exact', () => {
+    expect(converter.storageToMarkdown(`<blockquote><p>hi</p><blockquote>${codeMacro('js', 'a   b\n\n  c')}</blockquote></blockquote>`))
+      .toBe('> hi\n>\n> > ```js\n> > a   b\n> >\n> >   c\n> > ```');
+  });
+
+  test('list inside a callout: code on the marker line', () => {
+    const md = roundTrip(macro('info', `<ul><li>${codeMacro('js', 'x   y\n  z')}</li></ul>`));
+    expect(md).toBe('> **INFO**\n> - ```js\n>   x   y\n>     z\n>   ```');
+  });
+
+  test('list inside a callout: code after a paragraph', () => {
+    const md = roundTrip(macro('note', `<ul><li><p>t</p>${codeMacro('js', 'p   q')}</li></ul>`));
+    expect(md).toBe('> **NOTE**\n> - t\n>\n>   ```js\n>   p   q\n>   ```');
+  });
+
+  test('blockquote as the first block of a list item', () => {
+    const md = roundTrip(`<ul><li><blockquote>${codeMacro('js', 'm   n')}</blockquote></li></ul>`);
+    expect(md).toBe('- > ```js\n  > m   n\n  > ```');
+  });
+
+  test('callout inside a list item', () => {
+    const md = roundTrip(`<ul><li><p>Step</p>${macro('info', codeMacro('js', 'a  =  1'))}</li></ul>`);
+    expect(md).toBe('- Step\n\n  > **INFO**\n  > ```js\n  > a  =  1\n  > ```');
+  });
+
+  test('nested list as the first block of an item with code on its marker line', () => {
+    const md = roundTrip(`<ul><li><ul><li>${codeMacro('js', 'a   b')}</li></ul></li></ul>`);
+    expect(md).toBe('- - ```js\n    a   b\n    ```');
+  });
+
+  test('panel and shared-block bodies keep code byte-exact', () => {
+    const title = '<ac:parameter ac:name="title">T</ac:parameter>';
+    expect(converter.storageToMarkdown(macro('panel', codeMacro('js', 'k   v'), title)))
+      .toBe('> **T**\n>\n> ```js\n> k   v\n> ```');
+    const key = '<ac:parameter ac:name="shared-block-key">B1</ac:parameter>';
+    expect(converter.storageToMarkdown(macro('shared-block', codeMacro('js', 'k   v'), key)))
+      .toBe('> **Shared Block: B1**\n>\n> ```js\n> k   v\n> ```');
+  });
+
+  test('blank lines between quoted blocks collapse, blank lines inside quoted code do not', () => {
+    const storage = macro('info', `<p>a</p>\n\n<p>b</p>\n\n${codeMacro('js', 'x\n\n\n\ny')}\n`);
+    expect(converter.storageToMarkdown(storage)).toBe('> **INFO**\n> a\n>\n> b\n>\n> ```js\n> x\n>\n>\n>\n> y\n> ```');
+  });
+
+  test('inline ``` in quoted prose does not pair with a later top-level fence', () => {
+    const storage = macro('info', '<p><code>``</code> is two backticks</p>')
+      + `<p>a     b</p>${codeMacro('', 'keep    this')}`;
+    expect(converter.storageToMarkdown(storage))
+      .toBe('> **INFO**\n> ``` `` ``` is two backticks\n\na b\n\n```\nkeep    this\n```');
+  });
+
+  test('a bare ``` paragraph in a callout does not swallow the code blocks after it', () => {
+    const storage = macro('info', '<p>```</p>') + codeMacro('', 'one   1') + '<p>x     y</p>' + codeMacro('', 'two   2');
+    expect(converter.storageToMarkdown(storage))
+      .toBe('> **INFO**\n> ```\n\n```\none   1\n```\n\nx y\n\n```\ntwo   2\n```');
+  });
+
+  test('a bare ``` paragraph in a callout does not pair with a fence in a later callout', () => {
+    const storage = macro('info', '<p>```</p>') + '<p>mid     text</p>' + macro('note', codeMacro('js', 'keep   1'));
+    expect(converter.storageToMarkdown(storage))
+      .toBe('> **INFO**\n> ```\n\nmid text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
+  });
+
+  test('indented loose text between callouts is cleaned, not turned into code on write-back', () => {
+    const storage = macro('info', '<p>```</p>') + 'loose\n        indented    text\n' + macro('note', codeMacro('js', 'keep   1'));
+    const md = converter.storageToMarkdown(storage);
+    expect(md).toBe('> **INFO**\n> ```\nloose\nindented text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
+    const storage1 = converter.markdownToStorage(md);
+    expect(storage1).toContain('<p>loose\nindented text</p>');
+    expect(storage1).toContain('<![CDATA[keep   1]]>');
+  });
+
+  test('consecutive blank paragraphs inside a callout collapse to one blank quote line', () => {
+    expect(converter.storageToMarkdown(macro('info', '<p>a</p><p>&nbsp;</p><p>b</p>')))
+      .toBe('> **INFO**\n> a\n>\n> b');
+  });
+
+  test('prose inside a quote keeps the historical whitespace collapse', () => {
+    expect(converter.storageToMarkdown('<blockquote><p>foo    bar</p><p>baz</p></blockquote>'))
+      .toBe('> foo bar\n>\n> baz');
+  });
+
+  test('literal U+E002 in quoted content survives the quote sentinel', () => {
+    const E2 = '\uE002';
+    expect(converter.storageToMarkdown(`<blockquote><p>a${E2}b</p>${codeMacro('js', `${E2} \`\`\``)}</blockquote>`))
+      .toBe(`> a${E2}b\n>\n> \`\`\`\`js\n> ${E2} \`\`\`\n> \`\`\`\``);
+  });
+});
+
 describe('MacroConverter ordered list start (#241)', () => {
   const converter = new MacroConverter({ isCloud: true });
   const roundTrip = (storage) => {
