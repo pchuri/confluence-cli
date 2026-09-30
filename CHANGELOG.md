@@ -1,3 +1,25 @@
+## [2.25.6](https://github.com/pchuri/confluence-cli/compare/v2.25.5...v2.25.6) (2026-09-30)
+
+
+### Bug Fixes
+
+* **storage-walker:** honor <ol start> in storage → markdown ([#246](https://github.com/pchuri/confluence-cli/issues/246)) ([b115d36](https://github.com/pchuri/confluence-cli/commit/b115d36160feaac972fe654fc0134d3ef24111af)), closes [#241](https://github.com/pchuri/confluence-cli/issues/241)
+
+## [2.25.5](https://github.com/pchuri/confluence-cli/compare/v2.25.4...v2.25.5) (2026-09-30)
+
+
+### Bug Fixes
+
+* **html-to-markdown:** preserve nested list structure in html → markdown ([#247](https://github.com/pchuri/confluence-cli/issues/247)) ([078886c](https://github.com/pchuri/confluence-cli/commit/078886c7c4b9dc5d1a04f43fd834b140ce852f48)), closes [#243](https://github.com/pchuri/confluence-cli/issues/243)
+
+## [2.25.4](https://github.com/pchuri/confluence-cli/compare/v2.25.3...v2.25.4) (2026-09-30)
+
+
+### Bug Fixes
+
+* **deps:** bump markdown-it to ^14.3.2 to address GHSA-253c-mchw-3w2r ([#250](https://github.com/pchuri/confluence-cli/issues/250)) ([1df64d5](https://github.com/pchuri/confluence-cli/commit/1df64d5f9c2a7d4830b7869f723ebc2801c8949d)), closes [#249](https://github.com/pchuri/confluence-cli/issues/249)
+* **storage-walker:** keep code blocks inside blockquotes and callouts byte-exact ([#249](https://github.com/pchuri/confluence-cli/issues/249)) ([dadfc93](https://github.com/pchuri/confluence-cli/commit/dadfc93eb96c5f78898f27d970ba2a19c1b3da7d)), closes [#244](https://github.com/pchuri/confluence-cli/issues/244)
+
 ## [2.25.3](https://github.com/pchuri/confluence-cli/compare/v2.25.2...v2.25.3) (2026-09-29)
 
 
