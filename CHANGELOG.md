@@ -1,3 +1,10 @@
+## [2.25.5](https://github.com/pchuri/confluence-cli/compare/v2.25.4...v2.25.5) (2026-09-30)
+
+
+### Bug Fixes
+
+* **html-to-markdown:** preserve nested list structure in html → markdown ([#247](https://github.com/pchuri/confluence-cli/issues/247)) ([078886c](https://github.com/pchuri/confluence-cli/commit/078886c7c4b9dc5d1a04f43fd834b140ce852f48)), closes [#243](https://github.com/pchuri/confluence-cli/issues/243)
+
 ## [2.25.4](https://github.com/pchuri/confluence-cli/compare/v2.25.3...v2.25.4) (2026-09-30)
 
 
