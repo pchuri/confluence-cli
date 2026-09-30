@@ -616,6 +616,8 @@ confluence attachment-upload 123456789 --file ./a.pdf --file ./b.png --comment "
 confluence attachment-upload 123456789 --file ./diagram.png --replace
 ```
 
+`--replace` adds a new version to the attachment with the same filename, and uploads the file as a new attachment when the page has none. It works on Confluence Cloud and on Server/Data Center. Without `--replace`, Confluence rejects a filename that already exists on the page with HTTP 400.
+
 ### Delete Attachments
 ```bash
 # Delete an attachment by ID

@@ -501,7 +501,7 @@ confluence attachment-upload <pageId> --file <path> [--file <path> ...] [--comme
 |---|---|
 | `--file` | File to upload (required, repeatable) |
 | `--comment` | Comment for the attachment(s) |
-| `--replace` | Replace an existing attachment with the same filename |
+| `--replace` | Replace an existing attachment with the same filename (uploads a new attachment if none exists). Without it, an existing filename is rejected with HTTP 400 |
 | `--minor-edit` | Mark the upload as a minor edit |
 
 ```sh
