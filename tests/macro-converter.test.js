@@ -1857,6 +1857,171 @@ describe('MacroConverter storageToMarkdown nested lists (#238)', () => {
     expect(converter.storageToMarkdown(storage)).toBe('- P\n  - [x] T');
   });
 
+  describe('nested task lists', () => {
+    const task = (status, body) => `<ac:task><ac:task-status>${status}</ac:task-status><ac:task-body>${body}</ac:task-body></ac:task>`;
+    const taskList = (...children) => `<ac:task-list>${children.join('')}</ac:task-list>`;
+    const code = '<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">js</ac:parameter>'
+      + '<ac:plain-text-body><![CDATA[a  =  1]]></ac:plain-text-body></ac:structured-macro>';
+
+    test('task list inside a task body', () => {
+      const storage = taskList(task('incomplete', `Parent${taskList(task('complete', 'Child'))}`));
+      expect(converter.storageToMarkdown(storage)).toBe('- [ ] Parent\n  - [x] Child');
+    });
+
+    test('sibling task list nests under the preceding task (Cloud editor form)', () => {
+      const storage = taskList(
+        task('incomplete', '<span class="placeholder-inline-tasks">A</span>'),
+        '\n',
+        taskList(task('complete', 'B'), taskList(task('incomplete', 'B1'))),
+        task('incomplete', 'C'),
+      );
+      expect(converter.storageToMarkdown(storage)).toBe('- [ ] A\n  - [x] B\n    - [ ] B1\n- [ ] C');
+    });
+
+    test('sibling task list with no preceding task stays at the same level', () => {
+      const storage = taskList(taskList(task('complete', 'orphan'), taskList(task('incomplete', 'sub'))), task('incomplete', 'A'));
+      expect(converter.storageToMarkdown(storage)).toBe('- [x] orphan\n  - [ ] sub\n- [ ] A');
+    });
+
+    test('nested lists in the body and as siblings stay one tight list', () => {
+      const storage = taskList(
+        task('incomplete', `A${taskList(task('complete', 'B'))}`),
+        taskList(task('complete', 'C')),
+        taskList(task('incomplete', 'D')),
+      );
+      expect(converter.storageToMarkdown(storage)).toBe('- [ ] A\n  - [x] B\n  - [x] C\n  - [ ] D');
+    });
+
+    test('empty parent with nested tasks keeps the checkbox on its own line', () => {
+      const storage = taskList(task('incomplete', ''), taskList(task('complete', 'B')));
+      expect(converter.storageToMarkdown(storage)).toBe('- [ ]\n  - [x] B');
+    });
+
+    test('body starting with a code macro puts the fence right under the checkbox', () => {
+      const storage = taskList(task('incomplete', code));
+      expect(converter.storageToMarkdown(storage)).toBe('- [ ]\n  ```js\n  a  =  1\n  ```');
+    });
+
+    test('body starting with a callout puts the quote right under the checkbox', () => {
+      const info = '<ac:structured-macro ac:name="info"><ac:rich-text-body><p>n</p></ac:rich-text-body></ac:structured-macro>';
+      expect(converter.storageToMarkdown(taskList(task('incomplete', info)))).toBe('- [ ]\n  > **INFO**\n  > n');
+    });
+
+    test('body starting with <hr/> uses *** so `[ ]` is not a setext heading', () => {
+      const storage = taskList(task('incomplete', '<hr/>x'));
+      expect(converter.storageToMarkdown(storage)).toBe('- [ ]\n  ***\n\n  x');
+    });
+
+    test('body starting with a block that cannot interrupt a paragraph keeps the checkbox inline', () => {
+      expect(converter.storageToMarkdown(taskList(task('incomplete', '<pre>raw</pre>')))).toBe('- [ ] raw');
+      const expand = '<ac:structured-macro ac:name="expand"><ac:parameter ac:name="title">T</ac:parameter>'
+        + '<ac:rich-text-body><p>in</p></ac:rich-text-body></ac:structured-macro>';
+      expect(converter.storageToMarkdown(taskList(task('incomplete', expand))))
+        .toBe('- [ ] **EXPAND: T**\n\n  in\n\n  **EXPAND_END**');
+    });
+
+    describe('round-trip is stable for every kind of first block', () => {
+      const firstBlocks = {
+        code,
+        pre: '<pre>raw</pre>',
+        heading: '<h2>H</h2>',
+        table: '<table><tr><th>h</th></tr><tr><td>c</td></tr></table>',
+        blockquote: '<blockquote><p>q</p></blockquote>',
+        info: '<ac:structured-macro ac:name="info"><ac:rich-text-body><p>n</p></ac:rich-text-body></ac:structured-macro>',
+        hr: '<hr/>',
+        list: '<ul><li>b</li></ul>',
+        taskList: taskList(task('complete', 'B')),
+      };
+      for (const [kind, block] of Object.entries(firstBlocks)) {
+        for (const [shape, rest] of [['tight', ''], ['loose', '<p>after</p>']]) {
+          test(`${kind} (${shape})`, () => {
+            const md1 = converter.storageToMarkdown(taskList(task('incomplete', block + rest)));
+            const storage1 = converter.markdownToStorage(md1);
+            const md2 = converter.storageToMarkdown(storage1);
+            expect(md2).toBe(md1);
+            expect(converter.markdownToStorage(md2)).toBe(storage1);
+          });
+        }
+      }
+    });
+
+    test('bare `[ ]` paragraph before ordinary text in a plain list item is left alone', () => {
+      expect(converter.storageToMarkdown('<ul><li><p>[ ]</p><p>para</p></li></ul>')).toBe('- [ ]\n\n  para');
+    });
+
+    test('multi-paragraph body becomes a loose item', () => {
+      const storage = taskList(task('incomplete', '<p>Para  1</p><p>Para 2</p>'), task('complete', 'Next'));
+      expect(converter.storageToMarkdown(storage)).toBe('- [ ] Para 1\n\n  Para 2\n- [x] Next');
+    });
+
+    test('empty task without nested content is still skipped', () => {
+      const storage = taskList(task('incomplete', ' '), task('complete', 'x'));
+      expect(converter.storageToMarkdown(storage)).toBe('- [x] x');
+    });
+
+    test('inline body whitespace is still collapsed', () => {
+      const storage = taskList(task('incomplete', 'a\n   b <strong>c</strong>'));
+      expect(converter.storageToMarkdown(storage)).toBe('- [ ] a b **c**');
+    });
+
+    test('code macro in a task body becomes an indented fence', () => {
+      const storage = taskList(task('incomplete', `Run${code}`));
+      expect(converter.storageToMarkdown(storage)).toBe('- [ ] Run\n\n  ```js\n  a  =  1\n  ```');
+    });
+
+    test('regular list inside a task body', () => {
+      const storage = taskList(task('incomplete', 'A<ul><li>b</li></ul>'));
+      expect(converter.storageToMarkdown(storage)).toBe('- [ ] A\n  - b');
+    });
+
+    test('nested task list inside a list item', () => {
+      const storage = `<ul><li>P${taskList(task('incomplete', `T${taskList(task('complete', 'U'))}`))}</li></ul>`;
+      expect(converter.storageToMarkdown(storage)).toBe('- P\n  - [ ] T\n    - [x] U');
+    });
+
+    test('nested task list inside a callout keeps quote prefix and indent', () => {
+      const storage = '<ac:structured-macro ac:name="info"><ac:rich-text-body>'
+        + `${taskList(task('incomplete', `A${taskList(task('complete', 'B'))}`))}</ac:rich-text-body></ac:structured-macro>`;
+      expect(converter.storageToMarkdown(storage)).toBe('> **INFO**\n> - [ ] A\n>   - [x] B');
+    });
+
+    test('nested task lists inside a table cell are flattened to one line', () => {
+      const inBody = taskList(task('incomplete', `A${taskList(task('complete', 'B'))}`));
+      const sibling = taskList(task('incomplete', 'C'), taskList(task('complete', 'D')));
+      const storage = `<table><tr><td>${inBody}</td><td>${sibling}</td></tr></table>`;
+      expect(converter.storageToMarkdown(storage)).toBe('| - [ ] A - [x] B | - [ ] C - [x] D |\n| --- | --- |');
+    });
+
+    test('task list inside a paragraph in a list item is flattened without leaking indent', () => {
+      const storage = `<ul><li><p>x${taskList(task('incomplete', `A${taskList(task('complete', 'B'))}`))}</p></li></ul>`;
+      expect(converter.storageToMarkdown(storage)).toBe('- x - [ ] A - [x] B');
+    });
+
+    test('storage → markdown → storage → markdown round-trip preserves nesting', () => {
+      const storage = taskList(
+        task('incomplete', 'Parent'),
+        taskList(task('complete', 'Child'), taskList(task('incomplete', 'Grandchild')), task('complete', 'Sibling')),
+        task('complete', 'Next'),
+      );
+      const md = converter.storageToMarkdown(storage);
+      expect(md).toBe('- [ ] Parent\n  - [x] Child\n    - [ ] Grandchild\n  - [x] Sibling\n- [x] Next');
+      const storage1 = converter.markdownToStorage(md);
+      const md2 = converter.storageToMarkdown(storage1);
+      expect(md2).toBe(md);
+      expect(converter.markdownToStorage(md2)).toBe(storage1);
+    });
+  });
+
+  test('two lists in one item join as one tight list', () => {
+    expect(converter.storageToMarkdown('<ul><li>A<ul><li>b</li></ul><ul><li>c</li></ul></li></ul>'))
+      .toBe('- A\n  - b\n  - c');
+  });
+
+  test('list inside a paragraph in a list item is flattened without leaking indent', () => {
+    expect(converter.storageToMarkdown('<ul><li><p>x<ul><li>a<ul><li>b</li></ul></li></ul></p></li></ul>'))
+      .toBe('- x - a - b');
+  });
+
   test('<hr/> as the first block uses *** so it stays inside the item', () => {
     const md = converter.storageToMarkdown('<ul><li><hr/>x</li></ul>');
     expect(md).toBe('- ***\n\n  x');

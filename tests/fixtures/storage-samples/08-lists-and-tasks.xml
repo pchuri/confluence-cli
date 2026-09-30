@@ -18,3 +18,22 @@
   <ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body>Pending item with <em>emphasis</em></ac:task-body></ac:task>
   <ac:task><ac:task-status>incomplete</ac:task-status><ac:task-body></ac:task-body></ac:task>
 </ac:task-list>
+<ac:task-list>
+    <ac:task>
+        <ac:task-id>1</ac:task-id>
+        <ac:task-status>incomplete</ac:task-status>
+        <ac:task-body><span class="placeholder-inline-tasks">Top level task 1</span></ac:task-body>
+    </ac:task>
+    <ac:task-list>
+        <ac:task>
+            <ac:task-id>2</ac:task-id>
+            <ac:task-status>complete</ac:task-status>
+            <ac:task-body><span class="placeholder-inline-tasks">Sub task 1</span></ac:task-body>
+        </ac:task>
+    </ac:task-list>
+    <ac:task>
+        <ac:task-id>3</ac:task-id>
+        <ac:task-status>incomplete</ac:task-status>
+        <ac:task-body><span class="placeholder-inline-tasks">Top level task 2</span></ac:task-body>
+    </ac:task>
+</ac:task-list>
