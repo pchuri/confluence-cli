@@ -43,6 +43,7 @@ function registerProfileCommands(program, { withLocal }) {
     .description('Add a new configuration profile interactively')
     .option('-d, --domain <domain>', 'Confluence domain')
     .option('--protocol <protocol>', 'Protocol (http or https)')
+    .option('--allow-insecure-http', 'Allow HTTP for this profile; credentials are sent in plaintext (not recommended)')
     .option('-p, --api-path <path>', 'REST API path')
     .option('-a, --auth-type <type>', 'Authentication type (basic, bearer, mtls, or cookie)')
     .option('-e, --email <email>', 'Email or username for basic auth')

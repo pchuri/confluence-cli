@@ -21,6 +21,7 @@ const {
   isValidProfileName,
   CONFIG_FILE,
 } = require('../lib/config');
+const ConfluenceClient = require('../lib/confluence-client');
 
 // Save and restore all relevant env vars around each test
 const ENV_KEYS = [
@@ -30,7 +31,8 @@ const ENV_KEYS = [
   'CONFLUENCE_AUTH_TYPE', 'CONFLUENCE_API_PATH',
   'CONFLUENCE_PROTOCOL', 'CONFLUENCE_PROFILE',
   'CONFLUENCE_TLS_CA_CERT', 'CONFLUENCE_TLS_CLIENT_CERT',
-  'CONFLUENCE_TLS_CLIENT_KEY', 'CONFLUENCE_PLANTUML_FORMAT'
+  'CONFLUENCE_TLS_CLIENT_KEY', 'CONFLUENCE_PLANTUML_FORMAT',
+  'CONFLUENCE_ALLOW_INSECURE_HTTP'
 ];
 
 // Helper to create a multi-profile config
@@ -179,6 +181,41 @@ describe('Profile management', () => {
       expect(config.email).toBe('user@staging.com');
       expect(config.authType).toBe('basic');
       expect(config.protocol).toBe('http');
+    });
+
+    test('profile with protocol http and allowInsecureHttp true propagates to ConfluenceClient as http', () => {
+      const data = multiProfileConfig();
+      data.profiles.staging.allowInsecureHttp = true;
+      mockConfigFile(data);
+
+      const config = getConfig('staging');
+      expect(config.protocol).toBe('http');
+      expect(config.allowInsecureHttp).toBe(true);
+
+      const client = new ConfluenceClient(config);
+      expect(client.protocol).toBe('http');
+    });
+
+    test('profile with protocol http and no allowInsecureHttp falls back to https in ConfluenceClient', () => {
+      mockConfigFile(multiProfileConfig());
+
+      const config = getConfig('staging');
+      expect(config.protocol).toBe('http');
+      expect(config.allowInsecureHttp).toBe(false);
+
+      const client = new ConfluenceClient(config);
+      expect(client.protocol).toBe('https');
+    });
+
+    test('CONFLUENCE_ALLOW_INSECURE_HTTP overrides a profile with no allowInsecureHttp field', () => {
+      mockConfigFile(multiProfileConfig());
+      process.env.CONFLUENCE_ALLOW_INSECURE_HTTP = 'true';
+
+      const config = getConfig('staging');
+      expect(config.allowInsecureHttp).toBe(true);
+
+      const client = new ConfluenceClient(config);
+      expect(client.protocol).toBe('http');
     });
 
     test('reads plantumlFormat from the profile', () => {

@@ -205,6 +205,7 @@ program
   .description('Initialize Confluence CLI configuration')
   .option('-d, --domain <domain>', 'Confluence domain')
   .option('--protocol <protocol>', 'Protocol (http or https)')
+  .option('--allow-insecure-http', 'Allow HTTP for this profile; credentials are sent in plaintext (not recommended)')
   .option('-p, --api-path <path>', 'REST API path')
   .option('-a, --auth-type <type>', 'Authentication type (basic, bearer, mtls, cookie, or none)')
   .option('-e, --email <email>', 'Email or username for basic auth')
