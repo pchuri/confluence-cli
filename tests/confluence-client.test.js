@@ -57,11 +57,12 @@ describe('ConfluenceClient', () => {
       expect(client.baseURL).toMatch(/^https:\/\//);
     });
 
-    test('uses http protocol when configured', () => {
+    test('uses http protocol when configured with allowInsecureHttp', () => {
       const httpClient = new ConfluenceClient({
         domain: 'internal.example.com',
         token: 'token',
-        protocol: 'http'
+        protocol: 'http',
+        allowInsecureHttp: true
       });
       expect(httpClient.protocol).toBe('http');
       expect(httpClient.baseURL).toBe('http://internal.example.com/rest/api');
@@ -77,11 +78,45 @@ describe('ConfluenceClient', () => {
       expect(invalidClient.baseURL).toBe('https://example.com/rest/api');
     });
 
-    test('buildUrl uses configured protocol', () => {
+    test('falls back to https and warns when http is requested without an opt-in', () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
       const httpClient = new ConfluenceClient({
         domain: 'internal.example.com',
         token: 'token',
         protocol: 'http'
+      });
+      expect(httpClient.protocol).toBe('https');
+      expect(httpClient.baseURL).toBe('https://internal.example.com/rest/api');
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('allowInsecureHttp'));
+      warnSpy.mockRestore();
+    });
+
+    test('uses http protocol when CONFLUENCE_ALLOW_INSECURE_HTTP env var is set', () => {
+      const original = process.env.CONFLUENCE_ALLOW_INSECURE_HTTP;
+      process.env.CONFLUENCE_ALLOW_INSECURE_HTTP = 'true';
+      try {
+        const httpClient = new ConfluenceClient({
+          domain: 'internal.example.com',
+          token: 'token',
+          protocol: 'http'
+        });
+        expect(httpClient.protocol).toBe('http');
+        expect(httpClient.baseURL).toBe('http://internal.example.com/rest/api');
+      } finally {
+        if (original === undefined) {
+          delete process.env.CONFLUENCE_ALLOW_INSECURE_HTTP;
+        } else {
+          process.env.CONFLUENCE_ALLOW_INSECURE_HTTP = original;
+        }
+      }
+    });
+
+    test('buildUrl uses configured protocol', () => {
+      const httpClient = new ConfluenceClient({
+        domain: 'internal.example.com',
+        token: 'token',
+        protocol: 'http',
+        allowInsecureHttp: true
       });
       expect(httpClient.buildUrl('/wiki/spaces/TEST')).toBe('http://internal.example.com/wiki/spaces/TEST');
     });
@@ -94,7 +129,8 @@ describe('ConfluenceClient', () => {
       const httpClient = new ConfluenceClient({
         domain: 'internal.example.com',
         token: 'token',
-        protocol: 'http'
+        protocol: 'http',
+        allowInsecureHttp: true
       });
       expect(httpClient.toAbsoluteUrl('/download/file.pdf')).toBe('http://internal.example.com/download/file.pdf');
     });
@@ -103,7 +139,8 @@ describe('ConfluenceClient', () => {
       const httpClient = new ConfluenceClient({
         domain: 'internal.example.com',
         token: 'token',
-        protocol: 'http'
+        protocol: 'http',
+        allowInsecureHttp: true
       });
       expect(httpClient.toAbsoluteUrl('https://cdn.example.com/file.pdf')).toBe('https://cdn.example.com/file.pdf');
     });

@@ -263,6 +263,7 @@ confluence init --email "user@example.com" --token "your-api-token"
 - `--tls-ca-cert <path>` - Optional CA certificate chain for mTLS authentication
 - `--read-only` - Enable read-only mode (blocks all write operations)
 - `--keychain` - Store the token in the macOS Keychain instead of `config.json` (macOS only, see Option 5)
+- `--allow-insecure-http` - Allow `--protocol http` to actually use HTTP for this profile (see [HTTP transport](#http-transport-allowinsecurehttp) below). Without it, `http` silently falls back to HTTPS.
 
 ⚠️ **Security note:** While flags work, storing tokens in shell history is risky. Prefer environment variables (Option 3) for production environments, or the macOS Keychain (Option 5) for a workstation.
 
@@ -386,6 +387,34 @@ Or add `"forceCloud": true` to your profile in the config file (see [Config file
     "default": {
       "domain": "wiki.example.org",
       "forceCloud": true
+    }
+  }
+}
+```
+
+**HTTP transport (`allowInsecureHttp`):**
+
+HTTPS is used by default even if a profile or `CONFLUENCE_PROTOCOL` requests `http` — connecting over plain HTTP sends your credentials (basic auth header, bearer token, cookie) in plaintext, including through transparent corporate proxies. Setting `protocol: "http"` without an explicit opt-in prints a warning and silently falls back to HTTPS.
+
+If you genuinely need HTTP — for example a local reverse-authentication proxy on `127.0.0.1` or an internal network you trust — opt in explicitly via any of:
+
+```bash
+# 1. CLI flag on init / profile add
+confluence init --domain "127.0.0.1:8080" --protocol http --allow-insecure-http ...
+
+# 2. Environment variable (overrides the profile's allowInsecureHttp setting)
+export CONFLUENCE_ALLOW_INSECURE_HTTP=true
+```
+
+Or set `"allowInsecureHttp": true` directly in the profile:
+
+```json
+{
+  "profiles": {
+    "local-proxy": {
+      "domain": "127.0.0.1:8080",
+      "protocol": "http",
+      "allowInsecureHttp": true
     }
   }
 }
@@ -1038,7 +1067,7 @@ confluence stats
 | `export <pageId_or_url>` | Export a page to a directory with its attachments | `--format <html\|text\|markdown>`, `--dest <directory>`, `--file <filename>`, `--attachments-dir <name>`, `--pattern <glob>`, `--exclude-attachments <patterns>`, `--referenced-only`, `--skip-attachments`, `-r, --recursive`, `--max-depth <depth>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--dry-run`, `--overwrite` |
 | `profile list` | List all configuration profiles | |
 | `profile use <name>` | Set the active configuration profile | |
-| `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol`, `--read-only`, `--keychain` |
+| `profile add <name>` | Add a new configuration profile | `-d, --domain`, `-p, --api-path`, `-a, --auth-type`, `-e, --email`, `-t, --token`, `--protocol`, `--allow-insecure-http`, `--read-only`, `--keychain` |
 | `profile remove <name>` | Remove a configuration profile | |
 | `api <endpoint>` | Make an authenticated API request (relative path uses apiPath; absolute path bypasses it; full URL must be same-origin) | `-X, --method <method>`, `-f, --field <key=value>`, `-H, --header <key:value>`, `--input <file>`, `--jq <expression>`, `-i, --include`, `--silent` |
 | `convert` | Convert between content formats locally (no server required) | `--input-file <path>`, `--output-file <path>`, `--input-format <markdown\|storage\|html>`, `--output-format <markdown\|storage\|html\|text>` |

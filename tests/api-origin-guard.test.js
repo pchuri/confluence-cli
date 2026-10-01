@@ -44,6 +44,7 @@ describe('rawRequest cross-origin credential guard', () => {
     return new ConfluenceClient({
       domain: `127.0.0.1:${configured.port}`,
       protocol: 'http',
+      allowInsecureHttp: true,
       apiPath: '/rest/api',
       authType: 'basic',
       email: 'victim@example.com',
