@@ -1,3 +1,10 @@
+## [2.25.10](https://github.com/pchuri/confluence-cli/compare/v2.25.9...v2.25.10) (2026-10-01)
+
+
+### Bug Fixes
+
+* secure confluence-client.js (CWE-319) ([#256](https://github.com/pchuri/confluence-cli/issues/256)) ([a2d61c6](https://github.com/pchuri/confluence-cli/commit/a2d61c6299baffb13d876da306a19fee9346bbc4))
+
 ## [2.25.9](https://github.com/pchuri/confluence-cli/compare/v2.25.8...v2.25.9) (2026-10-01)
 
 
