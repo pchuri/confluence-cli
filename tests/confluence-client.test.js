@@ -3081,6 +3081,254 @@ describe('ConfluenceClient', () => {
       }
     });
 
+    describe('uploadAttachment replace across Cloud and Server/Data Center', () => {
+      let mock;
+      let tempDir;
+      let tempFile;
+
+      const attachmentPayload = (overrides = {}) => ({
+        id: 'att77',
+        type: 'attachment',
+        title: 'replace.txt',
+        version: { number: 2 },
+        _links: { download: '/download/attachments/456/replace.txt' },
+        ...overrides
+      });
+
+      // Data Center answers PUT on the attachment collection with 405: that
+      // "create or update" endpoint exists on Cloud only.
+      const makeServerClient = () => {
+        const serverClient = new ConfluenceClient({
+          domain: 'confluence.example.com',
+          token: 'pat',
+          authType: 'bearer'
+        });
+        mock = new MockAdapter(serverClient.client);
+        mock.onPut('/content/456/child/attachment').reply(405);
+        return serverClient;
+      };
+
+      const contentTypeOf = (requestConfig) => (
+        requestConfig.headers['content-type'] || requestConfig.headers['Content-Type']
+      );
+
+      beforeEach(() => {
+        tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-cli-'));
+        tempFile = path.join(tempDir, 'replace.txt');
+        fs.writeFileSync(tempFile, 'replace');
+      });
+
+      afterEach(() => {
+        if (mock) {
+          mock.restore();
+          mock = null;
+        }
+        removeDirRecursive(tempDir);
+      });
+
+      test('Server/DC: replaces an existing attachment through POST .../{attachmentId}/data', async () => {
+        const serverClient = makeServerClient();
+        mock.onGet('/content/456/child/attachment').reply(200, {
+          results: [attachmentPayload()],
+          _links: {}
+        });
+        mock.onPost('/content/456/child/attachment/att77/data').reply(200, {
+          results: [attachmentPayload({ version: { number: 3 } })]
+        });
+
+        const response = await serverClient.uploadAttachment('456', tempFile, { replace: true });
+
+        // Data Center has no PUT on the attachment collection (it answers 405).
+        expect(mock.history.put).toHaveLength(0);
+        expect(mock.history.get).toHaveLength(1);
+        expect(mock.history.get[0].params).toMatchObject({ filename: 'replace.txt' });
+        expect(mock.history.post).toHaveLength(1);
+
+        const upload = mock.history.post[0];
+        expect(upload.url).toBe('/content/456/child/attachment/att77/data');
+        expect(upload.headers['X-Atlassian-Token']).toBe('nocheck');
+        expect(contentTypeOf(upload)).toContain('multipart/form-data');
+        expect(upload.data).toBeInstanceOf(FormData);
+
+        expect(response.results).toHaveLength(1);
+        expect(response.results[0]).toMatchObject({ id: 'att77', title: 'replace.txt', version: 3 });
+      });
+
+      test('Server/DC: looks the attachment up by its exact filename, including special characters', async () => {
+        const serverClient = makeServerClient();
+        const specialFile = path.join(tempDir, 'Q3 report (final) & 한글.txt');
+        fs.writeFileSync(specialFile, 'replace');
+        mock.onGet('/content/456/child/attachment').reply(200, {
+          results: [attachmentPayload({ id: 'att88', title: 'Q3 report (final) & 한글.txt' })]
+        });
+        mock.onPost('/content/456/child/attachment/att88/data').reply(200, {
+          results: [attachmentPayload({ id: 'att88', title: 'Q3 report (final) & 한글.txt' })]
+        });
+
+        await serverClient.uploadAttachment('456', specialFile, { replace: true });
+
+        expect(mock.history.get[0].params.filename).toBe('Q3 report (final) & 한글.txt');
+        expect(mock.history.post[0].url).toBe('/content/456/child/attachment/att88/data');
+      });
+
+      test('Server/DC: encodes the attachment ID it puts into the data URL', async () => {
+        const serverClient = makeServerClient();
+        const odd = attachmentPayload({ id: 'att/with space' });
+        mock.onGet('/content/456/child/attachment').reply(200, { results: [odd] });
+        mock.onPost('/content/456/child/attachment/att%2Fwith%20space/data').reply(200, { results: [odd] });
+
+        await serverClient.uploadAttachment('456', tempFile, { replace: true });
+
+        expect(mock.history.post).toHaveLength(1);
+        expect(mock.history.post[0].url).toBe('/content/456/child/attachment/att%2Fwith%20space/data');
+      });
+
+      test('Server/DC: uploads a new attachment when none with that filename exists', async () => {
+        const serverClient = makeServerClient();
+        mock.onGet('/content/456/child/attachment').reply(200, { results: [], _links: {} });
+        mock.onPost('/content/456/child/attachment').reply(200, {
+          results: [attachmentPayload({ id: 'att99', version: { number: 1 } })]
+        });
+
+        const response = await serverClient.uploadAttachment('456', tempFile, { replace: true });
+
+        expect(mock.history.put).toHaveLength(0);
+        expect(mock.history.post).toHaveLength(1);
+        expect(mock.history.post[0].url).toBe('/content/456/child/attachment');
+        expect(response.results[0]).toMatchObject({ id: 'att99', version: 1 });
+      });
+
+      test('Server/DC: never overwrites another attachment when the lookup has no exact filename match', async () => {
+        const serverClient = makeServerClient();
+        // A proxy or server that ignores the filename filter returns unrelated attachments.
+        mock.onGet('/content/456/child/attachment').reply(200, {
+          results: [
+            attachmentPayload({ id: 'att1', title: 'other.txt' }),
+            attachmentPayload({ id: 'att2', title: 'replace.txt.bak' })
+          ]
+        });
+        mock.onPost('/content/456/child/attachment').reply(200, {
+          results: [attachmentPayload({ id: 'att3', version: { number: 1 } })]
+        });
+
+        await serverClient.uploadAttachment('456', tempFile, { replace: true });
+
+        expect(mock.history.post).toHaveLength(1);
+        expect(mock.history.post[0].url).toBe('/content/456/child/attachment');
+      });
+
+      test('Server/DC: selects the exact-title attachment when the lookup returns several', async () => {
+        const serverClient = makeServerClient();
+        mock.onGet('/content/456/child/attachment').reply(200, {
+          results: [
+            attachmentPayload({ id: 'att1', title: 'other.txt' }),
+            attachmentPayload({ id: 'att2', title: 'replace.txt' })
+          ]
+        });
+        mock.onPost('/content/456/child/attachment/att2/data').reply(200, {
+          results: [attachmentPayload({ id: 'att2', version: { number: 3 } })]
+        });
+
+        const response = await serverClient.uploadAttachment('456', tempFile, { replace: true });
+
+        expect(mock.history.post).toHaveLength(1);
+        expect(response.results[0].id).toBe('att2');
+      });
+
+      test('Server/DC: accepts a single attachment object from the data endpoint', async () => {
+        const serverClient = makeServerClient();
+        mock.onGet('/content/456/child/attachment').reply(200, { results: [attachmentPayload()] });
+        // Cloud documents this endpoint as returning one Content object rather than { results: [] }.
+        mock.onPost('/content/456/child/attachment/att77/data').reply(200, attachmentPayload({
+          version: { number: 4 }
+        }));
+
+        const response = await serverClient.uploadAttachment('456', tempFile, { replace: true });
+
+        expect(response.results).toHaveLength(1);
+        expect(response.results[0]).toMatchObject({ id: 'att77', title: 'replace.txt', version: 4 });
+        expect(response.raw).toMatchObject({ id: 'att77' });
+      });
+
+      test('Server/DC: sends comment and minorEdit to the data endpoint', async () => {
+        const serverClient = makeServerClient();
+        mock.onGet('/content/456/child/attachment').reply(200, { results: [attachmentPayload()] });
+        mock.onPost('/content/456/child/attachment/att77/data').reply(200, {
+          results: [attachmentPayload({ version: { number: 3 } })]
+        });
+        const appendSpy = jest.spyOn(FormData.prototype, 'append');
+
+        try {
+          await serverClient.uploadAttachment('456', tempFile, {
+            replace: true,
+            comment: 'refreshed diagram',
+            minorEdit: true
+          });
+
+          const appended = appendSpy.mock.calls.map(([field, value, options]) => ({ field, value, options }));
+          expect(appended.map(entry => entry.field)).toEqual(['file', 'comment', 'minorEdit']);
+          expect(appended[0].options).toEqual({ filename: 'replace.txt' });
+          expect(appended[1]).toMatchObject({
+            value: 'refreshed diagram',
+            options: { contentType: 'text/plain; charset=utf-8' }
+          });
+          expect(appended[2].value).toBe('true');
+        } finally {
+          appendSpy.mockRestore();
+        }
+      });
+
+      test('Server/DC: does not look up existing attachments when replace is not requested', async () => {
+        const serverClient = makeServerClient();
+        mock.onPost('/content/456/child/attachment').reply(200, {
+          results: [attachmentPayload({ version: { number: 1 } })]
+        });
+
+        await serverClient.uploadAttachment('456', tempFile);
+
+        expect(mock.history.get).toHaveLength(0);
+        expect(mock.history.put).toHaveLength(0);
+        expect(mock.history.post).toHaveLength(1);
+        expect(mock.history.post[0].url).toBe('/content/456/child/attachment');
+      });
+
+      test('Server/DC: surfaces a failed lookup instead of uploading', async () => {
+        const serverClient = makeServerClient();
+        mock.onGet('/content/456/child/attachment').reply(403);
+
+        await expect(serverClient.uploadAttachment('456', tempFile, { replace: true }))
+          .rejects.toThrow(/403/);
+        expect(mock.history.post).toHaveLength(0);
+        expect(mock.history.put).toHaveLength(0);
+      });
+
+      test.each([
+        ['an *.atlassian.net domain', { domain: 'test.atlassian.net', token: 'token' }],
+        ['a custom domain with forceCloud', { domain: 'wiki.example.org', token: 'token', forceCloud: true }],
+        ['a scoped API token', {
+          domain: 'api.atlassian.com',
+          token: 'scoped-token',
+          apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
+        }]
+      ])('Cloud (%s): keeps the PUT create-or-update call and skips the lookup', async (_label, config) => {
+        const cloudClient = new ConfluenceClient(config);
+        mock = new MockAdapter(cloudClient.client);
+        mock.onPut('/content/456/child/attachment').reply(200, {
+          results: [attachmentPayload({ version: { number: 3 } })]
+        });
+
+        const response = await cloudClient.uploadAttachment('456', tempFile, { replace: true });
+
+        expect(mock.history.get).toHaveLength(0);
+        expect(mock.history.post).toHaveLength(0);
+        expect(mock.history.put).toHaveLength(1);
+        expect(mock.history.put[0].url).toBe('/content/456/child/attachment');
+        expect(mock.history.put[0].headers['X-Atlassian-Token']).toBe('nocheck');
+        expect(contentTypeOf(mock.history.put[0])).toContain('multipart/form-data');
+        expect(response.results[0]).toMatchObject({ id: 'att77', version: 3 });
+      });
+    });
+
     test('getAttachmentMetadata should return compact ownership metadata without a download URL', async () => {
       expect(typeof client.getAttachmentMetadata).toBe('function');
       const mock = new MockAdapter(client.client);
