@@ -1,3 +1,12 @@
+## [2.25.9](https://github.com/pchuri/confluence-cli/compare/v2.25.8...v2.25.9) (2026-10-01)
+
+
+### Bug Fixes
+
+* **attachments:** make --replace work on Data Center/Server ([#257](https://github.com/pchuri/confluence-cli/issues/257)) ([e9163e4](https://github.com/pchuri/confluence-cli/commit/e9163e40ff1f0bc94f3038e4b600a04cd7918099))
+* **client:** back off when Retry-After is zero or not in the future ([#258](https://github.com/pchuri/confluence-cli/issues/258)) ([5d9b3b9](https://github.com/pchuri/confluence-cli/commit/5d9b3b91ac7a724c2ee2b3c0fef4071ced3c23a3))
+* **deps:** update axios to 1.20.0 to unblock security audit ([#263](https://github.com/pchuri/confluence-cli/issues/263)) ([1f62546](https://github.com/pchuri/confluence-cli/commit/1f62546772c95c34d5654065064a7dbcd2742b1a))
+
 ## [2.25.8](https://github.com/pchuri/confluence-cli/compare/v2.25.7...v2.25.8) (2026-09-30)
 
 
