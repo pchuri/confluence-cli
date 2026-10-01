@@ -88,27 +88,17 @@ jobs:
     env:
       VERSION: ${{ github.event.inputs.version || needs.publish.outputs.new_release_version }}
     steps:
-      - name: Wait for npm publish propagation
-        run: |
-          PACKAGE_URL="https://registry.npmjs.org/confluence-cli/${VERSION}"
-          for i in $(seq 1 30); do
-            STATUS=$(curl -s -o /dev/null -w '%{http_code}' "$PACKAGE_URL")
-            if [ "$STATUS" = "200" ]; then
-              echo "npm package version ${VERSION} is available"
-              exit 0
-            fi
-            echo "Waiting for npm publish... attempt ${i}/30"
-            sleep 10
-          done
-          echo "Timed out waiting for npm package"
-          exit 1
-
       - name: Download npm tarball and compute sha256
         id: sha
+        timeout-minutes: 22
         run: |
           URL="https://registry.npmjs.org/confluence-cli/-/confluence-cli-${VERSION}.tgz"
-          if ! curl -fsSL "$URL" -o package.tgz; then
-            echo "Failed to download npm tarball from ${URL}" >&2
+          # Metadata can appear before the tarball. Retry the actual download,
+          # including propagation-related 404s, for approximately 20 minutes.
+          if ! curl -fsSL --retry 120 --retry-delay 10 --retry-all-errors \
+            --retry-max-time 1200 --connect-timeout 10 --max-time 30 \
+            "$URL" -o package.tgz; then
+            echo "Failed to download npm tarball from ${URL} after retries" >&2
             exit 1
           fi
           SHA256=$(shasum -a 256 package.tgz | awk '{print $1}')
