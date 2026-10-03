@@ -71,9 +71,52 @@ describe('MacroConverter', () => {
     });
   });
 
+  describe('linkStyle "auto"', () => {
+    const buildUrl = (p) => `https://example.atlassian.net${p.startsWith('/') ? p : `/${p}`}`;
+    const siteOptions = { isCloud: true, linkStyle: 'auto', webUrlPrefix: '/wiki', buildUrl };
+    const internal = 'https://example.atlassian.net/wiki/spaces/DEVOPS/pages/1346144034/acme';
+    const external = 'https://letsencrypt.org/docs/faq/';
+
+    test('renders internal links as smart links and external links as plain links', () => {
+      const converter = new MacroConverter(siteOptions);
+      const result = converter.markdownToStorage(
+        `See [ACME](${internal}) and [Let's Encrypt – FAQ](${external}).`
+      );
+      expect(result).toContain(`<a href="${internal}" data-card-appearance="inline">ACME</a>`);
+      expect(result).toContain(`<a href="${external}">Let's Encrypt – FAQ</a>`);
+      expect(result).not.toContain('<ac:link>');
+    });
+
+    test('a look-alike host is not treated as internal', () => {
+      const converter = new MacroConverter(siteOptions);
+      const lookalike = 'https://example.atlassian.net.evil.test/wiki/spaces/A/overview';
+      const result = converter.markdownToStorage(`[x](${lookalike})`);
+      expect(result).toContain(`<a href="${lookalike}">x</a>`);
+      expect(result).not.toContain('data-card-appearance');
+    });
+
+    test('anchor links still short-circuit the style', () => {
+      const converter = new MacroConverter(siteOptions);
+      expect(converter.markdownToStorage('[top](#top)')).toContain('<ac:link ac:anchor="top">');
+    });
+
+    test('without a configured site every link is plain, even on Cloud', () => {
+      const converter = new MacroConverter({ isCloud: true, linkStyle: 'auto' });
+      const result = converter.markdownToStorage(`[ACME](${internal})`);
+      expect(result).toContain(`<a href="${internal}">ACME</a>`);
+      expect(result).not.toContain('data-card-appearance');
+    });
+
+    test('storage → markdown is unchanged by the link style', () => {
+      const converter = new MacroConverter(siteOptions);
+      const storage = converter.markdownToStorage(`[ACME](${internal}) and [FAQ](${external})`);
+      expect(converter.storageToMarkdown(storage)).toBe(`[ACME](${internal}) and [FAQ](${external})`);
+    });
+  });
+
   describe('VALID_LINK_STYLES', () => {
     test('is exported alongside the class', () => {
-      expect(MacroConverter.VALID_LINK_STYLES).toEqual(['smart', 'plain', 'wiki']);
+      expect(MacroConverter.VALID_LINK_STYLES).toEqual(['smart', 'plain', 'wiki', 'auto']);
     });
   });
 });

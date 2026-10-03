@@ -1664,6 +1664,20 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('<a href="https://example.com">Link</a>');
       expect(result).not.toContain('data-card-appearance');
     });
+
+    test('linkStyle "auto" matches the client\'s own site and leaves other hosts plain', () => {
+      const client = new ConfluenceClient({
+        domain: 'example.atlassian.net',
+        token: 'test-token',
+        email: 'user@example.com',
+        linkStyle: 'auto'
+      });
+      const result = client.markdownToStorage(
+        '[Page](https://example.atlassian.net/wiki/spaces/A/pages/1/x) [Ext](https://example.com/y)'
+      );
+      expect(result).toContain('<a href="https://example.atlassian.net/wiki/spaces/A/pages/1/x" data-card-appearance="inline">Page</a>');
+      expect(result).toContain('<a href="https://example.com/y">Ext</a>');
+    });
   });
 
   describe('forceCloud', () => {

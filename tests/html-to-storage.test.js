@@ -342,6 +342,20 @@ describe('htmlToStorage', () => {
         .toBe('<ac:link><ri:url ri:value="https://example.com" /><ac:plain-text-link-body><![CDATA[link]]></ac:plain-text-link-body></ac:link>');
     });
 
+    test('`auto` is smart for links the isInternalLink predicate accepts, plain otherwise', () => {
+      const isInternalLink = (href) => href.startsWith('https://wiki.example.org/');
+      const opts = { linkStyle: 'auto', isInternalLink };
+      expect(htmlToStorage('<a href="https://wiki.example.org/p">in</a>', opts))
+        .toBe('<a href="https://wiki.example.org/p" data-card-appearance="inline">in</a>');
+      expect(htmlToStorage('<a href="https://example.com/p">out</a>', opts))
+        .toBe('<a href="https://example.com/p">out</a>');
+    });
+
+    test('`auto` without an isInternalLink predicate renders every link plain', () => {
+      expect(htmlToStorage('<a href="https://wiki.example.org/p">x</a>', { linkStyle: 'auto' }))
+        .toBe('<a href="https://wiki.example.org/p">x</a>');
+    });
+
     test('default linkStyle is `plain` for server (isCloud:false) and `smart` for cloud', () => {
       const a = '<a href="x">y</a>';
       expect(htmlToStorage(a, { isCloud: false })).toBe(a);

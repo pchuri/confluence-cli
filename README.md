@@ -442,7 +442,16 @@ Or per-profile:
 }
 ```
 
-Valid values: `smart` (Cloud smart links), `plain` (standard `<a href>`), and `wiki` (legacy `ac:link` + `ri:url` output for explicit backward compatibility). When unset, the CLI picks `smart` for Cloud and `plain` for Server/Data Center and local conversions. New configurations should not use `wiki` for external links.
+Valid values: `smart` (Cloud smart links), `plain` (standard `<a href>`), `auto` (smart links for links into your own Confluence site, plain links for everything else), and `wiki` (legacy `ac:link` + `ri:url` output for explicit backward compatibility). When unset, the CLI picks `smart` for Cloud and `plain` for Server/Data Center and local conversions. New configurations should not use `wiki` for external links.
+
+A Cloud smart link is rendered from the target page's own title and discards the link text you wrote, which suits links to other Confluence pages but not links to external sites. `auto` gives each link the right treatment:
+
+```markdown
+See [ACME](https://example.atlassian.net/wiki/spaces/DEVOPS/pages/1346144034/acme)
+and [Let's Encrypt FAQ](https://letsencrypt.org/docs/faq/).
+```
+
+becomes a smart link for `ACME` and a plain `<a href>` that keeps the text `Let's Encrypt FAQ`. A link counts as internal when its parsed origin matches the configured domain and its path is inside the site's context path (`/wiki` on Cloud), so look-alike hosts such as `example.atlassian.net.evil.test` stay plain. Relative links are rendered plain, and so is every link when no site is configured (for example in library use of the converter without `buildUrl`). Only the written storage differs: `read --format markdown` returns the same `[text](href)` under every style.
 
 **PlantUML macro format (`plantumlFormat`):**
 
@@ -1222,7 +1231,7 @@ A standard markdown link whose href starts with `#` becomes an `ac:link` with `a
 See [the anchor](#my-section) above.
 ```
 
-This works under all three `linkStyle` modes (`smart`, `wiki`, `plain`) — the anchor-link conversion runs before the general `<a href>` handling.
+This works under every `linkStyle` mode (`smart`, `plain`, `auto`, `wiki`) — the anchor-link conversion runs before the general `<a href>` handling.
 
 ## Development
 
