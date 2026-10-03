@@ -57,6 +57,44 @@ describe('link-style', () => {
       });
     });
 
+    describe('site served under a context path (Server/Data Center)', () => {
+      const isInternal = createInternalLinkMatcher({
+        webUrlPrefix: '',
+        buildUrl: (p) => `https://wiki.example.org/confluence${p.startsWith('/') ? p : `/${p}`}`,
+      });
+
+      test('matches only inside the context path', () => {
+        expect(isInternal('https://wiki.example.org/confluence/display/DOC/Home')).toBe(true);
+        expect(isInternal('https://wiki.example.org/confluence')).toBe(true);
+        expect(isInternal('https://wiki.example.org/confluence-other/page')).toBe(false);
+        expect(isInternal('https://wiki.example.org/jira/browse/ABC-1')).toBe(false);
+      });
+    });
+
+    describe('hostile or unusual hrefs', () => {
+      const isInternal = createInternalLinkMatcher({ webUrlPrefix: '/wiki', buildUrl });
+
+      test('a leading space is ignored by URL parsing, as a browser would', () => {
+        expect(isInternal(' https://example.atlassian.net/wiki/spaces/A/overview')).toBe(true);
+        expect(isInternal(' https://letsencrypt.org/docs/faq/')).toBe(false);
+      });
+
+      test('percent-encoded dot segments are normalized before comparing', () => {
+        expect(isInternal('https://example.atlassian.net/wiki/%2e%2e/jira/browse/ABC-1')).toBe(false);
+        expect(isInternal('https://example.atlassian.net/wiki/%2e%2e/wiki/spaces/A/overview')).toBe(true);
+      });
+
+      test('protocol-relative and backslash-only hrefs from another host stay external', () => {
+        expect(isInternal('//evil.test/wiki/spaces/A/overview')).toBe(false);
+        expect(isInternal('\\\\evil.test\\wiki\\x')).toBe(false);
+      });
+
+      test('userinfo does not change the origin that is compared', () => {
+        expect(isInternal('https://user:pw@example.atlassian.net/wiki/spaces/A/overview')).toBe(true);
+        expect(isInternal('https://example.atlassian.net@evil.test/wiki/spaces/A/overview')).toBe(false);
+      });
+    });
+
     describe('no resolvable site (offline conversion)', () => {
       test('returns false when no buildUrl is provided', () => {
         const isInternal = createInternalLinkMatcher({ webUrlPrefix: '/wiki' });

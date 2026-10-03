@@ -453,6 +453,8 @@ and [Let's Encrypt FAQ](https://letsencrypt.org/docs/faq/).
 
 becomes a smart link for `ACME` and a plain `<a href>` that keeps the text `Let's Encrypt FAQ`. A link counts as internal when its parsed origin matches the configured domain and its path is inside the site's context path (`/wiki` on Cloud), so look-alike hosts such as `example.atlassian.net.evil.test` stay plain. Relative links are rendered plain, and so is every link when no site is configured (for example in library use of the converter without `buildUrl`). Only the written storage differs: `read --format markdown` returns the same `[text](href)` under every style.
 
+Two caveats. Smart links are a Cloud feature, so on Server/Data Center `auto` would emit smart-link markup for internal links that those sites do not render; keep `plain` there. And with a scoped API token the CLI talks to the `api.atlassian.com` gateway rather than your site's own domain, so it cannot tell which links are internal and `auto` renders every link plain.
+
 **PlantUML macro format (`plantumlFormat`):**
 
 ````` ```plantuml ````` fences become the plain `plantuml` macro by default. Sites running the PlantUML Diagrams for Confluence app need the `plantumlcloud` macro (URI-encoded, deflated and base64-encoded `data` parameter) — select it with `CONFLUENCE_PLANTUML_FORMAT=plantumlcloud`, the profile field `"plantumlFormat": "plantumlcloud"`, or `--plantuml-format plantumlcloud` on `convert`, `create`, `create-child` and `update`:
