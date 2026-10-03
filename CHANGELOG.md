@@ -1,3 +1,10 @@
+## [2.25.11](https://github.com/pchuri/confluence-cli/compare/v2.25.10...v2.25.11) (2026-10-03)
+
+
+### Bug Fixes
+
+* **converter:** emit **TOC** marker for toc macro in storage → markdown ([#266](https://github.com/pchuri/confluence-cli/issues/266)) ([5441f9b](https://github.com/pchuri/confluence-cli/commit/5441f9bdf5a75ba94c797fa1bea2f56849f4bb9b)), closes [#265](https://github.com/pchuri/confluence-cli/issues/265)
+
 ## [2.25.10](https://github.com/pchuri/confluence-cli/compare/v2.25.9...v2.25.10) (2026-10-01)
 
 
