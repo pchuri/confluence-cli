@@ -1,3 +1,10 @@
+# [2.26.0](https://github.com/pchuri/confluence-cli/compare/v2.25.11...v2.26.0) (2026-10-03)
+
+
+### Features
+
+* **converter:** add linkStyle auto for site-aware link rendering ([#267](https://github.com/pchuri/confluence-cli/issues/267)) ([5fcbabd](https://github.com/pchuri/confluence-cli/commit/5fcbabdbbe35b5bf0e586a031d0b23a9348470e4)), closes [#259](https://github.com/pchuri/confluence-cli/issues/259)
+
 ## [2.25.11](https://github.com/pchuri/confluence-cli/compare/v2.25.10...v2.25.11) (2026-10-03)
 
 
