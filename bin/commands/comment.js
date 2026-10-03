@@ -322,6 +322,30 @@ function registerCommentCommands(program, { withClient }) {
     }));
 
   program
+    .command('comment-resolve <commentId>')
+    .description('Resolve (or reopen) an inline comment thread (Confluence Cloud)')
+    .option('--reopen', 'Reopen a resolved thread instead of resolving it')
+    .action(withClient('comment_resolve', async ({ client, analytics, wantsJson, emitJson }, commentId, options) => {
+      const resolved = !options.reopen;
+      const result = await client.setCommentResolved(commentId, resolved);
+
+      if (wantsJson()) {
+        emitJson({ id: result.id, resolved: result.resolved, changed: result.changed });
+        analytics.track('comment_resolve', true);
+        return;
+      }
+
+      const verb = resolved ? 'resolved' : 'reopened';
+      if (result.changed) {
+        console.log(chalk.green(`✅ Comment ${verb}.`));
+      } else {
+        console.log(chalk.yellow(`Comment is already ${verb}; nothing to do.`));
+      }
+      console.log(`ID: ${chalk.blue(result.id)}`);
+      analytics.track('comment_resolve', true);
+    }, { writable: true }));
+
+  program
     .command('comment-lookup <commentId>')
     .description('Look up compact metadata for one comment')
     .action(withClient('comment_lookup', async ({ client, analytics, emitJson }, commentId) => {

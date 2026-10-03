@@ -3084,8 +3084,12 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
-    test('should create inline comment with inline properties', async () => {
-      const mock = new MockAdapter(client.client);
+    test('should create inline comment with inline properties (v1 on Server/Data Center)', async () => {
+      const serverClient = new ConfluenceClient({
+        domain: 'wiki.example.org',
+        token: 'test-token'
+      });
+      const mock = new MockAdapter(serverClient.client);
       mock.onPost('/content').reply(config => {
         const payload = JSON.parse(config.data);
         expect(payload.type).toBe('comment');
@@ -3098,7 +3102,7 @@ describe('ConfluenceClient', () => {
         return [200, { id: 'c1', type: 'comment' }];
       });
 
-      await client.createComment('123', '<p>Hi</p>', 'storage', {
+      await serverClient.createComment('123', '<p>Hi</p>', 'storage', {
         parentId: 'c0',
         location: 'inline',
         inlineProperties: {
@@ -3109,6 +3113,155 @@ describe('ConfluenceClient', () => {
       });
 
       mock.restore();
+    });
+
+    describe('v2 replies and resolution (Confluence Cloud)', () => {
+      const V2 = 'https://test.atlassian.net/api/v2';
+      let mock;
+
+      beforeEach(() => {
+        mock = new MockAdapter(client.client);
+      });
+
+      afterEach(() => {
+        mock.restore();
+      });
+
+      test('a reply to an inline comment posts to v2 inline-comments without highlight metadata', async () => {
+        mock.onGet(`${V2}/inline-comments/c0`).reply(200, { id: 'c0', pageId: '123', resolutionStatus: 'open' });
+        mock.onPost(`${V2}/inline-comments`).reply(200, {
+          id: 'c1',
+          pageId: '123',
+          _links: { webui: '/spaces/A/pages/123?focusedCommentId=c1' }
+        });
+
+        const result = await client.createComment('123', '<p>Hi</p>', 'storage', { parentId: 'c0', location: 'footer' });
+
+        expect(JSON.parse(mock.history.post[0].data)).toEqual({
+          parentCommentId: 'c0',
+          body: { representation: 'storage', value: '<p>Hi</p>' }
+        });
+        expect(mock.history.post).toHaveLength(1);
+        expect(result).toEqual({
+          id: 'c1',
+          container: { id: '123' },
+          _links: { webui: '/spaces/A/pages/123?focusedCommentId=c1' }
+        });
+      });
+
+      test('a reply to a footer comment posts to v2 footer-comments', async () => {
+        mock.onGet(`${V2}/inline-comments/f0`).reply(404);
+        mock.onGet(`${V2}/footer-comments/f0`).reply(200, { id: 'f0', pageId: '123' });
+        mock.onPost(`${V2}/footer-comments`).reply(200, { id: 'f1', pageId: '123' });
+
+        const result = await client.createComment('123', 'text', 'markdown', { parentId: 'f0' });
+
+        expect(result.id).toBe('f1');
+        const payload = JSON.parse(mock.history.post[0].data);
+        expect(payload.parentCommentId).toBe('f0');
+        expect(payload.body.value).toBe('<p>text</p>\n');
+      });
+
+      test('a reply to an unknown comment fails before posting anything', async () => {
+        mock.onGet(`${V2}/inline-comments/nope`).reply(404);
+        mock.onGet(`${V2}/footer-comments/nope`).reply(404);
+
+        await expect(client.createComment('123', '<p>Hi</p>', 'storage', { parentId: 'nope' }))
+          .rejects.toThrow('Comment nope not found.');
+        expect(mock.history.post).toHaveLength(0);
+      });
+
+      test('a reply is refused when the parent belongs to a different page', async () => {
+        mock.onGet(`${V2}/inline-comments/c0`).reply(200, { id: 'c0', pageId: '999' });
+
+        await expect(client.createComment('123', '<p>Hi</p>', 'storage', { parentId: 'c0' }))
+          .rejects.toThrow('Comment c0 belongs to page 999, not page 123.');
+        expect(mock.history.post).toHaveLength(0);
+      });
+
+      test('a v2 API error on the reply is surfaced, not retried through v1', async () => {
+        mock.onGet(`${V2}/inline-comments/c0`).reply(200, { id: 'c0', pageId: '123' });
+        mock.onPost(`${V2}/inline-comments`).reply(400, { errors: [{ title: 'bad' }] });
+
+        await expect(client.createComment('123', '<p>Hi</p>', 'storage', { parentId: 'c0' }))
+          .rejects.toMatchObject({ response: { status: 400 } });
+        expect(mock.history.post).toHaveLength(1);
+      });
+
+      test('a top-level comment still uses v1', async () => {
+        mock.onPost('/content').reply(200, { id: 'c9', type: 'comment' });
+
+        await client.createComment('123', '<p>Hi</p>', 'storage', { location: 'footer' });
+
+        expect(mock.history.post[0].url).toBe('/content');
+      });
+
+      test('setCommentResolved resolves with the next version number', async () => {
+        mock.onGet(`${V2}/inline-comments/c0`).reply(200, {
+          id: 'c0', resolutionStatus: 'open', version: { number: 3 }
+        });
+        mock.onPut(`${V2}/inline-comments/c0`).reply(200, {});
+
+        const result = await client.setCommentResolved('c0', true);
+
+        expect(result).toEqual({ id: 'c0', resolved: true, changed: true, status: 'open' });
+        expect(JSON.parse(mock.history.put[0].data)).toEqual({ version: { number: 4 }, resolved: true });
+      });
+
+      test('setCommentResolved reopens a resolved thread', async () => {
+        mock.onGet(`${V2}/inline-comments/c0`).reply(200, {
+          id: 'c0', resolutionStatus: 'resolved', version: { number: 1 }
+        });
+        mock.onPut(`${V2}/inline-comments/c0`).reply(200, {});
+
+        const result = await client.setCommentResolved('c0', false);
+
+        expect(result.changed).toBe(true);
+        expect(JSON.parse(mock.history.put[0].data)).toEqual({ version: { number: 2 }, resolved: false });
+      });
+
+      test.each([
+        ['resolve an already resolved thread', 'resolved', true],
+        ['reopen an open thread', 'open', false],
+        ['reopen a reopened thread', 'reopened', false],
+      ])('setCommentResolved is a no-op to %s', async (_label, status, resolved) => {
+        mock.onGet(`${V2}/inline-comments/c0`).reply(200, {
+          id: 'c0', resolutionStatus: status, version: { number: 1 }
+        });
+
+        const result = await client.setCommentResolved('c0', resolved);
+
+        expect(result).toMatchObject({ id: 'c0', resolved, changed: false });
+        expect(mock.history.put).toHaveLength(0);
+      });
+
+      test('setCommentResolved refuses a dangling thread', async () => {
+        mock.onGet(`${V2}/inline-comments/c0`).reply(200, {
+          id: 'c0', resolutionStatus: 'dangling', version: { number: 1 }
+        });
+
+        await expect(client.setCommentResolved('c0', true)).rejects.toThrow('dangling');
+        expect(mock.history.put).toHaveLength(0);
+      });
+
+      test('setCommentResolved reports a comment that is not an inline comment', async () => {
+        mock.onGet(`${V2}/inline-comments/f0`).reply(404);
+
+        await expect(client.setCommentResolved('f0', true)).rejects.toThrow('Inline comment f0 not found');
+      });
+
+      test('setCommentResolved needs a readable current version', async () => {
+        mock.onGet(`${V2}/inline-comments/c0`).reply(200, { id: 'c0', resolutionStatus: 'open' });
+
+        await expect(client.setCommentResolved('c0', true)).rejects.toThrow('current version');
+        expect(mock.history.put).toHaveLength(0);
+      });
+
+      test('setCommentResolved requires Confluence Cloud', async () => {
+        const serverClient = new ConfluenceClient({ domain: 'wiki.example.org', token: 'test-token' });
+
+        await expect(serverClient.setCommentResolved('c0', true)).rejects.toThrow('requires Confluence Cloud');
+      });
     });
 
     test('getCommentMetadata should return compact ownership metadata for a reply without body content', async () => {
