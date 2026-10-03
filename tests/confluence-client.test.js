@@ -1664,6 +1664,69 @@ describe('ConfluenceClient', () => {
       expect(result).toContain('<a href="https://example.com">Link</a>');
       expect(result).not.toContain('data-card-appearance');
     });
+
+    test('linkStyle "auto" matches the client\'s own site and leaves other hosts plain', () => {
+      const client = new ConfluenceClient({
+        domain: 'example.atlassian.net',
+        token: 'test-token',
+        email: 'user@example.com',
+        linkStyle: 'auto'
+      });
+      const result = client.markdownToStorage(
+        '[Page](https://example.atlassian.net/wiki/spaces/A/pages/1/x) [Ext](https://example.com/y)'
+      );
+      expect(result).toContain('<a href="https://example.atlassian.net/wiki/spaces/A/pages/1/x" data-card-appearance="inline">Page</a>');
+      expect(result).toContain('<a href="https://example.com/y">Ext</a>');
+    });
+  });
+
+  describe('linkStyle "auto" site detection', () => {
+    const md = '[Page](https://example.atlassian.net/wiki/spaces/A/pages/1/x) [Ext](https://example.com/y)';
+
+    test('createLocalConverter without a site renders every link plain', () => {
+      const converter = ConfluenceClient.createLocalConverter({ isCloud: true, linkStyle: 'auto' });
+      const result = converter.converter.markdownToStorage(md);
+      expect(result).not.toContain('data-card-appearance');
+      expect(result).toContain('<a href="https://example.com/y">Ext</a>');
+    });
+
+    test('createLocalConverter with a site matches that site', () => {
+      const converter = ConfluenceClient.createLocalConverter({
+        isCloud: true,
+        linkStyle: 'auto',
+        webUrlPrefix: '/wiki',
+        buildUrl: (p) => `https://example.atlassian.net${p}`,
+      });
+      const result = converter.converter.markdownToStorage(md);
+      expect(result).toContain('data-card-appearance="inline">Page</a>');
+      expect(result).toContain('<a href="https://example.com/y">Ext</a>');
+    });
+
+    test('Server/Data Center under a context path matches only that path', () => {
+      const client = new ConfluenceClient({
+        domain: 'wiki.example.org/confluence',
+        token: 'test-token',
+        linkStyle: 'auto'
+      });
+      const result = client.markdownToStorage(
+        '[In](https://wiki.example.org/confluence/display/DOC/Home) [Out](https://wiki.example.org/jira/x)'
+      );
+      expect(result).toContain('<a href="https://wiki.example.org/confluence/display/DOC/Home" data-card-appearance="inline">In</a>');
+      expect(result).toContain('<a href="https://wiki.example.org/jira/x">Out</a>');
+    });
+
+    test('scoped-token gateway (api.atlassian.com) cannot identify the site and renders plain', () => {
+      const client = new ConfluenceClient({
+        domain: 'api.atlassian.com',
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api',
+        token: 'test-token',
+        email: 'user@example.com',
+        linkStyle: 'auto'
+      });
+      const result = client.markdownToStorage(md);
+      expect(result).not.toContain('data-card-appearance');
+      expect(result).toContain('<a href="https://example.atlassian.net/wiki/spaces/A/pages/1/x">Page</a>');
+    });
   });
 
   describe('forceCloud', () => {

@@ -84,5 +84,6 @@ describe('configuration warnings on command failures', () => {
     expect(humanResult.stderr).toContain(
       '⚠ Invalid linkStyle from CONFLUENCE_LINK_STYLE "smrt"; valid values:'
     );
+    expect(humanResult.stderr).toContain('smart, plain, wiki, auto');
   });
 });

@@ -163,6 +163,15 @@ describe('getConfig env var aliases', () => {
     expect(config.linkStyle).toBe('plain');
   });
 
+  test('CONFLUENCE_LINK_STYLE accepts "auto"', () => {
+    process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_LINK_STYLE = 'auto';
+
+    const config = getConfig();
+    expect(config.linkStyle).toBe('auto');
+  });
+
   test('linkStyle is undefined when CONFLUENCE_LINK_STYLE is not set', () => {
     process.env.CONFLUENCE_DOMAIN = 'wiki.example.org';
     process.env.CONFLUENCE_API_TOKEN = 'token';
