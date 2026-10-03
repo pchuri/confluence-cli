@@ -667,6 +667,23 @@ describe('MacroConverter storageToMarkdown anchor round-trip', () => {
   });
 });
 
+describe('MacroConverter storageToMarkdown TOC round-trip', () => {
+  const converter = new MacroConverter({ isCloud: true });
+
+  test('self-closing toc macro converts back to a **TOC** marker', () => {
+    const storage = '<p>Intro</p><ac:structured-macro ac:name="toc" ac:schema-version="1" ac:macro-id="abc-123" /><h2>Section</h2>';
+    const result = converter.storageToMarkdown(storage);
+    expect(result).toBe('Intro\n\n**TOC**\n\n## Section');
+  });
+
+  test('full round-trip: markdown → storage → markdown preserves the TOC position', () => {
+    const original = 'Intro\n\n**TOC**\n\n## Section';
+    const storage = converter.markdownToStorage(original);
+    expect(storage).toContain('ac:name="toc"');
+    expect(converter.storageToMarkdown(storage)).toBe(original);
+  });
+});
+
 describe('MacroConverter storageToMarkdown nested macros (regex pipeline could not express these)', () => {
   // The previous regex-based pipeline used non-greedy `[\s\S]*?` matchers
   // that landed on the first closing tag they saw, so nesting any rich-text

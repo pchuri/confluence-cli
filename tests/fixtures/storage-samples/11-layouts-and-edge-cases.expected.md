@@ -2,6 +2,8 @@ Left cell content.
 
 Right cell with **bold**.
 
+**TOC**
+
 Unknown macro: after.
 
 Mixed CDATA and entities: `a < b && c > d` compared to literal <tag>.
