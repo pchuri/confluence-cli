@@ -278,6 +278,28 @@ describe('JSON errors in the CLI', () => {
     });
   });
 
+  test('comment-resolve is blocked in read-only mode before any request is made', () => {
+    const env = { ...process.env };
+    for (const key of ENV_KEYS) delete env[key];
+    Object.assign(env, {
+      CONFLUENCE_DOMAIN: 'test.atlassian.net',
+      CONFLUENCE_API_TOKEN: 'test-token',
+      CONFLUENCE_READ_ONLY: 'true',
+    });
+
+    const result = spawnSync(
+      process.execPath,
+      [CLI, '--json', 'comment-resolve', '456'],
+      { encoding: 'utf8', env }
+    );
+
+    expect(result.status).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(JSON.parse(result.stderr).error).toBe(
+      'This profile is in read-only mode. Write operations are not allowed.'
+    );
+  });
+
   test('missing configuration emits one structured error on stderr', () => {
     const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'confluence-empty-config-'));
     const env = { ...process.env };

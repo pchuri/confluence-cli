@@ -184,7 +184,7 @@ const JSON_COMMANDS = new Set([
   'api', // already emits raw JSON
   // mutations
   'create', 'create-child', 'update', 'move', 'delete', 'copy-tree',
-  'comment', 'comment-delete', 'property-delete',
+  'comment', 'comment-resolve', 'comment-delete', 'property-delete',
   'attachment-upload', 'attachment-delete',
   'version-delete', 'versions-purge',
 ]);

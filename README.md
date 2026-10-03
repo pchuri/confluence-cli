@@ -544,7 +544,7 @@ confluence info 123456789 --json | jq '.version'
 confluence create "Notes" ENG --content "hi" --json | jq -r '.id'   # capture the new page id
 ```
 
-`--json` works on read commands (`info`, `search`, `spaces`, `find`, `children`, `versions`, `comments`, `attachments`, `property-list`/`-get`/`-set`) and write commands (`create`, `create-child`, `update`, `move`, `delete`, `copy-tree`, `comment`, `comment-delete`, `property-delete`, `attachment-upload`/`-delete`, `version-delete`, `versions-purge`). For destructive commands, `--json` requires `--yes` — it will not prompt interactively. Passing `--json` to a command that doesn't support it (e.g. `init`, `convert`, `export`, `edit`) is rejected with an error rather than silently ignored. Human-readable messages and warnings go to stderr, so stdout stays valid JSON.
+`--json` works on read commands (`info`, `search`, `spaces`, `find`, `children`, `versions`, `comments`, `attachments`, `property-list`/`-get`/`-set`) and write commands (`create`, `create-child`, `update`, `move`, `delete`, `copy-tree`, `comment`, `comment-resolve`, `comment-delete`, `property-delete`, `attachment-upload`/`-delete`, `version-delete`, `versions-purge`). For destructive commands, `--json` requires `--yes` — it will not prompt interactively. Passing `--json` to a command that doesn't support it (e.g. `init`, `convert`, `export`, `edit`) is rejected with an error rather than silently ignored. Human-readable messages and warnings go to stderr, so stdout stays valid JSON.
 
 > **Deprecation:** the per-command `--format json` form is deprecated in favor of the global `--json` flag. It still works but prints a warning to stderr and will be removed in a future major version.
 
@@ -706,14 +706,20 @@ confluence comment 123456789 \
   --inline-selection "foo" \
   --inline-original-selection "foo"
 
-# Reply to a comment
+# Reply to a comment (inline or footer thread)
 confluence comment 123456789 --parent 998877 --content "Agree with this"
+
+# Resolve or reopen an inline comment thread (Confluence Cloud)
+confluence comment-resolve 998877
+confluence comment-resolve 998877 --reopen
 
 # Delete a comment
 confluence comment-delete 998877
 ```
 
-Inline comment creation note (Confluence Cloud): Creating inline comments requires editor-generated highlight metadata (`matchIndex`, `lastFetchTime`, `serializedHighlights`, plus the selection text). The public REST API does not provide these fields, so inline creation and inline replies can fail with a 400 unless you supply the full `--inline-properties` payload captured from the editor. Footer comments and replies are fully supported.
+Inline comment creation note (Confluence Cloud): Creating inline comments requires editor-generated highlight metadata (`matchIndex`, `lastFetchTime`, `serializedHighlights`, plus the selection text). The public REST API does not provide these fields, so creating a new inline thread can fail with a 400 unless you supply the full `--inline-properties` payload captured from the editor. Footer comments are fully supported.
+
+Replies and resolution (Confluence Cloud): `--parent <commentId>` posts through the v2 comment API, which needs no highlight metadata, so replies to inline and footer threads both work. The reply goes to the same kind of thread as its parent (any `--location` or `--inline-*` option is ignored for replies), and the command fails before posting if the parent belongs to a different page. Replying does not change whether a thread is resolved. `comment-resolve <commentId>` resolves a top-level inline thread and `--reopen` reopens it; asking for the state the thread already has changes nothing, and a dangling thread (its highlighted text was removed) cannot be updated. Server/Data Center keeps the v1 reply behavior, and `comment-resolve` requires Cloud. API tokens with granular scopes need the v2 comment scopes (`read:comment:confluence` and `write:comment:confluence`) for replies and `comment-resolve`; a token with only the classic content scopes gets a 401/403 on a reply that used to work through v1. Comment IDs must be numeric.
 
 ### Export a Page with Attachments
 ```bash
@@ -985,7 +991,7 @@ confluence profile add agent --domain "company.atlassian.net" --token "xyz" --re
 export CONFLUENCE_READ_ONLY=true   # overrides profile setting
 ```
 
-When read-only mode is active, any write command (`create`, `create-child`, `update`, `delete`, `move`, `edit`, `comment`, `attachment-upload`, `attachment-delete`, `property-set`, `property-delete`, `comment-delete`, `copy-tree`) exits with code 1 and prints an error message.
+When read-only mode is active, any write command (`create`, `create-child`, `update`, `delete`, `move`, `edit`, `comment`, `comment-resolve`, `attachment-upload`, `attachment-delete`, `property-set`, `property-delete`, `comment-delete`, `copy-tree`) exits with code 1 and prints an error message.
 
 `confluence profile list` shows a `[read-only]` badge next to protected profiles.
 
@@ -1070,6 +1076,7 @@ confluence stats
 | `attachment-delete <pageId_or_url> <attachmentId>` | Delete an attachment from a page | `--yes`, `--json` |
 | `comments <pageId_or_url>` | List comments for a page | `--format <text\|markdown>`, `--json`, `--limit <number>`, `--start <number>`, `--location <inline\|footer\|resolved>`, `--depth <root\|all>`, `--all` |
 | `comment <pageId_or_url>` | Create a comment on a page | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--parent <commentId>`, `--location <inline\|footer>`, `--inline-selection <text>`, `--inline-original-selection <text>`, `--inline-marker-ref <ref>`, `--inline-properties <json>`, `--json` |
+| `comment-resolve <commentId>` | Resolve (or reopen) an inline comment thread (Cloud) | `--reopen`, `--json` |
 | `comment-delete <commentId>` | Delete a comment by ID | `--yes`, `--json` |
 | `property-list <pageId_or_url>` | List all content properties for a page | `--json`, `--limit <number>`, `--start <number>`, `--all` |
 | `property-get <pageId_or_url> <key>` | Get a content property by key | `--json` |
