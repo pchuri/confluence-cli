@@ -3128,68 +3128,68 @@ describe('ConfluenceClient', () => {
       });
 
       test('a reply to an inline comment posts to v2 inline-comments without highlight metadata', async () => {
-        mock.onGet(`${V2}/inline-comments/c0`).reply(200, { id: 'c0', pageId: '123', resolutionStatus: 'open' });
+        mock.onGet(`${V2}/inline-comments/1000`).reply(200, { id: '1000', pageId: '123', resolutionStatus: 'open' });
         mock.onPost(`${V2}/inline-comments`).reply(200, {
-          id: 'c1',
+          id: '1001',
           pageId: '123',
-          _links: { webui: '/spaces/A/pages/123?focusedCommentId=c1' }
+          _links: { webui: '/spaces/A/pages/123?focusedCommentId=1001' }
         });
 
-        const result = await client.createComment('123', '<p>Hi</p>', 'storage', { parentId: 'c0', location: 'footer' });
+        const result = await client.createComment('123', '<p>Hi</p>', 'storage', { parentId: '1000', location: 'footer' });
 
         expect(JSON.parse(mock.history.post[0].data)).toEqual({
-          parentCommentId: 'c0',
+          parentCommentId: '1000',
           body: { representation: 'storage', value: '<p>Hi</p>' }
         });
         expect(mock.history.post).toHaveLength(1);
         expect(result).toEqual({
-          id: 'c1',
+          id: '1001',
           container: { id: '123' },
-          _links: { webui: '/spaces/A/pages/123?focusedCommentId=c1' }
+          _links: { webui: '/spaces/A/pages/123?focusedCommentId=1001' }
         });
       });
 
       test('a reply to a footer comment posts to v2 footer-comments', async () => {
-        mock.onGet(`${V2}/inline-comments/f0`).reply(404);
-        mock.onGet(`${V2}/footer-comments/f0`).reply(200, { id: 'f0', pageId: '123' });
-        mock.onPost(`${V2}/footer-comments`).reply(200, { id: 'f1', pageId: '123' });
+        mock.onGet(`${V2}/inline-comments/2000`).reply(404);
+        mock.onGet(`${V2}/footer-comments/2000`).reply(200, { id: '2000', pageId: '123' });
+        mock.onPost(`${V2}/footer-comments`).reply(200, { id: '2001', pageId: '123' });
 
-        const result = await client.createComment('123', 'text', 'markdown', { parentId: 'f0' });
+        const result = await client.createComment('123', 'text', 'markdown', { parentId: '2000' });
 
-        expect(result.id).toBe('f1');
+        expect(result.id).toBe('2001');
         const payload = JSON.parse(mock.history.post[0].data);
-        expect(payload.parentCommentId).toBe('f0');
+        expect(payload.parentCommentId).toBe('2000');
         expect(payload.body.value).toBe('<p>text</p>\n');
       });
 
       test('a reply to an unknown comment fails before posting anything', async () => {
-        mock.onGet(`${V2}/inline-comments/nope`).reply(404);
-        mock.onGet(`${V2}/footer-comments/nope`).reply(404);
+        mock.onGet(`${V2}/inline-comments/9999`).reply(404);
+        mock.onGet(`${V2}/footer-comments/9999`).reply(404);
 
-        await expect(client.createComment('123', '<p>Hi</p>', 'storage', { parentId: 'nope' }))
-          .rejects.toThrow('Comment nope not found.');
+        await expect(client.createComment('123', '<p>Hi</p>', 'storage', { parentId: '9999' }))
+          .rejects.toThrow('Comment 9999 not found.');
         expect(mock.history.post).toHaveLength(0);
       });
 
       test('a reply is refused when the parent belongs to a different page', async () => {
-        mock.onGet(`${V2}/inline-comments/c0`).reply(200, { id: 'c0', pageId: '999' });
+        mock.onGet(`${V2}/inline-comments/1000`).reply(200, { id: '1000', pageId: '999' });
 
-        await expect(client.createComment('123', '<p>Hi</p>', 'storage', { parentId: 'c0' }))
-          .rejects.toThrow('Comment c0 belongs to page 999, not page 123.');
+        await expect(client.createComment('123', '<p>Hi</p>', 'storage', { parentId: '1000' }))
+          .rejects.toThrow('Comment 1000 belongs to content 999, not 123.');
         expect(mock.history.post).toHaveLength(0);
       });
 
       test('a v2 API error on the reply is surfaced, not retried through v1', async () => {
-        mock.onGet(`${V2}/inline-comments/c0`).reply(200, { id: 'c0', pageId: '123' });
+        mock.onGet(`${V2}/inline-comments/1000`).reply(200, { id: '1000', pageId: '123' });
         mock.onPost(`${V2}/inline-comments`).reply(400, { errors: [{ title: 'bad' }] });
 
-        await expect(client.createComment('123', '<p>Hi</p>', 'storage', { parentId: 'c0' }))
+        await expect(client.createComment('123', '<p>Hi</p>', 'storage', { parentId: '1000' }))
           .rejects.toMatchObject({ response: { status: 400 } });
         expect(mock.history.post).toHaveLength(1);
       });
 
       test('a top-level comment still uses v1', async () => {
-        mock.onPost('/content').reply(200, { id: 'c9', type: 'comment' });
+        mock.onPost('/content').reply(200, { id: '1009', type: 'comment' });
 
         await client.createComment('123', '<p>Hi</p>', 'storage', { location: 'footer' });
 
@@ -3197,24 +3197,24 @@ describe('ConfluenceClient', () => {
       });
 
       test('setCommentResolved resolves with the next version number', async () => {
-        mock.onGet(`${V2}/inline-comments/c0`).reply(200, {
-          id: 'c0', resolutionStatus: 'open', version: { number: 3 }
+        mock.onGet(`${V2}/inline-comments/1000`).reply(200, {
+          id: '1000', resolutionStatus: 'open', version: { number: 3 }
         });
-        mock.onPut(`${V2}/inline-comments/c0`).reply(200, {});
+        mock.onPut(`${V2}/inline-comments/1000`).reply(200, {});
 
-        const result = await client.setCommentResolved('c0', true);
+        const result = await client.setCommentResolved('1000', true);
 
-        expect(result).toEqual({ id: 'c0', resolved: true, changed: true, status: 'open' });
+        expect(result).toEqual({ id: '1000', resolved: true, changed: true, status: 'open' });
         expect(JSON.parse(mock.history.put[0].data)).toEqual({ version: { number: 4 }, resolved: true });
       });
 
       test('setCommentResolved reopens a resolved thread', async () => {
-        mock.onGet(`${V2}/inline-comments/c0`).reply(200, {
-          id: 'c0', resolutionStatus: 'resolved', version: { number: 1 }
+        mock.onGet(`${V2}/inline-comments/1000`).reply(200, {
+          id: '1000', resolutionStatus: 'resolved', version: { number: 1 }
         });
-        mock.onPut(`${V2}/inline-comments/c0`).reply(200, {});
+        mock.onPut(`${V2}/inline-comments/1000`).reply(200, {});
 
-        const result = await client.setCommentResolved('c0', false);
+        const result = await client.setCommentResolved('1000', false);
 
         expect(result.changed).toBe(true);
         expect(JSON.parse(mock.history.put[0].data)).toEqual({ version: { number: 2 }, resolved: false });
@@ -3225,42 +3225,88 @@ describe('ConfluenceClient', () => {
         ['reopen an open thread', 'open', false],
         ['reopen a reopened thread', 'reopened', false],
       ])('setCommentResolved is a no-op to %s', async (_label, status, resolved) => {
-        mock.onGet(`${V2}/inline-comments/c0`).reply(200, {
-          id: 'c0', resolutionStatus: status, version: { number: 1 }
+        mock.onGet(`${V2}/inline-comments/1000`).reply(200, {
+          id: '1000', resolutionStatus: status, version: { number: 1 }
         });
 
-        const result = await client.setCommentResolved('c0', resolved);
+        const result = await client.setCommentResolved('1000', resolved);
 
-        expect(result).toMatchObject({ id: 'c0', resolved, changed: false });
+        expect(result).toMatchObject({ id: '1000', resolved, changed: false });
         expect(mock.history.put).toHaveLength(0);
       });
 
       test('setCommentResolved refuses a dangling thread', async () => {
-        mock.onGet(`${V2}/inline-comments/c0`).reply(200, {
-          id: 'c0', resolutionStatus: 'dangling', version: { number: 1 }
+        mock.onGet(`${V2}/inline-comments/1000`).reply(200, {
+          id: '1000', resolutionStatus: 'dangling', version: { number: 1 }
         });
 
-        await expect(client.setCommentResolved('c0', true)).rejects.toThrow('dangling');
+        await expect(client.setCommentResolved('1000', true)).rejects.toThrow('dangling');
         expect(mock.history.put).toHaveLength(0);
       });
 
       test('setCommentResolved reports a comment that is not an inline comment', async () => {
-        mock.onGet(`${V2}/inline-comments/f0`).reply(404);
+        mock.onGet(`${V2}/inline-comments/2000`).reply(404);
 
-        await expect(client.setCommentResolved('f0', true)).rejects.toThrow('Inline comment f0 not found');
+        await expect(client.setCommentResolved('2000', true)).rejects.toThrow('Inline comment 2000 not found');
       });
 
       test('setCommentResolved needs a readable current version', async () => {
-        mock.onGet(`${V2}/inline-comments/c0`).reply(200, { id: 'c0', resolutionStatus: 'open' });
+        mock.onGet(`${V2}/inline-comments/1000`).reply(200, { id: '1000', resolutionStatus: 'open' });
 
-        await expect(client.setCommentResolved('c0', true)).rejects.toThrow('current version');
+        await expect(client.setCommentResolved('1000', true)).rejects.toThrow('current version');
         expect(mock.history.put).toHaveLength(0);
       });
 
       test('setCommentResolved requires Confluence Cloud', async () => {
         const serverClient = new ConfluenceClient({ domain: 'wiki.example.org', token: 'test-token' });
 
-        await expect(serverClient.setCommentResolved('c0', true)).rejects.toThrow('requires Confluence Cloud');
+        await expect(serverClient.setCommentResolved('1000', true)).rejects.toThrow('requires Confluence Cloud');
+      });
+
+      test('a non-numeric comment ID is rejected before any request is made', async () => {
+        await expect(client.createComment('123', '<p>Hi</p>', 'storage', { parentId: 'abc' }))
+          .rejects.toThrow('Invalid comment ID "abc": comment IDs are numeric.');
+        await expect(client.setCommentResolved('..', true))
+          .rejects.toThrow('Invalid comment ID "..": comment IDs are numeric.');
+        expect(mock.history.get).toHaveLength(0);
+        expect(mock.history.post).toHaveLength(0);
+      });
+
+      test('a reply is refused when the parent is a comment on a blog post', async () => {
+        mock.onGet(`${V2}/footer-comments/2000`).reply(200, { id: '2000', blogPostId: '555' });
+        mock.onGet(`${V2}/inline-comments/2000`).reply(404);
+
+        await expect(client.createComment('123', '<p>Hi</p>', 'storage', { parentId: '2000' }))
+          .rejects.toThrow('Comment 2000 belongs to content 555, not 123.');
+        expect(mock.history.post).toHaveLength(0);
+      });
+
+      test('setCommentResolved refuses a reply', async () => {
+        mock.onGet(`${V2}/inline-comments/1001`).reply(200, {
+          id: '1001', parentCommentId: '1000', resolutionStatus: 'open', version: { number: 1 }
+        });
+
+        await expect(client.setCommentResolved('1001', true)).rejects.toThrow('is a reply');
+        expect(mock.history.put).toHaveLength(0);
+      });
+
+      test.each([
+        ['a /wiki/rest/api profile', '/wiki/rest/api', 'https://real.atlassian.net/wiki/api/v2'],
+        ['a scoped-token gateway', '/ex/confluence/cloud-id/wiki/rest/api', 'https://api.atlassian.com/ex/confluence/cloud-id/wiki/api/v2'],
+      ])('v2 requests use the right base URL for %s', async (_label, apiPath, base) => {
+        const domain = base.startsWith('https://api.atlassian.com') ? 'api.atlassian.com' : 'real.atlassian.net';
+        const realClient = new ConfluenceClient({ domain, apiPath, token: 'test-token', email: 'user@example.com' });
+        const realMock = new MockAdapter(realClient.client);
+        realMock.onGet(`${base}/inline-comments/1000`).reply(200, {
+          id: '1000', resolutionStatus: 'open', version: { number: 2 }
+        });
+        realMock.onPut(`${base}/inline-comments/1000`).reply(200, {});
+
+        const result = await realClient.setCommentResolved('1000', true);
+
+        expect(result.changed).toBe(true);
+        expect(JSON.parse(realMock.history.put[0].data)).toEqual({ version: { number: 3 }, resolved: true });
+        realMock.restore();
       });
     });
 
