@@ -760,6 +760,60 @@ describe('htmlToMarkdown', () => {
       });
     });
 
+    describe('character references around a break', () => {
+      test('&nbsp; lines next to a break are dropped as whitespace', () => {
+        expect(htmlToMarkdown('<ul><li>a<br/>&nbsp;</li><li>b</li></ul>')).toBe('- a\n- b');
+        expect(htmlToMarkdown('<ul><li>&nbsp;<br/>a</li></ul>')).toBe('- a');
+        expect(htmlToMarkdown('<ul><li>a<br/>&nbsp;<br/>&nbsp;</li></ul>')).toBe('- a');
+        expect(htmlToMarkdown('<ul><li>a<br/>&#160;</li></ul>')).toBe('- a');
+        expect(htmlToMarkdown('<table><tr><td>a<br/>&nbsp;</td></tr></table>')).toBe('| a |\n| --- |');
+        expect(htmlToMarkdown('<table><tr><td>&nbsp;<br/>&nbsp;</td></tr></table>')).toBe('| |\n| --- |');
+      });
+
+      test('&nbsp; in an item without a break is left exactly as before', () => {
+        expect(htmlToMarkdown('<ul><li>a&nbsp;&nbsp;b</li></ul>')).toBe('- a b');
+        expect(htmlToMarkdown('<ul><li>&nbsp;a</li></ul>')).toBe('- a');
+      });
+
+      test.each([
+        // an opener built from a mix of literal text and references
+        ['&#45;&nbsp;b', '\\- b'],
+        ['-&#32;b', '\\- b'],
+        ['---&#45;', '\\----'],
+        ['#&#32;b', '\\# b'],
+        ['*&#32;b', '\\* b'],
+        ['1&#46; b', '1\\. b'],
+        ['&#124;---&#124;', '\\|---|'],
+        // a reference to a reference (the entity pass decodes `&amp;` first)
+        ['&amp;#35; b', '\\# b'],
+        ['&amp;#45; b', '\\- b'],
+      ])('a continuation line that only decodes to a block opener is escaped: %s', (text, escaped) => {
+        expect(htmlToMarkdown(`<ul><li>a<br/>${text}</li></ul>`)).toBe(`- a\\\n  ${escaped}`);
+      });
+
+      test('a backslash produced by a double-decoded reference is counted before the break', () => {
+        expect(htmlToMarkdown('<ul><li>a&amp;#92;<br/>b</li></ul>')).toBe('- a\\\\\\\n  b');
+      });
+
+      test('a reference to a sentinel codepoint stays literal text on a continuation line', () => {
+        const out = htmlToMarkdown('<ul><li>a<br/>&#xE002;x<br/>&#xE003;y<br/>&#xE000;z</li></ul>');
+        expect(out).toBe('- a\\\n  \uE002x\\\n  \uE003y\\\n  \uE000z');
+      });
+
+      test('< and & written as references survive on an escaped line', () => {
+        expect(htmlToMarkdown('<ul><li>a<br/>- &lt;b&gt; &amp;amp; c</li></ul>')).toBe('- a\\\n  \\- <b> &amp; c');
+      });
+    });
+
+    test('<BR> is a break too, since HTML tag names are case-insensitive', () => {
+      expect(htmlToMarkdown('<ul><li>a<BR>b</li></ul>')).toBe('- a\\\n  b');
+    });
+
+    test('a break in a cell holding a list is flattened with the list', () => {
+      expect(htmlToMarkdown('<table><tr><td><ul><li>a<br/>b</li></ul></td></tr></table>'))
+        .toBe('| a<br>b |\n| --- |');
+    });
+
     test('table cells: header, several cells and surrounding whitespace', () => {
       expect(htmlToMarkdown('<table><tr><th>h1<br/>h2</th><th>k</th></tr><tr><td>a <br/> b<br/></td><td>c<br/>d</td></tr></table>'))
         .toBe('| h1<br>h2 | k |\n| --- | --- |\n| a<br>b | c<br>d |');
@@ -796,6 +850,15 @@ describe('htmlToMarkdown', () => {
         '<ul><li>x<br/>&#35; y</li></ul>',
         '<ul><li>x<br/>&#45;&#45;&#45;</li></ul>',
         '<ul><li>a&#92;<br/>b</li></ul>',
+        '<ul><li>a&amp;#92;<br/>b</li></ul>',
+        '<ul><li>a<br/>&nbsp;</li><li>b</li></ul>',
+        '<ul><li>&nbsp;<br/>a</li></ul>',
+        '<table><tr><td>a<br/>&nbsp;</td></tr></table>',
+        '<ul><li>a<br/>-&#32;b</li></ul>',
+        '<ul><li>a<br/>---&#45;</li></ul>',
+        '<ul><li>a<br/>&amp;#35; b</li></ul>',
+        '<ul><li>a<br/>1&#46; b</li></ul>',
+        '<ul><li>a<br/>&#124;---&#124;</li></ul>',
         ...BLOCK_STARTS.map((text) => `<ul><li>a<br/>${text}</li></ul>`),
       ])('%s', (html) => {
         expect(htmlToMarkdown(html)).toBe(converter.storageToMarkdown(html));
