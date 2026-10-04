@@ -1,3 +1,10 @@
+## [2.27.4](https://github.com/pchuri/confluence-cli/compare/v2.27.3...v2.27.4) (2026-10-04)
+
+
+### Bug Fixes
+
+* **client:** coordinate rate-limit backoff across concurrent requests ([#272](https://github.com/pchuri/confluence-cli/issues/272)) ([f22a087](https://github.com/pchuri/confluence-cli/commit/f22a087696e1e4080913ddab549d81701a681d15)), closes [#261](https://github.com/pchuri/confluence-cli/issues/261)
+
 ## [2.27.3](https://github.com/pchuri/confluence-cli/compare/v2.27.2...v2.27.3) (2026-10-04)
 
 
