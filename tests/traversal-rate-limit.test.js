@@ -134,6 +134,78 @@ describe('page tree traversal under a low shared rate limit (#261)', () => {
     expect(result.elapsedMs).toBeLessThan(5 * 60 * 1000);
   });
 
+  test.each([
+    ['without Retry-After', undefined, 20 * 1000],
+    ['with Retry-After: 0', '0', 20 * 1000],
+    // Honoring a 60 s Retry-After three times is what one request did before.
+    ['with Retry-After: 60', '60', 4 * 60 * 1000]
+  ])('concurrent requests against a server that always refuses fail about as fast as before %s', async (_label, retryAfter, boundMs) => {
+    const { stats, mock } = startServer(client, buildTree([]), { capacity: 0, ratePerSecond: 0, retryAfter });
+    const failures = [];
+
+    const done = Promise.all(
+      Array.from({ length: 50 }, (_, i) =>
+        client.client.get(`/content/${i}/child/page`).then(() => 'ok', (error) => {
+          failures.push(Date.now());
+          return error.response.status;
+        })
+      )
+    );
+    const outcome = await settle(done);
+    mock.restore();
+
+    expect(outcome.value.every((status) => status === 429)).toBe(true);
+    // Before this change the last of them failed after 7 s (3 retries of
+    // 1, 2 and 4 s) or three Retry-After waits, however many ran at once.
+    expect(outcome.elapsedMs).toBeLessThan(boundMs);
+    expect(stats.rejected).toBeLessThan(200);
+  });
+
+  test('503 responses keep their independent retries and never pace other requests', async () => {
+    // The first call of every fourth page fails with a 503; its retry succeeds.
+    const seen = new Set();
+    const mock = new MockAdapter(client.client);
+    mock.onGet(/\/content\/\d+\/child\/page$/).reply((config) => {
+      const id = Number(config.url.match(/content\/(\d+)\/child/)[1]);
+      const firstCall = !seen.has(id);
+      seen.add(id);
+      return id % 4 === 0 && firstCall ? [503, {}] : [200, { results: [] }];
+    });
+
+    const outcome = await settle(Promise.all(Array.from({ length: 40 }, (_, i) => client.getChildPages(String(i)))));
+    mock.restore();
+
+    expect(outcome.error).toBeUndefined();
+    expect(client.gate.intervalMs).toBe(0);
+    expect(client.gate.epoch).toBe(0);
+    // Each 503 waited its own 1 s and nothing else did.
+    expect(outcome.elapsedMs).toBeLessThan(2000);
+  });
+
+  test('isolated 429s with a Retry-After do not leave the client throttled', async () => {
+    const tree = buildTree([6, 4, 3]);
+    let count = 0;
+    const mock = new MockAdapter(client.client);
+    mock.onGet(/\/content\/\d+\/child\/page$/).reply((config) => {
+      count++;
+      if (count % 25 === 0) return [429, {}, { 'retry-after': '1' }];
+      const id = config.url.match(/content\/(\d+)\/child/)[1];
+      return [200, { results: (tree.children.get(id) || []).map((childId) => ({
+        id: childId, title: `Page ${childId}`, type: 'page', space: { key: 'ENG' }, version: { number: 1 }
+      })) }];
+    });
+
+    const result = await settle(client.getAllDescendantPages('1', 10));
+    mock.restore();
+
+    expect(result.error).toBeUndefined();
+    expect(result.value).toHaveLength(tree.total);
+    expect(client.gate.open).toBe(false);
+    // Each throttle costs about its one-second Retry-After, nothing compounding.
+    const throttles = Math.floor(count / 25);
+    expect(result.elapsedMs).toBeLessThan((throttles + 2) * 1500);
+  });
+
   test('a throttled request makes concurrent requests wait for the same pause', async () => {
     const { stats, mock } = startServer(client, buildTree([]), { capacity: 1, ratePerSecond: 1, retryAfter: '3' });
 
