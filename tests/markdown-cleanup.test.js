@@ -6,6 +6,9 @@ const {
   finalizeSentinels,
   fenceLength,
   escapeFenceLikeText,
+  collapseInline,
+  escapeContinuationLine,
+  resolveHardBreaks,
   splitOnFences,
   isFenceOpenLine,
   cleanupOutsideFence,
@@ -332,5 +335,55 @@ describe('escapeFenceLikeText', () => {
     const segments = splitOnFences(text);
     expect(segments).toHaveLength(3);
     expect(segments[1]).toBe('```\n  code\n```');
+  });
+});
+
+describe('hard-break helpers (#253)', () => {
+  const B = HARD_BREAK;
+
+  test('collapseInline keeps breaks, trims their padding and drops edge breaks', () => {
+    expect(collapseInline(`a \n ${B}  b ${B}${B}c`)).toBe(`a${B}b${B}${B}c`);
+    expect(collapseInline(`${B} a ${B}`)).toBe('a');
+    expect(collapseInline('  x \t y  ')).toBe('x y');
+  });
+
+  test.each([
+    ['- b', '\\- b'],
+    ['1. b', '1\\. b'],
+    ['2) b', '2\\) b'],
+    ['# b', '\\# b'],
+    ['> b', '\\> b'],
+    ['---', '\\---'],
+    ['|:---|---:|', '\\|:---|---:|'],
+    ['plain', 'plain'],
+    ['**bold**', '**bold**'],
+    ['10 items', '10 items'],
+  ])('escapeContinuationLine(%j)', (line, expected) => {
+    expect(escapeContinuationLine(line)).toBe(expected);
+  });
+
+  test('resolveHardBreaks joins lines with a backslash break and escapes openers', () => {
+    expect(resolveHardBreaks(`a${B}b`)).toBe('a\\\nb');
+    expect(resolveHardBreaks(`a${B}- b`)).toBe('a\\\n\\- b');
+    expect(resolveHardBreaks('no breaks')).toBe('no breaks');
+  });
+
+  test('an odd run of trailing backslashes is doubled, an even run is left', () => {
+    expect(resolveHardBreaks(`C:\\temp\\${B}next`)).toBe('C:\\temp\\\\\\\nnext');
+    expect(resolveHardBreaks(`a\\\\${B}b`)).toBe('a\\\\\\\nb');
+  });
+
+  test('decode and encode let a caller check lines it has not decoded yet', () => {
+    const decode = (line) => line.replace(/&gt;/g, '>').replace(/&#92;/g, '\\');
+    const encode = (line) => line.replace(/>/g, '&gt;');
+    // A continuation line that decodes to a block opener is escaped and re-encoded;
+    // one that does not is kept exactly as written.
+    expect(resolveHardBreaks(`a${B}&gt; b${B}x &gt; y`, { decode, encode })).toBe('a\\\n\\&gt; b\\\nx &gt; y');
+    // The trailing-backslash check looks at the decoded line.
+    expect(resolveHardBreaks(`C:&#92;temp&#92;${B}next`, { decode })).toBe('C:&#92;temp&#92;\\\\\nnext');
+  });
+
+  test('the first line is only checked for trailing backslashes, never escaped as an opener', () => {
+    expect(resolveHardBreaks(`- a${B}b`)).toBe('- a\\\nb');
   });
 });
