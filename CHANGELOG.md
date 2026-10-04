@@ -1,3 +1,10 @@
+## [2.27.1](https://github.com/pchuri/confluence-cli/compare/v2.27.0...v2.27.1) (2026-10-04)
+
+
+### Bug Fixes
+
+* **converter:** escape literal fence-like prose so it cannot capture code blocks ([#269](https://github.com/pchuri/confluence-cli/issues/269)) ([4ad48ce](https://github.com/pchuri/confluence-cli/commit/4ad48cec37e4e07ed482317fbdae74705eb92e8b)), closes [#254](https://github.com/pchuri/confluence-cli/issues/254)
+
 # [2.27.0](https://github.com/pchuri/confluence-cli/compare/v2.26.0...v2.27.0) (2026-10-04)
 
 
