@@ -161,6 +161,33 @@ describe('page tree traversal under a low shared rate limit (#261)', () => {
     expect(stats.rejected).toBeLessThan(200);
   });
 
+  test.each([
+    ['Retry-After: 0', '0', 15 * 1000],
+    ['Retry-After: 5', '5', 60 * 1000]
+  ])('one page that is always refused fails after the same attempts as before while the others succeed (%s)', async (_label, retryAfter, boundMs) => {
+    const tree = buildTree([6, 4, 3]);
+    const stuck = tree.children.get('1')[0];
+    const attempts = new Map();
+    const mock = new MockAdapter(client.client);
+    mock.onGet(/\/content\/\d+\/child\/page$/).reply((config) => {
+      const id = config.url.match(/content\/(\d+)\/child/)[1];
+      attempts.set(id, (attempts.get(id) || 0) + 1);
+      if (id === stuck) return [429, {}, { 'retry-after': retryAfter }];
+      return [200, { results: (tree.children.get(id) || []).map((childId) => ({
+        id: childId, title: `Page ${childId}`, type: 'page', space: { key: 'ENG' }, version: { number: 1 }
+      })) }];
+    });
+
+    const result = await settle(client.getAllDescendantPages('1', 10));
+    mock.restore();
+
+    // The traversal fails on that page as it did before, with the same four attempts, not hanging.
+    expect(result.error).toBeDefined();
+    expect(result.error.response.status).toBe(429);
+    expect(attempts.get(stuck)).toBe(4);
+    expect(result.elapsedMs).toBeLessThan(boundMs);
+  });
+
   test('503 responses keep their independent retries and never pace other requests', async () => {
     // The first call of every fourth page fails with a 503; its retry succeeds.
     const seen = new Set();

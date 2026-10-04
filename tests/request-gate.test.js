@@ -222,6 +222,22 @@ describe('RequestGate (#261)', () => {
       expect(gate.open).toBe(false);
     });
 
+    test('a pause requested by the throttle that opens it does not come back when a success closes it', async () => {
+      const { gate, clock } = makeGate();
+      gate.reportThrottle(await start(gate), { pauseMs: 60000, maxFresh: 2 });
+      const opened = gate.reportThrottle(await start(gate), { pauseMs: 60000, maxFresh: 2 });
+      expect(opened.retry).toBe(false);
+      expect(gate.open).toBe(true);
+
+      gate.reportSuccess();
+      const before = clock.now;
+      await start(gate);
+
+      expect(gate.pauseUntil).toBe(0);
+      // Only the short spacing between starts, not the 60 s pause.
+      expect(clock.now - before).toBeLessThan(1000);
+    });
+
     test('while open nothing is paced or paused, and a success closes it', async () => {
       const { gate, clock } = makeGate();
       for (let i = 0; i < 3; i++) gate.reportThrottle(await start(gate), { pauseMs: 5000, maxFresh: 3 });
