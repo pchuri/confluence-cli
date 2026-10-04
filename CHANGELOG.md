@@ -1,3 +1,10 @@
+## [2.27.2](https://github.com/pchuri/confluence-cli/compare/v2.27.1...v2.27.2) (2026-10-04)
+
+
+### Bug Fixes
+
+* **converter:** honor <ol start> in html → markdown ([#270](https://github.com/pchuri/confluence-cli/issues/270)) ([ca153e3](https://github.com/pchuri/confluence-cli/commit/ca153e3e38fcd4abb0b095c1fdf1c7d6dd18881f)), closes [#246](https://github.com/pchuri/confluence-cli/issues/246) [#252](https://github.com/pchuri/confluence-cli/issues/252)
+
 ## [2.27.1](https://github.com/pchuri/confluence-cli/compare/v2.27.0...v2.27.1) (2026-10-04)
 
 
