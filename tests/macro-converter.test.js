@@ -2184,21 +2184,23 @@ describe('MacroConverter storageToMarkdown code inside quotes and callouts (#244
   test('a bare ``` paragraph in a callout does not swallow the code blocks after it', () => {
     const storage = macro('info', '<p>```</p>') + codeMacro('', 'one   1') + '<p>x     y</p>' + codeMacro('', 'two   2');
     expect(converter.storageToMarkdown(storage))
-      .toBe('> **INFO**\n> ```\n\n```\none   1\n```\n\nx y\n\n```\ntwo   2\n```');
+      .toBe('> **INFO**\n> \\```\n\n```\none   1\n```\n\nx y\n\n```\ntwo   2\n```');
   });
 
   test('a bare ``` paragraph in a callout does not pair with a fence in a later callout', () => {
     const storage = macro('info', '<p>```</p>') + '<p>mid     text</p>' + macro('note', codeMacro('js', 'keep   1'));
     expect(converter.storageToMarkdown(storage))
-      .toBe('> **INFO**\n> ```\n\nmid text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
+      .toBe('> **INFO**\n> \\```\n\nmid text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
   });
 
   test('indented loose text between callouts is cleaned, not turned into code on write-back', () => {
     const storage = macro('info', '<p>```</p>') + 'loose\n        indented    text\n' + macro('note', codeMacro('js', 'keep   1'));
     const md = converter.storageToMarkdown(storage);
-    expect(md).toBe('> **INFO**\n> ```\nloose\nindented text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
+    expect(md).toBe('> **INFO**\n> \\```\nloose\nindented text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
     const storage1 = converter.markdownToStorage(md);
-    expect(storage1).toContain('<p>loose\nindented text</p>');
+    // The escaped literal stays prose; the loose text continues that paragraph
+    // (no blank line separates them) and is not turned into code.
+    expect(storage1).toContain('<p>```\nloose\nindented text</p>');
     expect(storage1).toContain('<![CDATA[keep   1]]>');
   });
 
@@ -2631,5 +2633,58 @@ describe('MacroConverter storageToMarkdown <br/> in flattened contexts (#242)', 
     test('plain <li> with a leading [ ] keeps the break', () => {
       expect(roundTrip('<ul><li>[ ] a<br/>b</li></ul>').md).toBe('- [ ] a\\\n  b');
     });
+  });
+});
+
+describe('MacroConverter storageToMarkdown literal fence-like text (#254)', () => {
+  const converter = new MacroConverter({ isCloud: true });
+  const codeMacro = (lang, body) =>
+    `<ac:structured-macro ac:name="code"><ac:parameter ac:name="language">${lang}</ac:parameter><ac:plain-text-body><![CDATA[${body}]]></ac:plain-text-body></ac:structured-macro>`;
+  const macro = (name, body) =>
+    `<ac:structured-macro ac:name="${name}"><ac:rich-text-body>${body}</ac:rich-text-body></ac:structured-macro>`;
+  const code = codeMacro('', '  indented\n    code   here');
+  const FENCED = '```\n  indented\n    code   here\n```';
+
+  test('a <p>```</p> does not capture the next code macro', () => {
+    expect(converter.storageToMarkdown(`<p>\`\`\`</p>${code}`)).toBe(`\\\`\`\`\n\n${FENCED}`);
+  });
+
+  test('a literal ``` after a nested list does not capture the next code macro', () => {
+    const storage = `<ul><li>a<ul><li>b</li></ul>\`\`\`</li></ul>${code}`;
+    expect(converter.storageToMarkdown(storage)).toBe(`- a\n  - b\n\n  \\\`\`\`\n\n${FENCED}`);
+  });
+
+  test('a literal fence line after a <br/> is escaped', () => {
+    expect(converter.storageToMarkdown(`<p>x<br/>\`\`\`</p>${code}`)).toBe(`x\n\\\`\`\`\n\n${FENCED}`);
+  });
+
+  test('backticks written as entities or CDATA are treated the same way', () => {
+    expect(converter.storageToMarkdown(`<p>&#96;&#96;&#96;</p>${code}`)).toBe(`\\\`\`\`\n\n${FENCED}`);
+    expect(converter.storageToMarkdown(`<p><![CDATA[\`\`\`]]></p>${code}`)).toBe(`\\\`\`\`\n\n${FENCED}`);
+  });
+
+  test('a literal ``` inside a callout stays escaped and the code after it is untouched', () => {
+    expect(converter.storageToMarkdown(macro('info', '<p>```</p>') + code))
+      .toBe(`> **INFO**\n> \\\`\`\`\n\n${FENCED}`);
+  });
+
+  test('the code macro body is never escaped', () => {
+    expect(converter.storageToMarkdown(codeMacro('', '```\n  inner\n```')))
+      .toBe('````\n```\n  inner\n```\n````');
+  });
+
+  test('code spans and mid-line backticks are left as written', () => {
+    expect(converter.storageToMarkdown('<p><code>```</code></p>')).toBe('```` ``` ````');
+    expect(converter.storageToMarkdown('<p>use ```js fences</p>')).toBe('use ```js fences');
+  });
+
+  test('round-trip keeps the literal text as prose and the code body byte-exact', () => {
+    const md = converter.storageToMarkdown(`<p>\`\`\`</p>${code}`);
+    const storage1 = converter.markdownToStorage(md);
+    expect(storage1).toContain('<p>```</p>');
+    expect(storage1).toContain('<![CDATA[  indented\n    code   here]]>');
+    // Writing back labels a language-less fence `text`; that is unrelated here.
+    expect(converter.storageToMarkdown(storage1))
+      .toBe('\\```\n\n```text\n  indented\n    code   here\n```');
   });
 });
