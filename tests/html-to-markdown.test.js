@@ -582,6 +582,34 @@ describe('htmlToMarkdown', () => {
         .toBe('999999998. a\n999999999. b');
     });
 
+    test('only the first start attribute counts, and its name is case-insensitive', () => {
+      expect(htmlToMarkdown('<ol start="5" start="3"><li>a</li></ol>')).toBe('5. a');
+      expect(htmlToMarkdown('<ol START="5" start="3"><li>a</li></ol>')).toBe('5. a');
+      expect(htmlToMarkdown('<ol START=3><li>a</li></ol>')).toBe('3. a');
+      expect(htmlToMarkdown('<ol start><li>a</li></ol>')).toBe('1. a');
+    });
+
+    test('start= inside another attribute value is not read', () => {
+      expect(htmlToMarkdown('<ol data-x="a start=7"><li>a</li></ol>')).toBe('1. a');
+      expect(htmlToMarkdown('<ol title=" start=7 "><li>a</li></ol>')).toBe('1. a');
+      expect(htmlToMarkdown('<ol title=" start=7 " start="4"><li>a</li></ol>')).toBe('4. a');
+    });
+
+    test('numeric character references in the start value are decoded', () => {
+      expect(htmlToMarkdown('<ol start="&#51;"><li>a</li></ol>')).toBe('3. a');
+      expect(htmlToMarkdown('<ol start="&#x33;"><li>a</li></ol>')).toBe('3. a');
+      expect(htmlToMarkdown('<ol start="&#51;&#52;"><li>a</li></ol>')).toBe('34. a');
+      expect(htmlToMarkdown('<ol start="&#99999999;"><li>a</li></ol>')).toBe('1. a');
+    });
+
+    test.each([
+      '<ol-foo><li>a</li></ol-foo>',
+      '<ol:x><li>a</li></ol:x>',
+      '<ol/start=3><li>a</li></ol>',
+    ])('odd tag name or separator %s is still a plain ordered list', (html) => {
+      expect(htmlToMarkdown(html)).toBe('1. a');
+    });
+
     test('start is ignored on <ul> and unquoted attributes on other tags are still stripped', () => {
       expect(htmlToMarkdown('<ul start="3"><li>a</li></ul>')).toBe('- a');
       expect(htmlToMarkdown('<p class=x start=3>hello</p>')).toBe('hello');
