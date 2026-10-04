@@ -666,4 +666,140 @@ describe('htmlToMarkdown', () => {
       });
     });
   });
+  describe('<br> in list items and table cells (#253)', () => {
+    const converter = new MacroConverter({ isCloud: true });
+
+    test('issue repro: <br/> in a list item is a backslash hard break', () => {
+      expect(htmlToMarkdown('<ul><li>line1<br/>line2</li></ul>')).toBe('- line1\\\n  line2');
+    });
+
+    test('issue repro: <br/> in a table cell stays an inline <br>', () => {
+      expect(htmlToMarkdown('<table><tbody><tr><td>line one<br/>line two</td></tr></tbody></table>'))
+        .toBe('| line one<br>line two |\n| --- |');
+    });
+
+    test('continuation is indented to the content column of the marker', () => {
+      expect(htmlToMarkdown('<ol><li>a<br/>b</li><li>c</li></ol>')).toBe('1. a\\\n   b\n2. c');
+      const items = Array.from({ length: 9 }, (_, i) => `<li>i${i + 1}</li>`).join('');
+      expect(htmlToMarkdown(`<ol>${items}<li>ten<br/>more</li></ol>`).split('\n').slice(-2).join('\n'))
+        .toBe('10. ten\\\n    more');
+    });
+
+    test('nested item continuation is indented to the nested content column', () => {
+      expect(htmlToMarkdown('<ul><li>P<ul><li>a<br/>b</li></ul></li></ul>')).toBe('- P\n  - a\\\n    b');
+    });
+
+    test('surrounding whitespace is dropped and consecutive breaks are kept', () => {
+      expect(htmlToMarkdown('<ul><li>a \n <br /> b<br/><br/>c</li></ul>')).toBe('- a\\\n  b\\\n  \\\n  c');
+    });
+
+    test('leading and trailing breaks are dropped', () => {
+      expect(htmlToMarkdown('<ul><li><br/>a<br/> </li></ul>')).toBe('- a');
+    });
+
+    test('a trailing backslash before a break is doubled so the break survives', () => {
+      expect(htmlToMarkdown('<ul><li>C:\\temp\\<br/>next</li></ul>')).toBe('- C:\\temp\\\\\\\n  next');
+      expect(htmlToMarkdown('<ul><li>a\\\\<br/>b</li></ul>')).toBe('- a\\\\\\\n  b');
+    });
+
+    test('a backslash written as a character reference is counted too', () => {
+      expect(htmlToMarkdown('<ul><li>C:&#92;temp&#92;<br/>next</li></ul>')).toBe('- C:\\temp\\\\\\\n  next');
+      expect(htmlToMarkdown('<ul><li>C:&#x5C;temp&#x5c;<br/>next</li></ul>')).toBe('- C:\\temp\\\\\\\n  next');
+    });
+
+    test('paragraphs in an item are merged as before and keep their breaks', () => {
+      expect(htmlToMarkdown('<ul><li><p>a<br/>b</p><p>c</p></li></ul>')).toBe('- a\\\n  b c');
+    });
+
+    test('a break inside a code span stays a space', () => {
+      expect(htmlToMarkdown('<ul><li><code>a<br/>b</code> x<br/>y</li></ul>')).toBe('- `a b` x\\\n  y');
+      expect(htmlToMarkdown('<table><tr><td><code>a<br/>b</code></td></tr></table>')).toBe('| `a b` |\n| --- |');
+    });
+
+    test('top-level <br> is still a soft break', () => {
+      expect(htmlToMarkdown('<p>a<br/>b</p>')).toBe('a\nb');
+    });
+
+    describe('continuation lines that would start a block are escaped', () => {
+      test.each([
+        ['- b', '\\- b'],
+        ['* b', '\\* b'],
+        ['+ b', '\\+ b'],
+        ['1. b', '1\\. b'],
+        ['2) b', '2\\) b'],
+        ['# b', '\\# b'],
+        ['&gt; b', '\\> b'],
+        ['---', '\\---'],
+        ['-', '\\-'],
+        ['===', '\\==='],
+        ['* * *', '\\* * *'],
+        ['~~~', '\\~~~'],
+        ['--- | ---', '\\--- | ---'],
+        ['|:---|---:|', '\\|:---|---:|'],
+        // written as character references, which are decoded later
+        ['&#35; b', '\\# b'],
+        ['&#x2D; b', '\\- b'],
+        ['&#45;&#45;&#45;', '\\---'],
+      ])('%s', (text, escaped) => {
+        expect(htmlToMarkdown(`<ul><li>a<br/>${text}</li></ul>`)).toBe(`- a\\\n  ${escaped}`);
+      });
+
+      test('a literal ``` line is escaped and cannot capture a later code block', () => {
+        const html = '<ul><li>a<br/>```js</li></ul><pre><code>  x\n    y</code></pre>';
+        expect(htmlToMarkdown(html)).toBe('- a\\\n  \\`\\`\\`js\n\n```\n  x\n    y\n```');
+      });
+
+      test('a decoded < or & is left encoded until the final pass', () => {
+        expect(htmlToMarkdown('<ul><li>a<br/>&#60;b&#62; c</li></ul>')).toBe('- a\\\n  <b> c');
+        expect(htmlToMarkdown('<ul><li>a<br/>&#38;amp; c</li></ul>')).toBe('- a\\\n  &amp; c');
+      });
+
+      test('inline syntax at line start is left alone', () => {
+        expect(htmlToMarkdown('<ul><li>a<br/><strong>b</strong><br/>10 items</li></ul>'))
+          .toBe('- a\\\n  **b**\\\n  10 items');
+      });
+    });
+
+    test('table cells: header, several cells and surrounding whitespace', () => {
+      expect(htmlToMarkdown('<table><tr><th>h1<br/>h2</th><th>k</th></tr><tr><td>a <br/> b<br/></td><td>c<br/>d</td></tr></table>'))
+        .toBe('| h1<br>h2 | k |\n| --- | --- |\n| a<br>b | c<br>d |');
+    });
+
+    test('a table cell break does not leak into a following list', () => {
+      expect(htmlToMarkdown('<table><tr><td>a<br/>b</td></tr></table><ul><li>c<br/>d</li></ul>'))
+        .toBe('| a<br>b |\n| --- |\n\n- c\\\n  d');
+    });
+
+    test('literal U+E003 in content survives next to a real break', () => {
+      expect(htmlToMarkdown('<ul><li>a\uE003b<br/>c</li></ul>')).toBe('- a\uE003b\\\n  c');
+    });
+
+    describe('matches storage → markdown for the same markup', () => {
+      const BLOCK_STARTS = ['- b', '* b', '+ b', '1. b', '2) b', '# b', '&gt; b', '---', '-', '===', '* * *', '```js', '~~~', '--- | ---', '|:---|---:|'];
+      test.each([
+        '<ul><li>line1<br/>line2</li></ul>',
+        '<ol><li>a<br/>b</li><li>c</li></ol>',
+        '<ul><li>C:\\temp\\<br/>next</li></ul>',
+        '<ul><li>a\\\\<br/>b</li></ul>',
+        '<ul><li><p>a<br/>b</p><ul><li>c</li></ul></li></ul>',
+        '<ul><li>P<ul><li>a<br/>b</li></ul></li></ul>',
+        '<ul><li>a \n <br /> b<br/><br/>c</li></ul>',
+        '<ul><li><br/>a<br/> </li><li><br/></li></ul>',
+        '<ul><li><strong>a<br/>b</strong></li></ul>',
+        '<ul><li><a href="https://e.com">x<br/>y</a></li></ul>',
+        '<ul><li>x<br/>a | b<br/>--- | ---</li></ul>',
+        '<ul><li>a<code>x<br/>- y</code></li></ul>',
+        '<table><tr><th>h</th></tr><tr><td>a <br/> b<br/></td></tr></table>',
+        '<table><tr><th>h1<br/>h2</th><th>k</th></tr><tr><td>a<br/>b</td><td>c<br/>d</td></tr></table>',
+        '<table><tr><td><code>a<br/>b</code></td></tr></table>',
+        '<p>a<br/>b</p>',
+        '<ul><li>x<br/>&#35; y</li></ul>',
+        '<ul><li>x<br/>&#45;&#45;&#45;</li></ul>',
+        '<ul><li>a&#92;<br/>b</li></ul>',
+        ...BLOCK_STARTS.map((text) => `<ul><li>a<br/>${text}</li></ul>`),
+      ])('%s', (html) => {
+        expect(htmlToMarkdown(html)).toBe(converter.storageToMarkdown(html));
+      });
+    });
+  });
 });

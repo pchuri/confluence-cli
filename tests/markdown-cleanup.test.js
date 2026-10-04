@@ -6,6 +6,9 @@ const {
   finalizeSentinels,
   fenceLength,
   escapeFenceLikeText,
+  collapseInline,
+  escapeContinuationLine,
+  resolveHardBreaks,
   splitOnFences,
   isFenceOpenLine,
   cleanupOutsideFence,
@@ -332,5 +335,48 @@ describe('escapeFenceLikeText', () => {
     const segments = splitOnFences(text);
     expect(segments).toHaveLength(3);
     expect(segments[1]).toBe('```\n  code\n```');
+  });
+});
+
+describe('hard-break helpers (#253)', () => {
+  const B = HARD_BREAK;
+
+  test('collapseInline keeps breaks, trims their padding and drops edge breaks', () => {
+    expect(collapseInline(`a \n ${B}  b ${B}${B}c`)).toBe(`a${B}b${B}${B}c`);
+    expect(collapseInline(`${B} a ${B}`)).toBe('a');
+    expect(collapseInline('  x \t y  ')).toBe('x y');
+  });
+
+  test.each([
+    ['- b', '\\- b'],
+    ['1. b', '1\\. b'],
+    ['2) b', '2\\) b'],
+    ['# b', '\\# b'],
+    ['> b', '\\> b'],
+    ['---', '\\---'],
+    ['|:---|---:|', '\\|:---|---:|'],
+    ['plain', 'plain'],
+    ['**bold**', '**bold**'],
+    ['10 items', '10 items'],
+  ])('escapeContinuationLine(%j)', (line, expected) => {
+    expect(escapeContinuationLine(line)).toBe(expected);
+  });
+
+  test('resolveHardBreaks joins lines with a backslash break and escapes openers', () => {
+    expect(resolveHardBreaks(`a${B}b`)).toBe('a\\\nb');
+    expect(resolveHardBreaks(`a${B}- b`)).toBe('a\\\n\\- b');
+    expect(resolveHardBreaks('no breaks')).toBe('no breaks');
+  });
+
+  test('an odd run of trailing backslashes is doubled, an even run is left', () => {
+    expect(resolveHardBreaks(`C:\\temp\\${B}next`)).toBe('C:\\temp\\\\\\\nnext');
+    expect(resolveHardBreaks(`a\\\\${B}b`)).toBe('a\\\\\\\nb');
+  });
+
+  test('prepareLine rewrites a continuation line before it is checked, but not the first line', () => {
+    const seen = [];
+    const prepare = (line) => { seen.push(line); return line.replace('&gt;', '>'); };
+    expect(resolveHardBreaks(`&gt; a${B}&gt; b`, prepare)).toBe('&gt; a\\\n\\> b');
+    expect(seen).toEqual(['&gt; b']);
   });
 });
