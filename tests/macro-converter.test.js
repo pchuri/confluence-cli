@@ -2184,19 +2184,19 @@ describe('MacroConverter storageToMarkdown code inside quotes and callouts (#244
   test('a bare ``` paragraph in a callout does not swallow the code blocks after it', () => {
     const storage = macro('info', '<p>```</p>') + codeMacro('', 'one   1') + '<p>x     y</p>' + codeMacro('', 'two   2');
     expect(converter.storageToMarkdown(storage))
-      .toBe('> **INFO**\n> \\```\n\n```\none   1\n```\n\nx y\n\n```\ntwo   2\n```');
+      .toBe('> **INFO**\n> \\`\\`\\`\n\n```\none   1\n```\n\nx y\n\n```\ntwo   2\n```');
   });
 
   test('a bare ``` paragraph in a callout does not pair with a fence in a later callout', () => {
     const storage = macro('info', '<p>```</p>') + '<p>mid     text</p>' + macro('note', codeMacro('js', 'keep   1'));
     expect(converter.storageToMarkdown(storage))
-      .toBe('> **INFO**\n> \\```\n\nmid text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
+      .toBe('> **INFO**\n> \\`\\`\\`\n\nmid text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
   });
 
   test('indented loose text between callouts is cleaned, not turned into code on write-back', () => {
     const storage = macro('info', '<p>```</p>') + 'loose\n        indented    text\n' + macro('note', codeMacro('js', 'keep   1'));
     const md = converter.storageToMarkdown(storage);
-    expect(md).toBe('> **INFO**\n> \\```\nloose\nindented text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
+    expect(md).toBe('> **INFO**\n> \\`\\`\\`\nloose\nindented text\n\n> **NOTE**\n> ```js\n> keep   1\n> ```');
     const storage1 = converter.markdownToStorage(md);
     // The escaped literal stays prose; the loose text continues that paragraph
     // (no blank line separates them) and is not turned into code.
@@ -2526,7 +2526,7 @@ describe('MacroConverter storageToMarkdown <br/> in flattened contexts (#242)', 
       ['-', '\\-'],
       ['===', '\\==='],
       ['* * *', '\\* * *'],
-      ['```js', '\\```js'],
+      ['```js', '\\`\\`\\`js'],
       ['~~~', '\\~~~'],
       ['--- | ---', '\\--- | ---'],
       ['|:---|---:|', '\\|:---|---:|'],
@@ -2646,26 +2646,40 @@ describe('MacroConverter storageToMarkdown literal fence-like text (#254)', () =
   const FENCED = '```\n  indented\n    code   here\n```';
 
   test('a <p>```</p> does not capture the next code macro', () => {
-    expect(converter.storageToMarkdown(`<p>\`\`\`</p>${code}`)).toBe(`\\\`\`\`\n\n${FENCED}`);
+    expect(converter.storageToMarkdown(`<p>\`\`\`</p>${code}`)).toBe(`\\\`\\\`\\\`\n\n${FENCED}`);
   });
 
   test('a literal ``` after a nested list does not capture the next code macro', () => {
     const storage = `<ul><li>a<ul><li>b</li></ul>\`\`\`</li></ul>${code}`;
-    expect(converter.storageToMarkdown(storage)).toBe(`- a\n  - b\n\n  \\\`\`\`\n\n${FENCED}`);
+    expect(converter.storageToMarkdown(storage)).toBe(`- a\n  - b\n\n  \\\`\\\`\\\`\n\n${FENCED}`);
   });
 
   test('a literal fence line after a <br/> is escaped', () => {
-    expect(converter.storageToMarkdown(`<p>x<br/>\`\`\`</p>${code}`)).toBe(`x\n\\\`\`\`\n\n${FENCED}`);
+    expect(converter.storageToMarkdown(`<p>x<br/>\`\`\`</p>${code}`)).toBe(`x\n\\\`\\\`\\\`\n\n${FENCED}`);
   });
 
   test('backticks written as entities or CDATA are treated the same way', () => {
-    expect(converter.storageToMarkdown(`<p>&#96;&#96;&#96;</p>${code}`)).toBe(`\\\`\`\`\n\n${FENCED}`);
-    expect(converter.storageToMarkdown(`<p><![CDATA[\`\`\`]]></p>${code}`)).toBe(`\\\`\`\`\n\n${FENCED}`);
+    expect(converter.storageToMarkdown(`<p>&#96;&#96;&#96;</p>${code}`)).toBe(`\\\`\\\`\\\`\n\n${FENCED}`);
+    expect(converter.storageToMarkdown(`<p><![CDATA[\`\`\`]]></p>${code}`)).toBe(`\\\`\\\`\\\`\n\n${FENCED}`);
+  });
+
+  test('a literal NBSP before the fence-like run does not hide it', () => {
+    expect(converter.storageToMarkdown(`<p>\u00a0\`\`\`</p>${code}`)).toBe(`\\\`\\\`\\\`\n\n${FENCED}`);
+    expect(converter.storageToMarkdown(`<p>&nbsp;\`\`\`</p>${code}`)).toBe(`\\\`\\\`\\\`\n\n${FENCED}`);
+  });
+
+  test.each([
+    ['four backticks then a matching run', '<p>````<br/>b ``` c</p>', '<p>````\nb ``` c</p>'],
+    ['a run followed by a shorter one', '<p>```<br/>use `` here</p>', '<p>```\nuse `` here</p>'],
+    ['a run and a code-span-like pair', '<p>``` ``</p>', '<p>``` ``</p>'],
+  ])('every backtick of the run is escaped, so %s stays literal on write-back', (_label, storage, expected) => {
+    const md = converter.storageToMarkdown(storage);
+    expect(converter.markdownToStorage(md)).toBe(`${expected}\n`);
   });
 
   test('a literal ``` inside a callout stays escaped and the code after it is untouched', () => {
     expect(converter.storageToMarkdown(macro('info', '<p>```</p>') + code))
-      .toBe(`> **INFO**\n> \\\`\`\`\n\n${FENCED}`);
+      .toBe(`> **INFO**\n> \\\`\\\`\\\`\n\n${FENCED}`);
   });
 
   test('the code macro body is never escaped', () => {
@@ -2685,6 +2699,6 @@ describe('MacroConverter storageToMarkdown literal fence-like text (#254)', () =
     expect(storage1).toContain('<![CDATA[  indented\n    code   here]]>');
     // Writing back labels a language-less fence `text`; that is unrelated here.
     expect(converter.storageToMarkdown(storage1))
-      .toBe('\\```\n\n```text\n  indented\n    code   here\n```');
+      .toBe('\\`\\`\\`\n\n```text\n  indented\n    code   here\n```');
   });
 });

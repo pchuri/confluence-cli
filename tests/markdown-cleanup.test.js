@@ -301,12 +301,12 @@ describe('markdown-cleanup QUOTE_MARK sentinel (#244)', () => {
 
 describe('escapeFenceLikeText', () => {
   test.each([
-    ['```', '\\```'],
-    ['````', '\\````'],
-    ['```js', '\\```js'],
-    ['  ```', '  \\```'],
-    ['a\n```\nb', 'a\n\\```\nb'],
-    ['```\n```', '\\```\n\\```'],
+    ['```', '\\`\\`\\`'],
+    ['````', '\\`\\`\\`\\`'],
+    ['```js', '\\`\\`\\`js'],
+    ['  ```', '  \\`\\`\\`'],
+    ['a\n```\nb', 'a\n\\`\\`\\`\nb'],
+    ['```\n```', '\\`\\`\\`\n\\`\\`\\`'],
   ])('escapes a line-leading run of backticks: %j', (input, expected) => {
     expect(escapeFenceLikeText(input)).toBe(expected);
   });
@@ -319,6 +319,12 @@ describe('escapeFenceLikeText', () => {
     '',
   ])('leaves text without a line-leading 3+ run alone: %j', (input) => {
     expect(escapeFenceLikeText(input)).toBe(input);
+  });
+
+  test('NBSP counts as indentation, and extra indent alternatives can be supplied', () => {
+    expect(escapeFenceLikeText('\u00a0```')).toBe('\u00a0\\`\\`\\`');
+    expect(escapeFenceLikeText('&nbsp;```')).toBe('&nbsp;```');
+    expect(escapeFenceLikeText('&nbsp;```', '&nbsp;')).toBe('&nbsp;\\`\\`\\`');
   });
 
   test('an escaped line can no longer open a fence', () => {

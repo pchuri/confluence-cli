@@ -181,7 +181,7 @@ describe('htmlToMarkdown', () => {
         // The literal is escaped, and joining the marker with LIST_INDENT
         // would make splitOnFences pair it with the following real fence.
         const html = '<ul><li>```</li></ul><p>x   y</p><pre><code>  c</code></pre>';
-        expect(htmlToMarkdown(html)).toBe('- \\```\n\nx y\n\n```\n  c\n```');
+        expect(htmlToMarkdown(html)).toBe('- \\`\\`\\`\n\nx y\n\n```\n  c\n```');
       });
 
       test('pretty-printed HTML with whitespace between tags', () => {
@@ -476,7 +476,7 @@ describe('htmlToMarkdown', () => {
 
   test('a line whose info string contains a backtick does not open a fence (#244)', () => {
     const out = htmlToMarkdown('<p>```js `x`</p><p>a    b</p><pre><code>c    d</code></pre>');
-    expect(out).toBe('\\```js `x`\n\na b\n\n```\nc    d\n```');
+    expect(out).toBe('\\`\\`\\`js `x`\n\na b\n\n```\nc    d\n```');
   });
 
   test('a fence in a list item does not disturb a later top-level fence (#238, #243)', () => {
@@ -490,20 +490,39 @@ describe('htmlToMarkdown', () => {
 
     test('a literal ``` after a nested list does not capture the next code block', () => {
       const html = `<ul><li>a<ul><li>b</li></ul>\`\`\`</li></ul>${PRE}`;
-      expect(htmlToMarkdown(html)).toBe(`- a\n  - b\n\n  \\\`\`\`\n\n${FENCED}`);
+      expect(htmlToMarkdown(html)).toBe(`- a\n  - b\n\n  \\\`\\\`\\\`\n\n${FENCED}`);
     });
 
     test('a top-level <p>```</p> does not capture the next code block', () => {
-      expect(htmlToMarkdown(`<p>\`\`\`</p>${PRE}`)).toBe(`\\\`\`\`\n\n${FENCED}`);
+      expect(htmlToMarkdown(`<p>\`\`\`</p>${PRE}`)).toBe(`\\\`\\\`\\\`\n\n${FENCED}`);
     });
 
     test('backticks written as entities are treated the same way', () => {
-      expect(htmlToMarkdown(`<p>&#96;&#96;&#96;</p>${PRE}`)).toBe(`\\\`\`\`\n\n${FENCED}`);
-      expect(htmlToMarkdown(`<p>&#x60;&#x60;&#x60;</p>${PRE}`)).toBe(`\\\`\`\`\n\n${FENCED}`);
+      expect(htmlToMarkdown(`<p>&#96;&#96;&#96;</p>${PRE}`)).toBe(`\\\`\\\`\\\`\n\n${FENCED}`);
+      expect(htmlToMarkdown(`<p>&#x60;&#x60;&#x60;</p>${PRE}`)).toBe(`\\\`\\\`\\\`\n\n${FENCED}`);
     });
 
     test('a literal fence line after a <br> is escaped', () => {
-      expect(htmlToMarkdown(`<p>x<br/>\`\`\`</p>${PRE}`)).toBe(`x\n\\\`\`\`\n\n${FENCED}`);
+      expect(htmlToMarkdown(`<p>x<br/>\`\`\`</p>${PRE}`)).toBe(`x\n\\\`\\\`\\\`\n\n${FENCED}`);
+    });
+
+    test.each([
+      ['&nbsp;', '<p>x<br>&nbsp;```</p>', 'x\n'],
+      ['&#160;', '<p>&#160;```</p>', ''],
+      ['&#xA0;', '<p>&#xA0;```</p>', ''],
+    ])('a literal fence line indented by %s is escaped', (_label, prose, lead) => {
+      const out = htmlToMarkdown(`${prose}${PRE}`);
+      expect(out).toBe(`${lead}\\\`\\\`\\\`\n\n${FENCED}`);
+    });
+
+    test('a bare < in prose is not mistaken for a tag that hides a literal fence', () => {
+      expect(htmlToMarkdown(`<p>a < b\n\`\`\`\nc</p>${PRE}`)).toBe(`a < b\n\\\`\\\`\\\`\nc\n\n${FENCED}`);
+    });
+
+    test('unclosed <pre> tags do not make the escape pass quadratic', () => {
+      const start = Date.now();
+      htmlToMarkdown('<pre>x'.repeat(40000));
+      expect(Date.now() - start).toBeLessThan(1000);
     });
 
     test('backticks inside a code block body are left untouched', () => {
