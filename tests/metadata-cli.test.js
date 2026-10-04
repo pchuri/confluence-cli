@@ -156,6 +156,45 @@ describe('CLI metadata and storage output', () => {
     expect(JSON.parse(logSpy.mock.calls[0][0])).toEqual(expected);
   });
 
+  test.each([
+    [[], true],
+    [['--reopen'], false],
+  ])('comment-resolve %p --json reports the requested state', async (flags, resolved) => {
+    const setCommentResolved = jest.fn(async (id, value) => ({ id, resolved: value, changed: true }));
+    const { program, client } = await loadCli({ setCommentResolved });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['--json', 'comment-resolve', '456', ...flags]);
+
+    expect(client.setCommentResolved).toHaveBeenCalledWith('456', resolved);
+    expect(JSON.parse(logSpy.mock.calls[0][0])).toEqual({ id: '456', resolved, changed: true });
+  });
+
+  test('comment-resolve text output says when there was nothing to do', async () => {
+    const { program } = await loadCli({
+      setCommentResolved: jest.fn(async (id) => ({ id, resolved: true, changed: false }))
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['comment-resolve', '456']);
+
+    const lines = logSpy.mock.calls.map((call) => stripAnsi(call[0]));
+    expect(lines).toContain('Comment is already resolved; nothing to do.');
+    expect(lines).toContain('ID: 456');
+  });
+
+  test('comment-resolve text output confirms a change', async () => {
+    const { program } = await loadCli({
+      setCommentResolved: jest.fn(async (id, value) => ({ id, resolved: value, changed: true }))
+    });
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+    await runCli(program, ['comment-resolve', '456', '--reopen']);
+
+    const lines = logSpy.mock.calls.map((call) => stripAnsi(call[0]));
+    expect(lines).toContain('✅ Comment reopened.');
+  });
+
   test('info default text output remains human-readable', async () => {
     const { program, client } = await loadCli({
       getPageInfo: jest.fn(async () => ({

@@ -567,7 +567,7 @@ confluence comment <pageId> [--content <string>] [--file <path>] [--format stora
 | `--content` | — | Inline content string |
 | `--file` | — | Path to content file |
 | `--format` | `storage` | Content format |
-| `--parent` | — | Reply to a comment by ID |
+| `--parent` | — | Reply to a comment by ID. On Cloud this uses the v2 API: works for inline and footer threads, `--location` and `--inline-*` are ignored |
 | `--location` | `footer` | `footer` or `inline` |
 | `--inline-selection` | — | Highlighted selection text (inline only) |
 | `--inline-original-selection` | — | Original selection text (inline only) |
@@ -582,6 +582,21 @@ confluence comment 123456789 --content "See note" --parent 456 --location footer
 ```
 
 > **Note on inline comments**: Creating a brand-new inline comment requires editor highlight metadata (`matchIndex`, `lastFetchTime`, `serializedHighlights`) that is only available in the Confluence editor. This metadata is not accessible via the REST API, so inline comment creation will typically fail with a 400 error. Use `--location footer` or reply to an existing inline comment with `--parent <commentId>` instead.
+
+---
+
+### `comment-resolve <commentId>`
+
+Resolve an inline comment thread, or reopen it with `--reopen` (Confluence Cloud only). Replying to a thread does not change its state. Requesting the state the thread already has is a no-op, and a dangling thread cannot be updated.
+
+```sh
+confluence comment-resolve <commentId> [--reopen] [--json]
+```
+
+```sh
+confluence comment-resolve 456789
+confluence comment-resolve 456789 --reopen
+```
 
 ---
 
