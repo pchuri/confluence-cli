@@ -5,6 +5,7 @@ const {
   escapeSentinels,
   finalizeSentinels,
   fenceLength,
+  escapeFenceLikeText,
   splitOnFences,
   isFenceOpenLine,
   cleanupOutsideFence,
@@ -295,5 +296,41 @@ describe('markdown-cleanup QUOTE_MARK sentinel (#244)', () => {
   test('escapeSentinels / finalizeSentinels round-trip literal U+E003 next to the other sentinels', () => {
     const literal = '\uE003\uE001b\uE002\uE000';
     expect(finalizeSentinels(`${I}${HARD_BREAK}${escapeSentinels(literal)}`)).toBe(` \n${literal}`);
+  });
+});
+
+describe('escapeFenceLikeText', () => {
+  test.each([
+    ['```', '\\`\\`\\`'],
+    ['````', '\\`\\`\\`\\`'],
+    ['```js', '\\`\\`\\`js'],
+    ['  ```', '  \\`\\`\\`'],
+    ['a\n```\nb', 'a\n\\`\\`\\`\nb'],
+    ['```\n```', '\\`\\`\\`\n\\`\\`\\`'],
+  ])('escapes a line-leading run of backticks: %j', (input, expected) => {
+    expect(escapeFenceLikeText(input)).toBe(expected);
+  });
+
+  test.each([
+    'use ```js fences',
+    'two `` backticks',
+    'one ` backtick',
+    'no backticks',
+    '',
+  ])('leaves text without a line-leading 3+ run alone: %j', (input) => {
+    expect(escapeFenceLikeText(input)).toBe(input);
+  });
+
+  test('NBSP counts as indentation, and extra indent alternatives can be supplied', () => {
+    expect(escapeFenceLikeText('\u00a0```')).toBe('\u00a0\\`\\`\\`');
+    expect(escapeFenceLikeText('&nbsp;```')).toBe('&nbsp;```');
+    expect(escapeFenceLikeText('&nbsp;```', '&nbsp;')).toBe('&nbsp;\\`\\`\\`');
+  });
+
+  test('an escaped line can no longer open a fence', () => {
+    const text = `${escapeFenceLikeText('```')}\n\n\`\`\`\n  code\n\`\`\``;
+    const segments = splitOnFences(text);
+    expect(segments).toHaveLength(3);
+    expect(segments[1]).toBe('```\n  code\n```');
   });
 });
