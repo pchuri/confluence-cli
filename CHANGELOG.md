@@ -1,3 +1,10 @@
+## [2.27.3](https://github.com/pchuri/confluence-cli/compare/v2.27.2...v2.27.3) (2026-10-04)
+
+
+### Bug Fixes
+
+* **converter:** keep <br> as a hard break in html → markdown lists and tables ([#271](https://github.com/pchuri/confluence-cli/issues/271)) ([d853acf](https://github.com/pchuri/confluence-cli/commit/d853acf83c8e99abe5d48358b4af952ef31b05c4)), closes [#248](https://github.com/pchuri/confluence-cli/issues/248) [#253](https://github.com/pchuri/confluence-cli/issues/253)
+
 ## [2.27.2](https://github.com/pchuri/confluence-cli/compare/v2.27.1...v2.27.2) (2026-10-04)
 
 
