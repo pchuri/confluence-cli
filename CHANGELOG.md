@@ -1,3 +1,10 @@
+# [2.27.0](https://github.com/pchuri/confluence-cli/compare/v2.26.0...v2.27.0) (2026-10-04)
+
+
+### Features
+
+* **comments:** reply to inline threads and resolve/reopen via the v2 API ([#268](https://github.com/pchuri/confluence-cli/issues/268)) ([57033a8](https://github.com/pchuri/confluence-cli/commit/57033a8a0c29156e386f6cc36655343d1e9ea965)), closes [#251](https://github.com/pchuri/confluence-cli/issues/251)
+
 # [2.26.0](https://github.com/pchuri/confluence-cli/compare/v2.25.11...v2.26.0) (2026-10-03)
 
 
