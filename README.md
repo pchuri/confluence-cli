@@ -886,6 +886,7 @@ Notes:
 - Continues on errors: failed pages are logged and the copy proceeds.
 - Exclude patterns use simple globbing: `*` matches any sequence, `?` matches any single character, and special regex characters are treated literally.
 - Large trees may take time; the CLI applies a small delay between sibling page creations to avoid rate limits (configurable via `--delay-ms`).
+- If the server answers `429` (for example a Data Center instance limited to a few requests per second), the CLI paces its requests: a positive `Retry-After` makes every request wait, and requests are spaced further apart until the server accepts them, then speeded up again. Traversals such as `copy-tree`, `export` and `children --recursive` therefore finish under a low shared limit instead of failing after a few retries, and a server that keeps refusing still fails after about as long as before. Without throttling nothing is slowed down. A `503` on a read is retried per request, as before.
 - Root title suffix defaults to ` (Copy)`; override with `--copy-suffix`. Child pages keep their original titles.
 - Use `--fail-on-error` to exit non-zero if any page fails to copy.
 
