@@ -1,4 +1,5 @@
 const { htmlToMarkdown, NAMED_ENTITIES } = require('../lib/html-to-markdown');
+const MacroConverter = require('../lib/macro-converter');
 
 describe('htmlToMarkdown', () => {
   describe('inline formatting', () => {
@@ -536,6 +537,105 @@ describe('htmlToMarkdown', () => {
 
     test('backticks inside an attribute value are not touched', () => {
       expect(htmlToMarkdown('<p><a href="https://example.com/a```b">x</a></p>')).toBe('[x](https://example.com/a```b)');
+    });
+  });
+  describe('<ol start> (#252)', () => {
+    test('issue repro: numbering starts at the start attribute', () => {
+      expect(htmlToMarkdown('<ol start="3"><li>a</li><li>b</li></ol>')).toBe('3. a\n4. b');
+    });
+
+    test('start="0" is a valid CommonMark start', () => {
+      expect(htmlToMarkdown('<ol start="0"><li>zero</li><li>one</li></ol>')).toBe('0. zero\n1. one');
+    });
+
+    test('surrounding whitespace and leading zeros are ignored', () => {
+      expect(htmlToMarkdown('<ol start=" 5 "><li>x</li></ol>')).toBe('5. x');
+      expect(htmlToMarkdown('<ol start="03"><li>x</li></ol>')).toBe('3. x');
+    });
+
+    test('single-quoted, unquoted and mixed-attribute forms are read', () => {
+      expect(htmlToMarkdown('<ol start=\'4\'><li>a</li></ol>')).toBe('4. a');
+      expect(htmlToMarkdown('<ol start=7><li>a</li></ol>')).toBe('7. a');
+      expect(htmlToMarkdown('<ol type="a" start="6" class="x"><li>a</li></ol>')).toBe('6. a');
+      expect(htmlToMarkdown('<ol data-start="9"><li>a</li></ol>')).toBe('1. a');
+    });
+
+    test.each([
+      ['negative', '-2'],
+      ['signed', '+3'],
+      ['non-numeric', 'abc'],
+      ['decimal', '3.5'],
+      ['empty', ''],
+      ['over nine digits', '1000000000'],
+    ])('%s start falls back to 1', (_, start) => {
+      expect(htmlToMarkdown(`<ol start="${start}"><li>a</li><li>b</li></ol>`)).toBe('1. a\n2. b');
+    });
+
+    test('a run that would outgrow a nine-digit marker falls back to 1', () => {
+      expect(htmlToMarkdown('<ol start="999999999"><li>a</li></ol>')).toBe('999999999. a');
+      expect(htmlToMarkdown('<ol start="999999999"><li>a</li><li>b</li></ol>')).toBe('1. a\n2. b');
+    });
+
+    test('empty items neither consume a number nor count toward the limit', () => {
+      expect(htmlToMarkdown('<ol start="3"><li></li><li>a</li><li>b</li></ol>')).toBe('3. a\n4. b');
+      expect(htmlToMarkdown('<ol start="999999998"><li>a</li><li></li><li>b</li></ol>'))
+        .toBe('999999998. a\n999999999. b');
+    });
+
+    test('start is ignored on <ul> and unquoted attributes on other tags are still stripped', () => {
+      expect(htmlToMarkdown('<ul start="3"><li>a</li></ul>')).toBe('- a');
+      expect(htmlToMarkdown('<p class=x start=3>hello</p>')).toBe('hello');
+    });
+
+    test('marker widening past 9 indents nested content', () => {
+      expect(htmlToMarkdown('<ol start="9"><li>nine</li><li>ten<ul><li>sub</li></ul></li></ol>'))
+        .toBe('9. nine\n10. ten\n    - sub');
+    });
+
+    test('each list in a document keeps its own start', () => {
+      const html = '<ol start="3"><li>a</li></ol><p>x</p><ol><li>b</li></ol><ol start="7"><li>c</li></ol>';
+      expect(htmlToMarkdown(html)).toBe('3. a\n\nx\n\n1. b\n\n7. c');
+    });
+
+    test('a list inside a table cell does not shift later lists', () => {
+      const html = '<table><tr><td><ol start="3"><li>a</li></ol></td></tr></table><ol start="7"><li>b</li></ol>';
+      expect(htmlToMarkdown(html)).toBe('| a |\n| --- |\n\n7. b');
+    });
+
+    test('nested list not starting at 1 is separated from the lead-in by a blank line', () => {
+      expect(htmlToMarkdown('<ul><li>Parent<ol start="3"><li>Child</li></ol></li></ul>'))
+        .toBe('- Parent\n\n  3. Child');
+    });
+
+    test('nested list starting at 1 stays tight', () => {
+      expect(htmlToMarkdown('<ul><li>Parent<ol start="1"><li>Child</li></ol></li></ul>'))
+        .toBe('- Parent\n  1. Child');
+      expect(htmlToMarkdown('<ul><li>Parent<ol><li>Child</li></ol></li></ul>'))
+        .toBe('- Parent\n  1. Child');
+    });
+
+    test('a list not starting at 1 after inline text is separated by a blank line', () => {
+      expect(htmlToMarkdown('Steps:<ol start="3"><li>a</li></ol>')).toBe('Steps:\n\n3. a');
+    });
+
+    test('an unpaired <ol start> is stripped like any other stray tag', () => {
+      expect(htmlToMarkdown('<ol start="3"><li>a</li>')).not.toContain('start');
+    });
+
+    describe('matches storage → markdown for the same markup', () => {
+      const converter = new MacroConverter({ isCloud: true });
+      test.each([
+        '<ol start="3"><li>a</li><li>b</li></ol>',
+        '<ol start="0"><li>a</li></ol>',
+        '<ol start="-2"><li>a</li></ol>',
+        '<ol start="999999999"><li>a</li><li>b</li></ol>',
+        '<ol start="9"><li>nine</li><li>ten<ul><li>sub</li></ul></li></ol>',
+        '<ul><li>Parent<ol start="3"><li>Child</li></ol></li></ul>',
+        '<ul><li>Parent<ol start="1"><li>Child</li></ol></li></ul>',
+        '<ol start="3"><li></li><li>a</li></ol>',
+      ])('%s', (html) => {
+        expect(htmlToMarkdown(html)).toBe(converter.storageToMarkdown(html));
+      });
     });
   });
 });
