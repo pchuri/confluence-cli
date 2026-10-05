@@ -9,7 +9,7 @@ const {
 describe('parseFrontMatter', () => {
   test('returns the body untouched when there is no front matter', () => {
     const text = '# Title\n\nBody\n';
-    expect(parseFrontMatter(text)).toEqual({ properties: null, body: text });
+    expect(parseFrontMatter(text)).toEqual({ properties: null, body: text, present: false });
   });
 
   test('extracts the properties map and strips the block from the body', () => {
@@ -32,6 +32,7 @@ describe('parseFrontMatter', () => {
         settings: { color: 'red', tags: ['a', 'b'] },
       },
       body: '# Title\n',
+      present: true,
     });
   });
 
@@ -40,17 +41,18 @@ describe('parseFrontMatter', () => {
     expect(parseFrontMatter(text)).toEqual({
       properties: { width: 'full-width' },
       body: 'Body\r\n',
+      present: true,
     });
   });
 
   test('ignores other top-level keys', () => {
     const text = '---\ntitle: Ignored\ntags: [x]\nproperties:\n  a: 1\n---\nBody';
-    expect(parseFrontMatter(text)).toEqual({ properties: { a: 1 }, body: 'Body' });
+    expect(parseFrontMatter(text)).toEqual({ properties: { a: 1 }, body: 'Body', present: true });
   });
 
-  test('returns an empty map when front matter has no properties', () => {
-    expect(parseFrontMatter('---\ntitle: x\n---\nBody')).toEqual({ properties: {}, body: 'Body' });
-    expect(parseFrontMatter('---\n---\nBody')).toEqual({ properties: {}, body: 'Body' });
+  test('reports a block without properties as present with null properties', () => {
+    expect(parseFrontMatter('---\ntitle: x\n---\nBody')).toEqual({ properties: null, body: 'Body', present: true });
+    expect(parseFrontMatter('---\n---\nBody')).toEqual({ properties: null, body: 'Body', present: true });
   });
 
   test('keeps a later thematic break in the body', () => {
@@ -97,7 +99,14 @@ describe('serializeFrontMatter', () => {
 
     expect(block.startsWith('---\nproperties:\n  content-appearance-published: full-width\n')).toBe(true);
     expect(block.endsWith('---\n\n')).toBe(true);
-    expect(parseFrontMatter(`${block}# Body\n`)).toEqual({ properties, body: '# Body\n' });
+    expect(parseFrontMatter(`${block}# Body\n`)).toEqual({ properties, body: '# Body\n', present: true });
+  });
+
+  test('keeps the given order for integer-like keys when given entries', () => {
+    const block = serializeFrontMatter([['b', 1], ['123', 'x'], ['a', { nested: ['y'] }]]);
+
+    expect(block).toBe('---\nproperties:\n  b: 1\n  \'123\': x\n  a:\n    nested:\n      - \'y\'\n---\n\n');
+    expect(parseFrontMatter(block).properties).toEqual({ b: 1, 123: 'x', a: { nested: ['y'] } });
   });
 });
 
@@ -111,7 +120,7 @@ describe('prependFrontMatter', () => {
     const output = prependFrontMatter({}, body);
 
     expect(output).toBe(`---\nproperties: {}\n---\n\n${body}`);
-    expect(parseFrontMatter(output)).toEqual({ properties: {}, body });
+    expect(parseFrontMatter(output)).toEqual({ properties: {}, body, present: true });
   });
 });
 

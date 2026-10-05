@@ -713,9 +713,10 @@ confluence create-child "Page title" 123456789 --file ./page.md --format markdow
 ```
 
 - Front matter is only processed with `--front-matter`; without it, a leading `---` stays part of the Markdown body (a thematic break), as before.
-- Only the `properties` map is used; other top-level keys are ignored. Properties not listed are left untouched, and properties whose value already matches are not rewritten.
+- Only the `properties` map is used; other top-level keys are ignored (a warning is printed if the block has no `properties` map). Properties not listed are left untouched, and properties whose value already matches are not rewritten.
+- On Confluence Cloud the editor also keeps a `content-appearance-draft` property; set it alongside `content-appearance-published` so the width survives the next edit in the browser.
 - Front matter is parsed before anything is uploaded, so invalid YAML fails without changing the page.
-- The body is saved first, then the properties. If a property fails (for example because the token lacks the needed scope), the command exits non-zero and reports that the body was saved and which keys failed. With `--json`, the result on stdout includes `properties: { applied, unchanged, failed }` and stderr carries a `PARTIAL_FAILURE` error. Re-running the same command is safe: properties that already match are skipped.
+- The body is saved first, then the properties. If a property fails (for example because the token lacks the needed scope), the command exits non-zero and reports that the body was saved and which keys failed. With `--json`, the result on stdout includes `properties: { applied, unchanged, failed }` and stderr carries a `PARTIAL_FAILURE` error. Re-running `update` is safe: properties that already match are skipped. For `create` and `create-child`, the error names the `update` command that retries the properties on the new page (re-running `create` would try to make another page).
 - `read` → edit → `update` round trips keep the selected properties. Markdown output is stable and normalized, not byte-identical to the original file.
 
 ### Comments

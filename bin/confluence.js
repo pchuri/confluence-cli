@@ -75,16 +75,22 @@ class PropertySyncError extends Error {
 // a thematic break).
 function extractFrontMatter(content, options) {
   if (!options.frontMatter) {
-    return { content, properties: null };
+    return { content, properties: null, present: false };
+  }
+  if (options.type === 'folder') {
+    throw new Error('--front-matter is not allowed with --type folder (folders have no body).');
   }
   if (String(options.format).trim().toLowerCase() !== 'markdown') {
     throw new Error('--front-matter requires --format markdown.');
   }
-  if (content === null || content === '' || content === undefined) {
+  if (content === null || content === undefined) {
     throw new Error('--front-matter requires --file or --content.');
   }
-  const { properties, body } = parseFrontMatter(content);
-  return { content: body, properties: properties || {} };
+  const { properties, body, present } = parseFrontMatter(content);
+  if (present && !properties) {
+    console.error(chalk.yellow('Warning: front matter has no "properties" map; no content properties will be set.'));
+  }
+  return { content: body, properties: properties || {}, present };
 }
 
 async function applyFrontMatterProperties(client, pageId, properties) {
@@ -107,17 +113,25 @@ function printPropertySummary(syncResult) {
   }
 }
 
+// Re-running create would make another page, so point at update instead.
+function createRetryHint(pageId, options) {
+  const source = options.file ? `--file ${options.file}` : '--file <file>';
+  return `Retry the properties with "confluence update ${pageId} ${source} --format markdown --front-matter"; ` +
+    'properties that already match are skipped.';
+}
+
+const UPDATE_RETRY_HINT = 'Re-run the same command to retry; properties that already match are skipped.';
+
 // The body is saved before properties, so a property failure is a partial
 // result: report it after the success output and exit non-zero.
-function assertPropertiesSynced(syncResult, pageId) {
+function assertPropertiesSynced(syncResult, pageId, retryHint) {
   if (!syncResult || syncResult.failed.length === 0) return;
   const failures = syncResult.failed
     .map(({ key, status, error }) => `${key} (${status ? `${status}: ` : ''}${error})`)
     .join(', ');
   const count = syncResult.failed.length;
   throw new PropertySyncError(
-    `Page ${pageId} was saved, but ${count} content ${count === 1 ? 'property' : 'properties'} failed: ${failures}. ` +
-    'Re-run the same command to retry; properties that already match are skipped.',
+    `Page ${pageId} was saved, but ${count} content ${count === 1 ? 'property' : 'properties'} failed: ${failures}. ${retryHint}`,
     syncResult
   );
 }
@@ -500,7 +514,7 @@ program
         url: client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`),
         ...(syncResult && { properties: syncResult }),
       });
-      assertPropertiesSynced(syncResult, result.id);
+      assertPropertiesSynced(syncResult, result.id, createRetryHint(result.id, options));
       analytics.track('create', true);
       return;
     }
@@ -512,7 +526,7 @@ program
     console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
     console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
     printPropertySummary(syncResult);
-    assertPropertiesSynced(syncResult, result.id);
+    assertPropertiesSynced(syncResult, result.id, createRetryHint(result.id, options));
 
     analytics.track('create', true);
   }, { writable: true }));
@@ -566,7 +580,7 @@ program
         url: client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`),
         ...(syncResult && { properties: syncResult }),
       });
-      assertPropertiesSynced(syncResult, result.id);
+      assertPropertiesSynced(syncResult, result.id, createRetryHint(result.id, options));
       analytics.track('create_child', true);
       return;
     }
@@ -579,7 +593,7 @@ program
     console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
     console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
     printPropertySummary(syncResult);
-    assertPropertiesSynced(syncResult, result.id);
+    assertPropertiesSynced(syncResult, result.id, createRetryHint(result.id, options));
 
     analytics.track('create_child', true);
   }, { writable: true }));
@@ -617,8 +631,8 @@ program
     } else if (options.content) {
       content = options.content;
     }
-    const { content: body, properties } = extractFrontMatter(content, options);
-    if (properties && !body.trim()) {
+    const { content: body, properties, present } = extractFrontMatter(content, options);
+    if (present && !body.trim()) {
       throw new Error('The document has front matter but no body; refusing to replace the page content with an empty body. Use "confluence property-set" to change only properties.');
     }
 
@@ -633,7 +647,7 @@ program
         url: client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`),
         ...(syncResult && { properties: syncResult }),
       });
-      assertPropertiesSynced(syncResult, result.id);
+      assertPropertiesSynced(syncResult, result.id, UPDATE_RETRY_HINT);
       analytics.track('update', true);
       return;
     }
@@ -644,7 +658,7 @@ program
     console.log(`Version: ${chalk.blue(result.version.number)}`);
     console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
     printPropertySummary(syncResult);
-    assertPropertiesSynced(syncResult, result.id);
+    assertPropertiesSynced(syncResult, result.id, UPDATE_RETRY_HINT);
 
     analytics.track('update', true);
   }, { writable: true }));

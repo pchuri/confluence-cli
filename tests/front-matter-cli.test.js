@@ -1,3 +1,7 @@
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+
 describe('CLI --front-matter', () => {
   const FRONT_MATTER_DOC = [
     '---',
@@ -40,7 +44,7 @@ describe('CLI --front-matter', () => {
         unchanged: [],
         failed: [],
       })),
-      getPropertyValues: jest.fn(async () => ({})),
+      getPropertyValues: jest.fn(async () => []),
       buildUrl: jest.fn((value) => value),
       webUrlPrefix: '/wiki',
       ...clientOverrides,
@@ -154,6 +158,60 @@ describe('CLI --front-matter', () => {
       expect(cli.client.updatePage).not.toHaveBeenCalled();
     });
 
+    test('create rejects --front-matter with --type folder', async () => {
+      const cli = await loadCli();
+
+      await cli.run(['create', 'Docs', 'ENG', '--type', 'folder', '--format', 'markdown', '--front-matter']);
+
+      expect(cli.exitSpy).toHaveBeenCalledWith(1);
+      expect(cli.stderr()).toMatch(/--front-matter is not allowed with --type folder/);
+      expect(cli.client.createPage).not.toHaveBeenCalled();
+    });
+
+    test('warns when front matter has no properties map', async () => {
+      const cli = await loadCli();
+
+      await cli.run(['update', '555', '--content', '---\ntitle: x\n---\n# Title\n', '--format', 'markdown', '--front-matter']);
+
+      expect(cli.stderr()).toContain('Warning: front matter has no "properties" map');
+      expect(cli.client.updatePage).toHaveBeenCalledWith('555', undefined, '# Title\n', 'markdown');
+      expect(cli.client.syncProperties).not.toHaveBeenCalled();
+    });
+
+    test('update with blank content and no front matter keeps the existing behavior', async () => {
+      const cli = await loadCli();
+
+      await cli.run(['update', '555', '--content', '  ', '--format', 'markdown', '--front-matter']);
+
+      expect(cli.exitSpy).not.toHaveBeenCalled();
+      expect(cli.client.updatePage).toHaveBeenCalledWith('555', undefined, '  ', 'markdown');
+    });
+
+    test('create partial failure points at update instead of re-running create', async () => {
+      const cli = await loadCli({
+        syncProperties: jest.fn(async () => ({
+          applied: [],
+          unchanged: [],
+          failed: [{ key: 'content-appearance-published', status: 403, error: 'scope missing' }],
+        })),
+      });
+
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'front-matter-'));
+      const file = path.join(dir, 'page.md');
+      fs.writeFileSync(file, FRONT_MATTER_DOC);
+      try {
+        await cli.run(['create', 'Doc', 'ENG', '--file', file, '--format', 'markdown', '--front-matter']);
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true });
+      }
+
+      expect(cli.stdout()).toContain('Page created successfully!');
+      expect(cli.stderr()).toContain('Page 555 was saved, but 1 content property failed: content-appearance-published (403: scope missing)');
+      expect(cli.stderr()).toContain(`Retry the properties with "confluence update 555 --file ${file} --format markdown --front-matter"`);
+      expect(cli.stderr()).not.toContain('Re-run the same command');
+      expect(cli.exitSpy).toHaveBeenCalledWith(1);
+    });
+
     test('requires body content', async () => {
       const cli = await loadCli();
 
@@ -224,7 +282,7 @@ describe('CLI --front-matter', () => {
   describe('read', () => {
     test('prepends the listed properties that exist, in the given order', async () => {
       const cli = await loadCli({
-        getPropertyValues: jest.fn(async () => ({ 'content-appearance-published': 'full-width' })),
+        getPropertyValues: jest.fn(async () => [['content-appearance-published', 'full-width']]),
       });
 
       await cli.run(['read', '555', '--format', 'markdown', '--front-matter', 'content-appearance-published, missing']);
@@ -254,7 +312,7 @@ describe('CLI --front-matter', () => {
 
     test('read output round-trips through update --front-matter', async () => {
       const properties = { 'content-appearance-published': 'full-width', settings: { tags: ['a'], note: null } };
-      const reader = await loadCli({ getPropertyValues: jest.fn(async () => properties) });
+      const reader = await loadCli({ getPropertyValues: jest.fn(async () => Object.entries(properties)) });
       await reader.run(['read', '555', '--format', 'markdown', '--front-matter', 'content-appearance-published,settings']);
       const exported = reader.logSpy.mock.calls[0][0];
       jest.restoreAllMocks();

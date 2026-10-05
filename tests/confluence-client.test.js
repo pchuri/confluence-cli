@@ -4229,7 +4229,7 @@ describe('ConfluenceClient', () => {
       expect(result.applied).toEqual(['open']);
       expect(result.unchanged).toEqual([]);
       expect(result.failed).toEqual([
-        { key: 'locked', status: 403, error: expect.any(String) }
+        { key: 'locked', status: 403, error: 'scope missing' }
       ]);
 
       mock.restore();
@@ -4243,8 +4243,7 @@ describe('ConfluenceClient', () => {
 
       const values = await client.getPropertyValues('123', ['b', 'missing', 'a']);
 
-      expect(values).toEqual({ b: 2, a: { x: 1 } });
-      expect(Object.keys(values)).toEqual(['b', 'a']);
+      expect(values).toEqual([['b', 2], ['a', { x: 1 }]]);
 
       mock.restore();
     });

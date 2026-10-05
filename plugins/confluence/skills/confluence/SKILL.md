@@ -391,9 +391,10 @@ properties:
 ```
 
 - Without the flag, a leading `---` is treated as Markdown (a thematic break).
-- Only `properties` is used; other top-level keys are ignored. Unlisted properties are left untouched; matching values are not rewritten.
+- Only `properties` is used; other top-level keys are ignored (with a warning if `properties` is missing). Unlisted properties are left untouched; matching values are not rewritten. Not allowed with `--type folder`.
+- On Cloud, set `content-appearance-draft` alongside `content-appearance-published` so page width survives the next browser edit.
 - Invalid front matter fails before anything is uploaded.
-- The body is saved first. If a property then fails, the command exits 1 and names the failed keys; with `--json`, stdout has `properties: { applied, unchanged, failed }` and stderr has a `PARTIAL_FAILURE` error. Re-running the same command is safe.
+- The body is saved first. If a property then fails, the command exits 1 and names the failed keys; with `--json`, stdout has `properties: { applied, unchanged, failed }` and stderr has a `PARTIAL_FAILURE` error. Re-running `update` is safe; after a `create`/`create-child` partial failure, run the `update ... --front-matter` command the error suggests instead of re-running `create`.
 
 ---
 
