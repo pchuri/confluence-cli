@@ -32,6 +32,7 @@
     "html-to-text": "^9.0.5",
     "htmlparser2": "^9.1.0",
     "inquirer": "^8.2.6",
+    "js-yaml": "^4.3.2",
     "markdown-it": "^14.3.2"
   },
   "devDependencies": {
@@ -59,7 +60,7 @@
     ]
   },
   "overrides": {
-    "js-yaml": "^4.1.1",
+    "js-yaml": "$js-yaml",
     "@istanbuljs/load-nyc-config": {
       "js-yaml": "^3.14.2"
     }

@@ -4176,6 +4176,88 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
+    test('syncProperties creates missing keys, updates changed keys, and skips matching keys', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/property/content-appearance-published').reply(200, {
+        key: 'content-appearance-published',
+        value: 'fixed-width',
+        version: { number: 2 }
+      });
+      mock.onGet('/content/123/property/settings').reply(200, {
+        key: 'settings',
+        value: { color: 'red', tags: ['a', 'b'] },
+        version: { number: 4 }
+      });
+      mock.onGet('/content/123/property/new-key').reply(404);
+      mock.onPut(/\/content\/123\/property\/.*/).reply((config) => [200, JSON.parse(config.data)]);
+
+      const result = await client.syncProperties('123', {
+        'content-appearance-published': 'full-width',
+        settings: { color: 'red', tags: ['a', 'b'] },
+        'new-key': true
+      });
+
+      expect(result).toEqual({
+        applied: ['content-appearance-published', 'new-key'],
+        unchanged: ['settings'],
+        failed: []
+      });
+      const puts = mock.history.put.map((request) => ({ url: request.url, body: JSON.parse(request.data) }));
+      expect(puts).toEqual([
+        {
+          url: '/content/123/property/content-appearance-published',
+          body: { key: 'content-appearance-published', value: 'full-width', version: { number: 3 } }
+        },
+        {
+          url: '/content/123/property/new-key',
+          body: { key: 'new-key', value: true, version: { number: 1 } }
+        }
+      ]);
+
+      mock.restore();
+    });
+
+    test('syncProperties collects failures and keeps applying the remaining keys', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/property/locked').reply(404);
+      mock.onPut('/content/123/property/locked').reply(403, { message: 'scope missing' });
+      mock.onGet('/content/123/property/open').reply(404);
+      mock.onPut('/content/123/property/open').reply((config) => [200, JSON.parse(config.data)]);
+
+      const result = await client.syncProperties('123', { locked: 'x', open: 'y' });
+
+      expect(result.applied).toEqual(['open']);
+      expect(result.unchanged).toEqual([]);
+      expect(result.failed).toEqual([
+        { key: 'locked', status: 403, error: expect.any(String) }
+      ]);
+
+      mock.restore();
+    });
+
+    test('getPropertyValues returns existing keys in the requested order and omits missing ones', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/property/b').reply(200, { key: 'b', value: 2, version: { number: 1 } });
+      mock.onGet('/content/123/property/missing').reply(404);
+      mock.onGet('/content/123/property/a').reply(200, { key: 'a', value: { x: 1 }, version: { number: 1 } });
+
+      const values = await client.getPropertyValues('123', ['b', 'missing', 'a']);
+
+      expect(values).toEqual({ b: 2, a: { x: 1 } });
+      expect(Object.keys(values)).toEqual(['b', 'a']);
+
+      mock.restore();
+    });
+
+    test('getPropertyValues propagates non-404 errors', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('/content/123/property/a').reply(403);
+
+      await expect(client.getPropertyValues('123', ['a'])).rejects.toThrow();
+
+      mock.restore();
+    });
+
     test('getProperty should URL-encode keys with reserved characters', async () => {
       const mock = new MockAdapter(client.client);
       mock.onGet('/content/123/property/my%20prop%2Fkey').reply(200, {

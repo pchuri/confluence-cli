@@ -20,6 +20,7 @@ const { readStdin } = require('../lib/stdin-utils');
 const { emitJson, emitJsonError, jsonRequested, setJsonMode } = require('../lib/output');
 const { fingerprintCopyPlan } = require('../lib/pi/copy-plan');
 const { VALID_PLANTUML_FORMATS, normalizePlantumlFormat } = require('../lib/plantuml-format');
+const { parseFrontMatter, prependFrontMatter, parsePropertyKeys } = require('../lib/front-matter');
 
 const READ_ONLY_MESSAGE = 'This profile is in read-only mode. Write operations are not allowed.';
 const READ_ONLY_TIP = 'Tip: Use "confluence profile add <name>" without --read-only, or set readOnly to false in config.';
@@ -59,6 +60,68 @@ function resolveCliPlantumlFormat(options, { readEnv = false } = {}) {
 
 const PLANTUML_FORMAT_OPTION = ['--plantuml-format <format>', `PlantUML macro format (${VALID_PLANTUML_FORMATS.join(', ')})`];
 
+const FRONT_MATTER_WRITE_OPTION = ['--front-matter', 'Apply the "properties" map from YAML front matter as content properties (requires --format markdown)'];
+
+class PropertySyncError extends Error {
+  constructor(message, syncResult) {
+    super(message);
+    this.syncResult = syncResult;
+  }
+}
+
+// With --front-matter, strip the front matter from the body and return its
+// properties. Runs before any network call so invalid YAML uploads nothing.
+// Without the flag, content is passed through untouched (a leading `---` stays
+// a thematic break).
+function extractFrontMatter(content, options) {
+  if (!options.frontMatter) {
+    return { content, properties: null };
+  }
+  if (String(options.format).trim().toLowerCase() !== 'markdown') {
+    throw new Error('--front-matter requires --format markdown.');
+  }
+  if (content === null || content === '' || content === undefined) {
+    throw new Error('--front-matter requires --file or --content.');
+  }
+  const { properties, body } = parseFrontMatter(content);
+  return { content: body, properties: properties || {} };
+}
+
+async function applyFrontMatterProperties(client, pageId, properties) {
+  if (!properties) {
+    return null;
+  }
+  if (Object.keys(properties).length === 0) {
+    return { applied: [], unchanged: [], failed: [] };
+  }
+  return client.syncProperties(pageId, properties);
+}
+
+function printPropertySummary(syncResult) {
+  if (!syncResult) return;
+  if (syncResult.applied.length > 0) {
+    console.log(`Properties set: ${chalk.blue(syncResult.applied.join(', '))}`);
+  }
+  if (syncResult.unchanged.length > 0) {
+    console.log(`Properties unchanged: ${chalk.gray(syncResult.unchanged.join(', '))}`);
+  }
+}
+
+// The body is saved before properties, so a property failure is a partial
+// result: report it after the success output and exit non-zero.
+function assertPropertiesSynced(syncResult, pageId) {
+  if (!syncResult || syncResult.failed.length === 0) return;
+  const failures = syncResult.failed
+    .map(({ key, status, error }) => `${key} (${status ? `${status}: ` : ''}${error})`)
+    .join(', ');
+  const count = syncResult.failed.length;
+  throw new PropertySyncError(
+    `Page ${pageId} was saved, but ${count} content ${count === 1 ? 'property' : 'properties'} failed: ${failures}. ` +
+    'Re-run the same command to retry; properties that already match are skipped.',
+    syncResult
+  );
+}
+
 const VALID_TYPES = ['page', 'folder'];
 
 function assertValidType(type) {
@@ -93,7 +156,11 @@ function handleCommandError(analytics, commandName, error, onExtra = null) {
   // the stdout=data / stderr=diagnostics contract) so agents/scripts can parse
   // failures. Non-JSON callers keep the exact human-readable prose below.
   if (program.opts().json) {
-    emitJsonError(error);
+    if (error instanceof PropertySyncError) {
+      emitJsonError(error, { code: 'PARTIAL_FAILURE', status: null, details: { properties: error.syncResult } });
+    } else {
+      emitJsonError(error);
+    }
     process.exit(1);
   }
   if (error instanceof ReadOnlyError) {
@@ -226,9 +293,23 @@ program
   .command('read <pageId>')
   .description('Read a Confluence page by ID or URL')
   .option('-f, --format <format>', 'Output format (html, text, storage, markdown)', 'text')
+  .option('--front-matter <keys>', 'Prepend YAML front matter with these comma-separated content property keys (requires --format markdown)')
   .action(withClient('read', async ({ client, analytics }, pageId, options) => {
-    const content = await client.readPage(pageId, options.format);
-    console.log(content);
+    if (options.frontMatter === undefined) {
+      const content = await client.readPage(pageId, options.format);
+      console.log(content);
+      analytics.track('read', true);
+      return;
+    }
+
+    if (String(options.format).trim().toLowerCase() !== 'markdown') {
+      throw new Error('--front-matter requires --format markdown.');
+    }
+    const keys = parsePropertyKeys(options.frontMatter);
+    const resolvedId = await client.extractPageId(pageId);
+    const content = await client.readPage(resolvedId, 'markdown');
+    const properties = await client.getPropertyValues(resolvedId, keys);
+    console.log(prependFrontMatter(properties, content));
     analytics.track('read', true);
   }));
 
@@ -384,6 +465,7 @@ program
   .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
   .option('--type <type>', 'Content type (page, folder)', 'page')
   .option(...PLANTUML_FORMAT_OPTION)
+  .option(...FRONT_MATTER_WRITE_OPTION)
   .action(withClient('create', async ({ client, analytics, wantsJson, emitJson }, title, spaceKey, options) => {
     assertNonEmpty(title, 'title');
     assertNonEmpty(spaceKey, 'spaceKey');
@@ -404,8 +486,10 @@ program
     } else if (options.type !== 'folder') {
       throw new Error('Either --file or --content option is required');
     }
+    const { content: body, properties } = extractFrontMatter(content, options);
 
-    const result = await client.createPage(title, spaceKey, content, options.format, options.type);
+    const result = await client.createPage(title, spaceKey, body, options.format, options.type);
+    const syncResult = await applyFrontMatterProperties(client, result.id, properties);
 
     if (wantsJson()) {
       emitJson({
@@ -414,7 +498,9 @@ program
         type: options.type,
         spaceKey: result.space.key,
         url: client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`),
+        ...(syncResult && { properties: syncResult }),
       });
+      assertPropertiesSynced(syncResult, result.id);
       analytics.track('create', true);
       return;
     }
@@ -425,6 +511,8 @@ program
     console.log(`ID: ${chalk.blue(result.id)}`);
     console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
     console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
+    printPropertySummary(syncResult);
+    assertPropertiesSynced(syncResult, result.id);
 
     analytics.track('create', true);
   }, { writable: true }));
@@ -438,6 +526,7 @@ program
   .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
   .option('--type <type>', 'Content type (page, folder)', 'page')
   .option(...PLANTUML_FORMAT_OPTION)
+  .option(...FRONT_MATTER_WRITE_OPTION)
   .action(withClient('create_child', async ({ client, analytics, wantsJson, emitJson }, title, parentId, options) => {
     assertNonEmpty(title, 'title');
     assertNonEmpty(parentId, 'parentId');
@@ -445,10 +534,6 @@ program
     assertNoBodyForFolder(options.type, options);
     const plantumlFormat = resolveCliPlantumlFormat(options);
     if (plantumlFormat) client.setPlantumlFormat(plantumlFormat);
-
-    // Get parent page info to get space key
-    const parentInfo = await client.getPageInfo(parentId);
-    const spaceKey = parentInfo.space.key;
 
     let content = '';
 
@@ -462,8 +547,14 @@ program
     } else if (options.type !== 'folder') {
       throw new Error('Either --file or --content option is required');
     }
+    const { content: body, properties } = extractFrontMatter(content, options);
 
-    const result = await client.createChildPage(title, spaceKey, parentId, content, options.format, options.type);
+    // Get parent page info to get space key
+    const parentInfo = await client.getPageInfo(parentId);
+    const spaceKey = parentInfo.space.key;
+
+    const result = await client.createChildPage(title, spaceKey, parentId, body, options.format, options.type);
+    const syncResult = await applyFrontMatterProperties(client, result.id, properties);
 
     if (wantsJson()) {
       emitJson({
@@ -473,7 +564,9 @@ program
         parentId,
         spaceKey: result.space.key,
         url: client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`),
+        ...(syncResult && { properties: syncResult }),
       });
+      assertPropertiesSynced(syncResult, result.id);
       analytics.track('create_child', true);
       return;
     }
@@ -485,6 +578,8 @@ program
     console.log(`Parent: ${chalk.blue(parentInfo.title)} (${parentId})`);
     console.log(`Space: ${chalk.blue(result.space.name)} (${result.space.key})`);
     console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
+    printPropertySummary(syncResult);
+    assertPropertiesSynced(syncResult, result.id);
 
     analytics.track('create_child', true);
   }, { writable: true }));
@@ -498,6 +593,7 @@ program
   .option('-c, --content <content>', 'Page content as string')
   .option('--format <format>', 'Content format (auto, storage, html, markdown)', 'storage')
   .option(...PLANTUML_FORMAT_OPTION)
+  .option(...FRONT_MATTER_WRITE_OPTION)
   .action(withClient('update', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
     // Check if at least one option is provided
     if (!options.title && !options.file && !options.content) {
@@ -521,8 +617,13 @@ program
     } else if (options.content) {
       content = options.content;
     }
+    const { content: body, properties } = extractFrontMatter(content, options);
+    if (properties && !body.trim()) {
+      throw new Error('The document has front matter but no body; refusing to replace the page content with an empty body. Use "confluence property-set" to change only properties.');
+    }
 
-    const result = await client.updatePage(pageId, options.title, content, options.format);
+    const result = await client.updatePage(pageId, options.title, body, options.format);
+    const syncResult = await applyFrontMatterProperties(client, result.id, properties);
 
     if (wantsJson()) {
       emitJson({
@@ -530,7 +631,9 @@ program
         title: result.title,
         version: result.version.number,
         url: client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`),
+        ...(syncResult && { properties: syncResult }),
       });
+      assertPropertiesSynced(syncResult, result.id);
       analytics.track('update', true);
       return;
     }
@@ -540,6 +643,8 @@ program
     console.log(`ID: ${chalk.blue(result.id)}`);
     console.log(`Version: ${chalk.blue(result.version.number)}`);
     console.log(`URL: ${chalk.gray(`${client.buildUrl(`${client.webUrlPrefix}${result._links.webui}`)}`)}`);
+    printPropertySummary(syncResult);
+    assertPropertiesSynced(syncResult, result.id);
 
     analytics.track('update', true);
   }, { writable: true }));

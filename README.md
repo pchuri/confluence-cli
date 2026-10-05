@@ -688,6 +688,36 @@ confluence property-delete 123456789 my-key
 confluence property-delete 123456789 my-key --yes
 ```
 
+#### Content properties in Markdown front matter
+
+Markdown files can carry selected content properties (for example page width) in YAML front matter, so property changes can be reviewed in git and applied through the normal upload workflow.
+
+```markdown
+---
+properties:
+  content-appearance-published: full-width
+---
+
+# Page title
+```
+
+```bash
+# Export a page with the listed properties as front matter
+# (keys that do not exist on the page are omitted, in the order given)
+confluence read 123456789 --format markdown --front-matter content-appearance-published > page.md
+
+# Upload the body and apply the front matter properties
+confluence update 123456789 --file ./page.md --format markdown --front-matter
+confluence create "Page title" MYSPACE --file ./page.md --format markdown --front-matter
+confluence create-child "Page title" 123456789 --file ./page.md --format markdown --front-matter
+```
+
+- Front matter is only processed with `--front-matter`; without it, a leading `---` stays part of the Markdown body (a thematic break), as before.
+- Only the `properties` map is used; other top-level keys are ignored. Properties not listed are left untouched, and properties whose value already matches are not rewritten.
+- Front matter is parsed before anything is uploaded, so invalid YAML fails without changing the page.
+- The body is saved first, then the properties. If a property fails (for example because the token lacks the needed scope), the command exits non-zero and reports that the body was saved and which keys failed. With `--json`, the result on stdout includes `properties: { applied, unchanged, failed }` and stderr carries a `PARTIAL_FAILURE` error. Re-running the same command is safe: properties that already match are skipped.
+- `read` → edit → `update` round trips keep the selected properties. Markdown output is stable and normalized, not byte-identical to the original file.
+
 ### Comments
 ```bash
 # List all comments (footer + inline)
@@ -1056,16 +1086,16 @@ confluence stats
 | Command | Description | Options |
 |---|---|---|
 | `init` | Initialize CLI configuration | `--read-only`, `--keychain` |
-| `read <pageId_or_url>` | Read page content | `--format <html\|text\|storage\|markdown>` |
+| `read <pageId_or_url>` | Read page content | `--format <html\|text\|storage\|markdown>`, `--front-matter <keys>` |
 | `info <pageId_or_url>` | Get page information | `--json` |
 | `search <query>` | Search for pages | `--json`, `--limit <number>`, `--start <number>` |
 | `spaces` | List available spaces | `--json`, `--limit <number>`, `--all` |
 | `find <title>` | Find a page by its title | `--space <spaceKey>`, `--json` |
 | `children <pageId>` | List child pages and folders of a page | `--recursive`, `--max-depth <number>`, `--type <pages\|folders\|all>`, `--format <list\|tree>`, `--json`, `--show-url`, `--show-id` |
-| `create <title> <spaceKey>` | Create a new page or folder | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--type <page\|folder>`, `--json` |
-| `create-child <title> <parentId>` | Create a child page or folder | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--type <page\|folder>`, `--json` |
+| `create <title> <spaceKey>` | Create a new page or folder | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--type <page\|folder>`, `--front-matter`, `--json` |
+| `create-child <title> <parentId>` | Create a child page or folder | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--type <page\|folder>`, `--front-matter`, `--json` |
 | `copy-tree <sourcePageId> <targetParentId> [newTitle]` | Copy page tree with all children | `--max-depth <number>`, `--exclude <patterns>`, `--delay-ms <ms>`, `--copy-suffix <text>`, `--dry-run`, `--fail-on-error`, `--quiet`, `--json` |
-| `update <pageId>` | Update a page's title or content | `--title <string>`, `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--json` |
+| `update <pageId>` | Update a page's title or content | `--title <string>`, `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--front-matter`, `--json` |
 | `move <pageId_or_url> <newParentId_or_url>` | Move a page to a new parent location | `--title <string>`, `--json` |
 | `delete <pageId_or_url>` | Delete a page by ID or URL | `--yes`, `--json` |
 | `versions <pageId_or_url>` | List historical versions of a page | `--json` |

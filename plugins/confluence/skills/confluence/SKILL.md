@@ -192,17 +192,19 @@ confluence --profile staging init --domain "staging.example.com" --auth-type bea
 Read page content. Outputs to stdout.
 
 ```sh
-confluence read <pageId> [--format html|text|storage|markdown]
+confluence read <pageId> [--format html|text|storage|markdown] [--front-matter <keys>]
 ```
 
 | Option | Default | Description |
 |---|---|---|
 | `--format` | `text` | Output format: `html`, `text`, `storage`, or `markdown` |
+| `--front-matter` | — | Comma-separated content property keys to prepend as YAML front matter (`--format markdown` only). Missing keys are omitted. |
 
 ```sh
 confluence read 123456789
 confluence read 123456789 --format storage
 confluence read 123456789 --format markdown
+confluence read 123456789 --format markdown --front-matter content-appearance-published
 ```
 
 Markdown output resolves accessible Confluence page links, including links to pages in the same space, to absolute URLs while preserving custom link text and inline formatting.
@@ -320,6 +322,7 @@ confluence create <title> <spaceKey> [--content <string>] [--file <path>] [--for
 | `--file` | — | Path to content file |
 | `--format` | `storage` | Content format |
 | `--type` | `page` | Content type — `page` (default) or `folder`. Folders have no body. |
+| `--front-matter` | off | Strip YAML front matter from the body and apply its `properties` map as content properties after saving (`--format markdown` only). See [Front matter properties](#front-matter-properties). |
 
 Either `--content` or `--file` is required for pages. Folders take no content — passing `--content` or `--file` with `--type folder` is rejected.
 
@@ -365,14 +368,32 @@ confluence update <pageId> [--title <title>] [--content <string>] [--file <path>
 | `--content` | — | Inline content string |
 | `--file` | — | Path to content file |
 | `--format` | `storage` | Content format |
+| `--front-matter` | off | Strip YAML front matter from the body and apply its `properties` map as content properties after saving (`--format markdown` only). |
 
 ```sh
 confluence update 123456789 --title "New Title"
 confluence update 123456789 --file ./updated.md --format markdown
+confluence update 123456789 --file ./page.md --format markdown --front-matter
 confluence update 123456789 --title "New Title" --file ./updated.xml --format storage
 ```
 
 Title-only updates reuse the target's existing storage body. Folders and other bodyless content cannot be updated this way and return `Page <id> has no readable body (it may be a folder or an unsupported content type).`.
+
+#### Front matter properties
+
+With `--front-matter`, `create`, `create-child`, and `update` read content properties from YAML front matter:
+
+```markdown
+---
+properties:
+  content-appearance-published: full-width
+---
+```
+
+- Without the flag, a leading `---` is treated as Markdown (a thematic break).
+- Only `properties` is used; other top-level keys are ignored. Unlisted properties are left untouched; matching values are not rewritten.
+- Invalid front matter fails before anything is uploaded.
+- The body is saved first. If a property then fails, the command exits 1 and names the failed keys; with `--json`, stdout has `properties: { applied, unchanged, failed }` and stderr has a `PARTIAL_FAILURE` error. Re-running the same command is safe.
 
 ---
 
