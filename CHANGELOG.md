@@ -1,3 +1,10 @@
+# [2.28.0](https://github.com/pchuri/confluence-cli/compare/v2.27.4...v2.28.0) (2026-10-05)
+
+
+### Features
+
+* map Markdown YAML front matter to content properties ([#273](https://github.com/pchuri/confluence-cli/issues/273)) ([2c3fe8d](https://github.com/pchuri/confluence-cli/commit/2c3fe8d86c0d62da802571f5754eb0ebe2426dde)), closes [#260](https://github.com/pchuri/confluence-cli/issues/260)
+
 ## [2.27.4](https://github.com/pchuri/confluence-cli/compare/v2.27.3...v2.27.4) (2026-10-04)
 
 
