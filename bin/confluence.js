@@ -285,6 +285,7 @@ program
   .command('init')
   .description('Initialize Confluence CLI configuration')
   .option('-d, --domain <domain>', 'Confluence domain')
+  .option('--site-url <url>', 'Confluence site URL for internal link detection')
   .option('--protocol <protocol>', 'Protocol (http or https)')
   .option('--allow-insecure-http', 'Allow HTTP for this profile; credentials are sent in plaintext (not recommended)')
   .option('-p, --api-path <path>', 'REST API path')

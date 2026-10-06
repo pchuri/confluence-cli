@@ -1,6 +1,7 @@
 const path = require('path');
 
 const { getConfig, initConfig } = require('../lib/config');
+const ConfluenceClient = require('../lib/confluence-client');
 
 // Save and restore all relevant env vars around each test
 const ENV_KEYS = [
@@ -9,6 +10,7 @@ const ENV_KEYS = [
   'CONFLUENCE_EMAIL', 'CONFLUENCE_USERNAME',
   'CONFLUENCE_AUTH_TYPE', 'CONFLUENCE_API_PATH',
   'CONFLUENCE_PROTOCOL', 'CONFLUENCE_FORCE_CLOUD',
+  'CONFLUENCE_SITE_URL',
   'CONFLUENCE_LINK_STYLE',
   'CONFLUENCE_COOKIE',
   'CONFLUENCE_TLS_CA_CERT', 'CONFLUENCE_TLS_CLIENT_CERT',
@@ -170,6 +172,23 @@ describe('getConfig env var aliases', () => {
 
     const config = getConfig();
     expect(config.linkStyle).toBe('auto');
+  });
+
+  test('CONFLUENCE_SITE_URL enables auto links without changing the API endpoint', () => {
+    process.env.CONFLUENCE_DOMAIN = 'api.atlassian.com';
+    process.env.CONFLUENCE_API_PATH = '/ex/confluence/cloud-id/wiki/rest/api';
+    process.env.CONFLUENCE_API_TOKEN = 'token';
+    process.env.CONFLUENCE_EMAIL = 'user@example.com';
+    process.env.CONFLUENCE_LINK_STYLE = 'auto';
+    process.env.CONFLUENCE_SITE_URL = 'https://example.atlassian.net';
+
+    const config = getConfig();
+    const client = new ConfluenceClient(config);
+    const result = client.markdownToStorage('[Page](https://example.atlassian.net/wiki/spaces/A/pages/1)');
+
+    expect(config.siteUrl).toBe('https://example.atlassian.net');
+    expect(client.baseURL).toBe('https://api.atlassian.com/ex/confluence/cloud-id/wiki/rest/api');
+    expect(result).toContain('data-card-appearance="inline"');
   });
 
   test('linkStyle is undefined when CONFLUENCE_LINK_STYLE is not set', () => {
