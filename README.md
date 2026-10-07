@@ -451,9 +451,16 @@ See [ACME](https://example.atlassian.net/wiki/spaces/DEVOPS/pages/1346144034/acm
 and [Let's Encrypt FAQ](https://letsencrypt.org/docs/faq/).
 ```
 
-becomes a smart link for `ACME` and a plain `<a href>` that keeps the text `Let's Encrypt FAQ`. A link counts as internal when its parsed origin matches the configured domain and its path is inside the site's context path (`/wiki` on Cloud), so look-alike hosts such as `example.atlassian.net.evil.test` stay plain. Relative links are rendered plain, and so is every link when no site is configured (for example in library use of the converter without `buildUrl`). Only the written storage differs: `read --format markdown` returns the same `[text](href)` under every style.
+becomes a smart link for `ACME` and a plain `<a href>` that keeps the text `Let's Encrypt FAQ`. A link counts as internal when its parsed origin matches `siteUrl` (or the configured domain when unset) and its path is inside the site's context path (`/wiki` on Cloud), so look-alike hosts such as `example.atlassian.net.evil.test` stay plain. Relative links are rendered plain, and so is every link when no site is configured (for example in library use of the converter without `buildUrl`). Only the written storage differs: `read --format markdown` returns the same `[text](href)` under every style.
 
-Two caveats. Smart links are a Cloud feature, so on Server/Data Center `auto` would emit smart-link markup for internal links that those sites do not render; keep `plain` there. And with a scoped API token the CLI talks to the `api.atlassian.com` gateway rather than your site's own domain, so it cannot tell which links are internal and `auto` renders every link plain.
+Smart links are a Cloud feature, so on Server/Data Center `auto` would emit smart-link markup for internal links that those sites do not render; keep `plain` there. With a scoped API token the CLI talks to the `api.atlassian.com` gateway. Set your actual Confluence site URL separately to enable internal link detection:
+
+```bash
+export CONFLUENCE_SITE_URL=https://example.atlassian.net
+export CONFLUENCE_LINK_STYLE=auto
+```
+
+Alternatively, save `"siteUrl": "https://example.atlassian.net"` in the profile, or pass `--site-url https://example.atlassian.net` to `confluence init` or `confluence profile add <name>`. Use an absolute HTTP(S) URL without credentials, query, or fragment; a `/wiki` context path and trailing slash are supported. When loading a profile, a nonempty `CONFLUENCE_SITE_URL` overrides its `siteUrl`; an empty value uses the saved setting. This setting only supplies the web URL for conversion and internal link detection; API requests and authentication still use `domain` and `apiPath`. When unset, detection uses the API domain as before, so scoped gateway profiles render site links plain under `auto`.
 
 **PlantUML macro format (`plantumlFormat`):**
 
