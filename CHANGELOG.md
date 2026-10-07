@@ -1,3 +1,10 @@
+# [2.29.0](https://github.com/pchuri/confluence-cli/compare/v2.28.0...v2.29.0) (2026-10-07)
+
+
+### Features
+
+* **config:** support site URLs for scoped API link detection ([#275](https://github.com/pchuri/confluence-cli/issues/275)) ([68c10e0](https://github.com/pchuri/confluence-cli/commit/68c10e0d12c9240ee646b90b238a95a82dfa297b))
+
 # [2.28.0](https://github.com/pchuri/confluence-cli/compare/v2.27.4...v2.28.0) (2026-10-05)
 
 
