@@ -15,6 +15,7 @@ jest.mock('fs', () => {
 
 const {
   getConfig,
+  initConfig,
   listProfiles,
   setActiveProfile,
   deleteProfile,
@@ -32,7 +33,7 @@ const ENV_KEYS = [
   'CONFLUENCE_PROTOCOL', 'CONFLUENCE_PROFILE',
   'CONFLUENCE_TLS_CA_CERT', 'CONFLUENCE_TLS_CLIENT_CERT',
   'CONFLUENCE_TLS_CLIENT_KEY', 'CONFLUENCE_PLANTUML_FORMAT',
-  'CONFLUENCE_ALLOW_INSECURE_HTTP'
+  'CONFLUENCE_ALLOW_INSECURE_HTTP', 'CONFLUENCE_SITE_URL'
 ];
 
 // Helper to create a multi-profile config
@@ -134,6 +135,59 @@ describe('Profile management', () => {
       } else {
         delete process.env[key];
       }
+    }
+  });
+
+  test.each(['https://example.atlassian.net/wiki/', 'http://wiki.example.org/confluence/'])('persists and reloads siteUrl %s in a named profile', async (siteUrl) => {
+    mockConfigFile(multiProfileConfig());
+    const writer = captureConfigWrite();
+    const logSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await initConfig({ profile: 'scoped', domain: 'api.atlassian.com', apiPath: '/ex/confluence/cloud-id/wiki/rest/api', token: 'token', authType: 'bearer', siteUrl: `  ${siteUrl}  ` });
+      const written = writer.getWritten();
+      expect(written.profiles.scoped.siteUrl).toBe(siteUrl);
+      expect(written.profiles.default.domain).toBe('default.atlassian.net');
+      mockConfigFile(written);
+      expect(getConfig('scoped').siteUrl).toBe(siteUrl);
+    } finally {
+      logSpy.mockRestore();
+    }
+  });
+
+  test.each([undefined, '', '   ', '  https://override.atlassian.net  '])('siteUrl env precedence for %p', (envValue) => {
+    const data = multiProfileConfig();
+    data.profiles.default.siteUrl = 'https://saved.atlassian.net';
+    mockConfigFile(data);
+    if (envValue !== undefined) process.env.CONFLUENCE_SITE_URL = envValue;
+    expect(getConfig().siteUrl).toBe(envValue && envValue.trim() ? envValue.trim() : 'https://saved.atlassian.net');
+  });
+
+  test('env-only configuration does not inherit stored siteUrl', () => {
+    const data = multiProfileConfig();
+    data.profiles.default.siteUrl = 'https://saved.atlassian.net';
+    mockConfigFile(data);
+    process.env.CONFLUENCE_DOMAIN = 'api.atlassian.com';
+    process.env.CONFLUENCE_API_TOKEN = 'env-token';
+    expect(getConfig().siteUrl).toBeUndefined();
+    process.env.CONFLUENCE_SITE_URL = 'https://env.atlassian.net';
+    expect(getConfig().siteUrl).toBe('https://env.atlassian.net');
+  });
+
+  test('loads siteUrl from a legacy flat config', () => {
+    mockConfigFile({ ...flatConfig(), siteUrl: 'https://legacy.atlassian.net/wiki/' });
+    expect(getConfig().siteUrl).toBe('https://legacy.atlassian.net/wiki/');
+  });
+
+  test('invalid stored siteUrl warns and falls back', () => {
+    const data = multiProfileConfig();
+    data.profiles.default.siteUrl = 'example.atlassian.net';
+    mockConfigFile(data);
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      expect(getConfig().siteUrl).toBeUndefined();
+      expect(errorSpy).toHaveBeenCalledWith(expect.stringMatching(/Invalid siteUrl.*profile/));
+    } finally {
+      errorSpy.mockRestore();
     }
   });
 

@@ -438,6 +438,7 @@ test('redacts every value in a multi-cookie header without environment credentia
 test('builds a minimal CLI environment from known config keys', () => {
   const env = {
     CONFLUENCE_DOMAIN: 'example.atlassian.net',
+    CONFLUENCE_SITE_URL: 'https://example.atlassian.net/wiki/',
     CONFLUENCE_API_TOKEN: 'token',
     CONFLUENCE_COOKIE: 'cookie',
     CONFLUENCE_TLS_CLIENT_KEY: '/tmp/key.pem',
@@ -448,6 +449,7 @@ test('builds a minimal CLI environment from known config keys', () => {
   const result = buildCliEnvironment(env);
 
   expect(result.CONFLUENCE_DOMAIN).toBe('example.atlassian.net');
+  expect(result.CONFLUENCE_SITE_URL).toBe('https://example.atlassian.net/wiki/');
   expect(result.CONFLUENCE_API_TOKEN).toBe('token');
   expect(result.CONFLUENCE_COOKIE).toBe('cookie');
   expect(result.CONFLUENCE_TLS_CLIENT_KEY).toBe('/tmp/key.pem');
