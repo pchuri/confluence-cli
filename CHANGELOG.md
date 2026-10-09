@@ -1,3 +1,10 @@
+## [2.29.1](https://github.com/pchuri/confluence-cli/compare/v2.29.0...v2.29.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* paginate child pages for complete tree traversal ([#276](https://github.com/pchuri/confluence-cli/issues/276)) ([3a32376](https://github.com/pchuri/confluence-cli/commit/3a3237653ae78e31a196785076b845ae2d166c1d))
+
 # [2.29.0](https://github.com/pchuri/confluence-cli/compare/v2.28.0...v2.29.0) (2026-10-07)
 
 
