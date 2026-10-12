@@ -737,12 +737,18 @@ confluence comments 123456789 --location inline --format markdown
 # Create a footer comment
 confluence comment 123456789 --content "Looks good to me!"
 
-# Create an inline comment
+# Create an inline comment (Confluence Cloud: no editor metadata needed)
 confluence comment 123456789 \
   --location inline \
   --content "Consider renaming this" \
+  --inline-selection "foo"
+
+# Highlight the second occurrence of the selected text instead of the first
+confluence comment 123456789 \
+  --location inline \
+  --content "Consider renaming this one too" \
   --inline-selection "foo" \
-  --inline-original-selection "foo"
+  --match-index 2
 
 # Reply to a comment (inline or footer thread)
 confluence comment 123456789 --parent 998877 --content "Agree with this"
@@ -755,7 +761,7 @@ confluence comment-resolve 998877 --reopen
 confluence comment-delete 998877
 ```
 
-Inline comment creation note (Confluence Cloud): Creating inline comments requires editor-generated highlight metadata (`matchIndex`, `lastFetchTime`, `serializedHighlights`, plus the selection text). The public REST API does not provide these fields, so creating a new inline thread can fail with a 400 unless you supply the full `--inline-properties` payload captured from the editor. Footer comments are fully supported.
+Inline comment creation (Confluence Cloud): `comment --location inline --inline-selection "<text on the page>"` creates a new inline thread through the v2 API, without any editor-generated highlight metadata. The CLI reads the page, counts how many times the selection text occurs, and fails with a clear error if the text is not on the page. When the text occurs more than once, `--match-index <n>` picks which occurrence to highlight (1-based: `1` is the first, the default). On Server/Data Center — and when `--inline-properties`, `--inline-original-selection`, or `--inline-marker-ref` is supplied — creation still goes through the v1 `POST /content` API, which does require editor highlight metadata (`matchIndex`, `lastFetchTime`, `serializedHighlights`, plus the selection text); supply the full `--inline-properties` payload captured from the editor there, or it can fail with a 400. Footer comments are fully supported everywhere.
 
 Replies and resolution (Confluence Cloud): `--parent <commentId>` posts through the v2 comment API, which needs no highlight metadata, so replies to inline and footer threads both work. The reply goes to the same kind of thread as its parent (any `--location` or `--inline-*` option is ignored for replies), and the command fails before posting if the parent belongs to a different page. Replying does not change whether a thread is resolved. `comment-resolve <commentId>` resolves a top-level inline thread and `--reopen` reopens it; asking for the state the thread already has changes nothing, and a dangling thread (its highlighted text was removed) cannot be updated. Server/Data Center keeps the v1 reply behavior, and `comment-resolve` requires Cloud. API tokens with granular scopes need the v2 comment scopes (`read:comment:confluence` and `write:comment:confluence`) for replies and `comment-resolve`; a token with only the classic content scopes gets a 401/403 on a reply that used to work through v1. Comment IDs must be numeric.
 
@@ -1114,7 +1120,7 @@ confluence stats
 | `attachment-upload <pageId_or_url>` | Upload attachments to a page | `--file <path>`, `--comment <text>`, `--replace`, `--minor-edit`, `--json` |
 | `attachment-delete <pageId_or_url> <attachmentId>` | Delete an attachment from a page | `--yes`, `--json` |
 | `comments <pageId_or_url>` | List comments for a page | `--format <text\|markdown>`, `--json`, `--limit <number>`, `--start <number>`, `--location <inline\|footer\|resolved>`, `--depth <root\|all>`, `--all` |
-| `comment <pageId_or_url>` | Create a comment on a page | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--parent <commentId>`, `--location <inline\|footer>`, `--inline-selection <text>`, `--inline-original-selection <text>`, `--inline-marker-ref <ref>`, `--inline-properties <json>`, `--json` |
+| `comment <pageId_or_url>` | Create a comment on a page | `--content <string>`, `--file <path>`, `--format <auto\|storage\|html\|markdown>`, `--parent <commentId>`, `--location <inline\|footer>`, `--inline-selection <text>`, `--inline-original-selection <text>`, `--inline-marker-ref <ref>`, `--inline-properties <json>`, `--match-index <n>`, `--json` |
 | `comment-resolve <commentId>` | Resolve (or reopen) an inline comment thread (Cloud) | `--reopen`, `--json` |
 | `comment-delete <commentId>` | Delete a comment by ID | `--yes`, `--json` |
 | `property-list <pageId_or_url>` | List all content properties for a page | `--json`, `--limit <number>`, `--start <number>`, `--all` |

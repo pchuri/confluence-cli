@@ -208,6 +208,7 @@ function registerCommentCommands(program, { withClient }) {
     .option('--inline-original-selection <text>', 'Original inline selection text')
     .option('--inline-marker-ref <ref>', 'Inline marker reference (optional)')
     .option('--inline-properties <json>', 'Inline properties JSON (advanced)')
+    .option('--match-index <n>', 'For --location inline with --inline-selection: which occurrence of the selected text to highlight (1 = first)', '1')
     .action(withClient('comment_create', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
       let content = '';
 
@@ -227,7 +228,14 @@ function registerCommentCommands(program, { withClient }) {
         throw new Error('Location must be either "inline" or "footer".');
       }
 
+      const rawMatchIndex = options.matchIndex ?? '1';
+      if (!/^\d+$/.test(String(rawMatchIndex).trim()) || parseInt(rawMatchIndex, 10) < 1) {
+        throw new Error('Match index must be a positive integer (1 for the first occurrence).');
+      }
+      const matchIndex = parseInt(rawMatchIndex, 10);
+
       let inlineProperties = {};
+      let explicitInlineProperties = null;
       if (options.inlineProperties) {
         try {
           const parsed = JSON.parse(options.inlineProperties);
@@ -235,6 +243,7 @@ function registerCommentCommands(program, { withClient }) {
             throw new Error('Inline properties must be a JSON object.');
           }
           inlineProperties = { ...parsed };
+          explicitInlineProperties = { ...parsed };
         } catch (error) {
           throw new Error(`Invalid --inline-properties JSON: ${error.message}`);
         }
@@ -275,6 +284,11 @@ function registerCommentCommands(program, { withClient }) {
         parentId,
         location,
         inlineProperties: location === 'inline' ? inlineProperties : null,
+        inlineSelection: options.inlineSelection || null,
+        inlineOriginalSelection: options.inlineOriginalSelection || null,
+        inlineMarkerRef: options.inlineMarkerRef || null,
+        inlinePropertiesExplicit: explicitInlineProperties,
+        matchIndex,
       });
 
       if (wantsJson()) {
@@ -315,8 +329,9 @@ function registerCommentCommands(program, { withClient }) {
           .every((key) => errorKeys.includes(key));
         const location = (options?.location || 'footer').toLowerCase();
         if (location === 'inline' && needsInlineMeta) {
-          console.error(chalk.yellow('Inline comment creation requires editor highlight metadata (matchIndex, lastFetchTime, serializedHighlights).'));
-          console.error(chalk.yellow('Try replying to an existing inline comment or use footer comments instead.'));
+          console.error(chalk.yellow('This inline comment went through the v1 API, which requires editor highlight metadata (matchIndex, lastFetchTime, serializedHighlights).'));
+          console.error(chalk.yellow('On Confluence Cloud, a new inline thread needs no editor metadata: use --location inline with only --inline-selection "<text on the page>" (plus --match-index <n> when the text occurs more than once) and it is created via the v2 API.'));
+          console.error(chalk.yellow('The v1 path is still used on Server/Data Center, and with --inline-properties, --inline-original-selection, or --inline-marker-ref — there you must supply the full highlight metadata, reply to an existing inline comment, or use a footer comment instead.'));
         }
       },
     }));
