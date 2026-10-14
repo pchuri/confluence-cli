@@ -1,3 +1,10 @@
+# [2.30.0](https://github.com/pchuri/confluence-cli/compare/v2.29.1...v2.30.0) (2026-10-14)
+
+
+### Features
+
+* create inline comments on selected text via v2 API ([#277](https://github.com/pchuri/confluence-cli/issues/277)) ([e87e700](https://github.com/pchuri/confluence-cli/commit/e87e700b2b66f52a1e4f2f9a9848a93c4dd03311)), closes [#251](https://github.com/pchuri/confluence-cli/issues/251) [#251](https://github.com/pchuri/confluence-cli/issues/251)
+
 ## [2.29.1](https://github.com/pchuri/confluence-cli/compare/v2.29.0...v2.29.1) (2026-10-09)
 
 
