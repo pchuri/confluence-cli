@@ -3196,6 +3196,163 @@ describe('ConfluenceClient', () => {
         expect(mock.history.post[0].url).toBe('/content');
       });
 
+      test('createInlineCommentV2 posts the counted selection to v2 inline-comments (default match index 1)', async () => {
+        mock.onGet('/content/123').reply(200, {
+          body: { storage: { value: '<p>foo and foo and foo</p>' } }
+        });
+        mock.onPost(`${V2}/inline-comments`).reply(200, {
+          id: '1010',
+          pageId: '123',
+          _links: { webui: '/spaces/A/pages/123?focusedCommentId=1010' }
+        });
+
+        const result = await client.createInlineCommentV2('123', '<p>Hi</p>', { textSelection: 'foo' });
+
+        expect(mock.history.get[0].params).toEqual({ expand: 'body.storage' });
+        expect(mock.history.post).toHaveLength(1);
+        expect(mock.history.post[0].url).toBe(`${V2}/inline-comments`);
+        expect(JSON.parse(mock.history.post[0].data)).toEqual({
+          pageId: '123',
+          body: { representation: 'storage', value: '<p>Hi</p>' },
+          inlineCommentProperties: {
+            textSelection: 'foo',
+            textSelectionMatchCount: 3,
+            // CLI match indexes are 1-based; the v2 field is zero-based.
+            textSelectionMatchIndex: 0
+          }
+        });
+        expect(result).toEqual({
+          id: '1010',
+          container: { id: '123' },
+          _links: { webui: '/spaces/A/pages/123?focusedCommentId=1010' }
+        });
+      });
+
+      test('createInlineCommentV2 converts a 1-based matchIndex to the zero-based v2 index', async () => {
+        mock.onGet('/content/123').reply(200, {
+          body: { storage: { value: '<p>foo and <strong>foo</strong> and foo</p>' } }
+        });
+        mock.onPost(`${V2}/inline-comments`).reply(200, { id: '1011', pageId: '123' });
+
+        await client.createInlineCommentV2('123', '<p>Hi</p>', { textSelection: 'foo', matchIndex: 2 });
+
+        const payload = JSON.parse(mock.history.post[0].data);
+        expect(payload.inlineCommentProperties).toEqual({
+          textSelection: 'foo',
+          textSelectionMatchCount: 3,
+          textSelectionMatchIndex: 1
+        });
+      });
+
+      test.each([0, -1, 1.5, 'abc'])('createInlineCommentV2 rejects invalid match index %p before any request', async (matchIndex) => {
+        await expect(client.createInlineCommentV2('123', '<p>Hi</p>', { textSelection: 'foo', matchIndex }))
+          .rejects.toThrow('--match-index must be a positive integer');
+        expect(mock.history.get).toHaveLength(0);
+        expect(mock.history.post).toHaveLength(0);
+      });
+
+      test('createInlineCommentV2 fails clearly when the selection is not on the page', async () => {
+        mock.onGet('/content/123').reply(200, {
+          body: { storage: { value: '<p>nothing to see here</p>' } }
+        });
+
+        await expect(client.createInlineCommentV2('123', '<p>Hi</p>', { textSelection: 'foo' }))
+          .rejects.toThrow('Inline selection "foo" was not found on page 123.');
+        expect(mock.history.post).toHaveLength(0);
+      });
+
+      test('createInlineCommentV2 fails clearly when the match index is out of range', async () => {
+        mock.onGet('/content/123').reply(200, {
+          body: { storage: { value: '<p>foo and foo</p>' } }
+        });
+
+        await expect(client.createInlineCommentV2('123', '<p>Hi</p>', { textSelection: 'foo', matchIndex: 3 }))
+          .rejects.toThrow('occurs 2 times on page 123, so --match-index must be between 1 and 2 (got 3)');
+        expect(mock.history.post).toHaveLength(0);
+      });
+
+      test('createInlineCommentV2 requires Confluence Cloud', async () => {
+        const serverClient = new ConfluenceClient({ domain: 'wiki.example.org', token: 'test-token' });
+
+        await expect(serverClient.createInlineCommentV2('123', '<p>Hi</p>', { textSelection: 'foo' }))
+          .rejects.toThrow('requires Confluence Cloud');
+      });
+
+      test('createComment routes a new inline thread with a selection to v2 on Cloud', async () => {
+        mock.onGet('/content/123').reply(200, {
+          body: { storage: { value: '<p>foo once</p>' } }
+        });
+        mock.onPost(`${V2}/inline-comments`).reply(200, { id: '1012', pageId: '123' });
+
+        const result = await client.createComment('123', '<p>Hi</p>', 'storage', {
+          location: 'inline',
+          inlineSelection: 'foo',
+          inlineProperties: { selection: 'foo', originalSelection: 'foo', markerRef: 'comment-1' },
+          matchIndex: 1
+        });
+
+        expect(result.id).toBe('1012');
+        expect(mock.history.post).toHaveLength(1);
+        expect(mock.history.post[0].url).toBe(`${V2}/inline-comments`);
+        expect(JSON.parse(mock.history.post[0].data).inlineCommentProperties.textSelectionMatchCount).toBe(1);
+      });
+
+      test('createComment routes a legacy selection-only inlineProperties to v2 on Cloud', async () => {
+        mock.onGet('/content/123').reply(200, {
+          body: { storage: { value: '<p>foo once</p>' } }
+        });
+        mock.onPost(`${V2}/inline-comments`).reply(200, { id: '1013', pageId: '123' });
+
+        const result = await client.createComment('123', '<p>Hi</p>', 'storage', {
+          location: 'inline',
+          inlineProperties: { selection: 'foo' }
+        });
+
+        expect(result.id).toBe('1013');
+        expect(mock.history.post[0].url).toBe(`${V2}/inline-comments`);
+      });
+
+      test('createComment keeps a new inline thread on v1 for Server/Data Center', async () => {
+        const serverClient = new ConfluenceClient({ domain: 'wiki.example.org', token: 'test-token' });
+        const serverMock = new MockAdapter(serverClient.client);
+        serverMock.onPost('/content').reply(200, { id: '1014', type: 'comment' });
+
+        await serverClient.createComment('123', '<p>Hi</p>', 'storage', {
+          location: 'inline',
+          inlineSelection: 'foo',
+          inlineProperties: { selection: 'foo', originalSelection: 'foo', markerRef: 'comment-1' },
+          matchIndex: 1
+        });
+
+        expect(serverMock.history.post).toHaveLength(1);
+        expect(serverMock.history.post[0].url).toBe('/content');
+        expect(serverMock.history.get).toHaveLength(0);
+        serverMock.restore();
+      });
+
+      test('createComment keeps explicit --inline-properties on v1 even on Cloud', async () => {
+        mock.onPost('/content').reply(200, { id: '1015', type: 'comment' });
+
+        await client.createComment('123', '<p>Hi</p>', 'storage', {
+          location: 'inline',
+          inlineSelection: 'foo',
+          inlinePropertiesExplicit: { matchIndex: 1, lastFetchTime: 2, serializedHighlights: 'abc' },
+          inlineProperties: {
+            selection: 'foo',
+            matchIndex: 1,
+            lastFetchTime: 2,
+            serializedHighlights: 'abc'
+          }
+        });
+
+        expect(mock.history.post).toHaveLength(1);
+        expect(mock.history.post[0].url).toBe('/content');
+        expect(mock.history.get).toHaveLength(0);
+        const payload = JSON.parse(mock.history.post[0].data);
+        expect(payload.extensions.location).toBe('inline');
+        expect(payload.extensions.inlineProperties.serializedHighlights).toBe('abc');
+      });
+
       test('setCommentResolved resolves with the next version number', async () => {
         mock.onGet(`${V2}/inline-comments/1000`).reply(200, {
           id: '1000', resolutionStatus: 'open', version: { number: 3 }
