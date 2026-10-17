@@ -1,3 +1,10 @@
+## [2.30.3](https://github.com/pchuri/confluence-cli/compare/v2.30.2...v2.30.3) (2026-10-17)
+
+
+### Bug Fixes
+
+* validate comment deletion and follow version pagination ([b34c20d](https://github.com/pchuri/confluence-cli/commit/b34c20d7d34cdcdc9912bec190abb81a8a8ae603))
+
 ## [2.30.2](https://github.com/pchuri/confluence-cli/compare/v2.30.1...v2.30.2) (2026-10-17)
 
 
