@@ -1,3 +1,10 @@
+## [2.30.2](https://github.com/pchuri/confluence-cli/compare/v2.30.1...v2.30.2) (2026-10-17)
+
+
+### Bug Fixes
+
+* **deps:** patch dev tooling CVE-2026-102277 ([#279](https://github.com/pchuri/confluence-cli/issues/279)) ([7da2270](https://github.com/pchuri/confluence-cli/commit/7da227083ea0a4227534c153c3d1ab3327bc9c70))
+
 ## [2.30.1](https://github.com/pchuri/confluence-cli/compare/v2.30.0...v2.30.1) (2026-10-17)
 
 
