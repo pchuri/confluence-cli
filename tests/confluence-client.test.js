@@ -3551,13 +3551,114 @@ describe('ConfluenceClient', () => {
       mock.restore();
     });
 
-    test('should delete a comment by ID', async () => {
-      const mock = new MockAdapter(client.client);
-      mock.onDelete('/content/456').reply(204);
+    describe('deleteComment', () => {
+      let mock;
 
-      await expect(client.deleteComment('456')).resolves.toEqual({ id: '456' });
+      const commentPayload = (overrides = {}) => ({
+        id: '456',
+        type: 'comment',
+        title: 'Re: Release Notes',
+        container: { id: '123', type: 'page' },
+        ancestors: [{ id: '123', type: 'page', title: 'Release Notes' }],
+        ...overrides,
+      });
 
-      mock.restore();
+      beforeEach(() => {
+        mock = new MockAdapter(client.client);
+      });
+
+      afterEach(() => {
+        mock.restore();
+      });
+
+      test('should delete a comment by ID after confirming it is a comment', async () => {
+        mock.onGet('/content/456').reply(200, commentPayload());
+        mock.onDelete('/content/456').reply(204);
+
+        await expect(client.deleteComment('456')).resolves.toEqual({ id: '456' });
+
+        expect(mock.history.get).toHaveLength(1);
+        expect(mock.history.get[0].params).toEqual({ expand: 'container,ancestors' });
+        expect(mock.history.delete).toHaveLength(1);
+        expect(mock.history.delete[0].url).toBe('/content/456');
+      });
+
+      test.each([
+        ['page', { id: '456', type: 'page', title: 'Release Notes' }],
+        ['attachment', { id: '456', type: 'attachment', title: 'release.pdf', container: { id: '123' } }],
+        ['blogpost', { id: '456', type: 'blogpost', title: 'Announcement' }],
+      ])('never deletes %s content passed as a comment ID', async (_type, payload) => {
+        mock.onGet('/content/456').reply(200, payload);
+        mock.onDelete('/content/456').reply(204);
+
+        await expect(client.deleteComment('456')).rejects.toThrow(/comment content/i);
+
+        expect(mock.history.delete).toHaveLength(0);
+      });
+
+      test('does not send DELETE when the comment does not exist', async () => {
+        mock.onGet('/content/456').reply(404, { message: 'Not found' });
+        mock.onDelete('/content/456').reply(204);
+
+        await expect(client.deleteComment('456')).rejects.toThrow('Comment 456 not found.');
+
+        expect(mock.history.get).toHaveLength(1);
+        expect(mock.history.delete).toHaveLength(0);
+      });
+
+      test('does not send DELETE when the metadata lookup fails', async () => {
+        mock.onGet('/content/456').reply(403, { message: 'Forbidden' });
+        mock.onDelete('/content/456').reply(204);
+
+        await expect(client.deleteComment('456')).rejects.toThrow();
+
+        expect(mock.history.delete).toHaveLength(0);
+      });
+
+      test('does not send DELETE for an empty metadata response', async () => {
+        mock.onGet('/content/456').reply(200, null);
+        mock.onDelete('/content/456').reply(204);
+
+        await expect(client.deleteComment('456')).rejects.toThrow(/comment content/i);
+
+        expect(mock.history.delete).toHaveLength(0);
+      });
+
+      test('refuses to delete when the lookup resolves to a different content ID', async () => {
+        mock.onGet('/content/456').reply(200, commentPayload({ id: '789' }));
+        mock.onDelete(/\/content\/.*/).reply(204);
+
+        await expect(client.deleteComment('456')).rejects.toThrow(/refusing to delete/);
+
+        expect(mock.history.delete).toHaveLength(0);
+      });
+
+      test('encodes the confirmed comment ID instead of using a raw path segment', async () => {
+        const rawId = '456/../123';
+        mock.onGet(`/content/${encodeURIComponent(rawId)}`).reply(200, commentPayload({ id: rawId }));
+        mock.onDelete(`/content/${encodeURIComponent(rawId)}`).reply(204);
+
+        await expect(client.deleteComment(rawId)).resolves.toEqual({ id: rawId });
+
+        expect(mock.history.delete).toHaveLength(1);
+        expect(mock.history.delete[0].url).toBe('/content/456%2F..%2F123');
+      });
+
+      test('requires a comment ID before any request', async () => {
+        await expect(client.deleteComment('')).rejects.toThrow('A comment ID is required.');
+
+        expect(mock.history.get).toHaveLength(0);
+        expect(mock.history.delete).toHaveLength(0);
+      });
+
+      test('propagates a failed DELETE instead of reporting success', async () => {
+        mock.onGet('/content/456').reply(200, commentPayload());
+        mock.onDelete('/content/456').reply(403, { message: 'Forbidden' });
+
+        await expect(client.deleteComment('456')).rejects.toThrow();
+
+        expect(mock.history.delete).toHaveLength(1);
+      });
     });
   });
 
