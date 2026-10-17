@@ -1,3 +1,10 @@
+## [2.30.1](https://github.com/pchuri/confluence-cli/compare/v2.30.0...v2.30.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* **deps:** patch transitive js-yaml CVE-2026-84375 ([#278](https://github.com/pchuri/confluence-cli/issues/278)) ([9945e44](https://github.com/pchuri/confluence-cli/commit/9945e4426f1d775e069a86a81d12781f86326b36))
+
 # [2.30.0](https://github.com/pchuri/confluence-cli/compare/v2.29.1...v2.30.0) (2026-10-14)
 
 
