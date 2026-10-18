@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node bin/confluence.js",
-    "test": "jest",
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
@@ -26,20 +26,22 @@
   "dependencies": {
     "axios": "^1.20.0",
     "chalk": "^4.1.2",
-    "commander": "^11.1.0",
-    "entities": "^4.5.0",
-    "form-data": "^4.0.5",
-    "html-to-text": "^9.0.5",
-    "htmlparser2": "^9.1.0",
+    "commander": "^15.0.0",
+    "entities": "^8.1.0",
+    "form-data": "^4.0.6",
+    "html-to-text": "^10.0.1",
+    "htmlparser2": "^12.0.0",
     "inquirer": "^8.2.6",
-    "js-yaml": "^4.3.2",
-    "markdown-it": "^14.3.2"
+    "js-yaml": "^5.5.0",
+    "markdown-it": "^15.0.3"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@types/node": "^20.10.0",
     "axios-mock-adapter": "^2.1.0",
-    "eslint": "^9.39.2",
-    "jest": "^29.7.0",
+    "eslint": "^10.13.0",
+    "globals": "^17.13.0",
+    "jest": "^30.5.2",
     "jiti": "^2.7.0",
     "typebox": "^1.3.18"
   },
@@ -66,7 +68,7 @@
     }
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.12.0"
   },
   "repository": {
     "type": "git",

@@ -17,7 +17,7 @@ jobs:
     
     strategy:
       matrix:
-        node-version: [18.x, 20.x, 22.x]
+        node-version: [22.x, 24.x]
     
     steps:
     - uses: actions/checkout@v5
@@ -61,7 +61,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v5
       with:
-        node-version: '18'
+        node-version: '22'
         registry-url: 'https://registry.npmjs.org'
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
