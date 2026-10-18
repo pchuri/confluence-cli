@@ -81,7 +81,7 @@ function registerCommentCommands(program, { withClient }) {
         ? null
         : (locationValues.length === 1 ? locationValues[0] : locationValues);
 
-      let comments = [];
+      let comments;
       let nextStart = null;
 
       if (options.all) {
@@ -210,7 +210,7 @@ function registerCommentCommands(program, { withClient }) {
     .option('--inline-properties <json>', 'Inline properties JSON (advanced)')
     .option('--match-index <n>', 'For --location inline with --inline-selection: which occurrence of the selected text to highlight (1 = first)', '1')
     .action(withClient('comment_create', async ({ client, analytics, wantsJson, emitJson }, pageId, options) => {
-      let content = '';
+      let content;
 
       if (options.file) {
         if (!fs.existsSync(options.file)) {
@@ -245,7 +245,7 @@ function registerCommentCommands(program, { withClient }) {
           inlineProperties = { ...parsed };
           explicitInlineProperties = { ...parsed };
         } catch (error) {
-          throw new Error(`Invalid --inline-properties JSON: ${error.message}`);
+          throw new Error(`Invalid --inline-properties JSON: ${error.message}`, { cause: error });
         }
       }
 

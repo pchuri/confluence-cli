@@ -233,7 +233,7 @@ async function exportRecursive(client, fs, path, pageId, options) {
     failures.push({ id: rootPage.id, title: rootPage.title, error: error.message });
     console.error(chalk.red(`  Failed: ${rootPage.title} — ${error.message}`));
     // Can't continue without root directory
-    throw new Error(`Failed to export root page: ${error.message}`);
+    throw new Error(`Failed to export root page: ${error.message}`, { cause: error });
   }
 
   if (delayMs > 0 && tree.length > 0) {

@@ -26,7 +26,7 @@ function registerPropertyCommands(program, { withClient }) {
         throw new Error('Start must be a non-negative number.');
       }
 
-      let properties = [];
+      let properties;
       let nextStart = null;
 
       if (options.all) {
