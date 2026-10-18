@@ -13,15 +13,12 @@ describe('mTLS failures', () => {
     fs.writeFileSync(clientCert, 'client-cert');
     fs.writeFileSync(clientKey, 'client-key', { mode: 0o644 });
 
-    const childEnv = { ...process.env };
-    delete childEnv.NODE_OPTIONS;
-
     try {
       const result = spawnSync(process.execPath, [CLI, '--json', 'info', '123'], {
         encoding: 'utf8',
         timeout: 10000,
         env: {
-          ...childEnv,
+          ...process.env,
           CONFLUENCE_DOMAIN: '127.0.0.1:1',
           CONFLUENCE_AUTH_TYPE: 'mtls',
           CONFLUENCE_TLS_CLIENT_CERT: clientCert,
@@ -44,7 +41,7 @@ describe('mTLS failures', () => {
         encoding: 'utf8',
         timeout: 10000,
         env: {
-          ...childEnv,
+          ...process.env,
           CONFLUENCE_DOMAIN: '127.0.0.1:1',
           CONFLUENCE_AUTH_TYPE: 'mtls',
           CONFLUENCE_TLS_CLIENT_CERT: clientCert,
