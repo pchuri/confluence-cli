@@ -1,3 +1,10 @@
+## [2.30.4](https://github.com/pchuri/confluence-cli/compare/v2.30.3...v2.30.4) (2026-10-21)
+
+
+### Bug Fixes
+
+* **deps:** bump follow-redirects to 1.16.1 ([df0ea25](https://github.com/pchuri/confluence-cli/commit/df0ea2524ab891443a8a1ce10bd6ef651f3a2ea3))
+
 ## [2.30.3](https://github.com/pchuri/confluence-cli/compare/v2.30.2...v2.30.3) (2026-10-17)
 
 
