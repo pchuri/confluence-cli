@@ -1460,6 +1460,11 @@ describe('ConfluenceClient', () => {
       expect(await client.extractPageId(url)).toBe('123456789');
     });
 
+    test('should extract page ID from URLs without a host', async () => {
+      expect(await client.extractPageId('/pages/viewpage.action?pageId=987654321')).toBe('987654321');
+      expect(await client.extractPageId('/wiki/spaces/TEST/pages/123456789/Page+Title')).toBe('123456789');
+    });
+
     test('should resolve display URLs', async () => {
       // Mock the API response for display URL resolution
       const mock = new MockAdapter(client.client);
@@ -1536,15 +1541,55 @@ describe('ConfluenceClient', () => {
       }
     });
 
-    test('should resolve tiny links via redirect', async () => {
+    test('should decode tiny links without a request', async () => {
+      const mock = new MockAdapter(client.client);
+
+      expect(await client.extractPageId('https://test.atlassian.net/wiki/x/xIKbMAE')).toBe('5110465220');
+      expect(await client.extractPageId('https://test.atlassian.net/x/xIKbMAE')).toBe('5110465220');
+      expect(await client.extractPageId('https://test.atlassian.net/x/xIKbMAE/?src=mail#comments')).toBe('5110465220');
+      expect(await client.extractPageId('test.atlassian.net/x/xIKbMAE')).toBe('5110465220');
+      expect(await client.extractPageId('/x/xIKbMAE')).toBe('5110465220');
+      expect(mock.history.get).toHaveLength(0);
+
+      mock.restore();
+    });
+
+    test('should decode tiny link codes containing - or _', async () => {
+      const mock = new MockAdapter(client.client);
+
+      // Real tiny links and page IDs from a Confluence Data Center instance
+      expect(await client.extractPageId('https://test.atlassian.net/wiki/x/e-tQYwE')).toBe('5961218939');
+      expect(await client.extractPageId('https://test.atlassian.net/wiki/x/h__sXAE')).toBe('5849804679');
+      expect(mock.history.get).toHaveLength(0);
+
+      mock.restore();
+    });
+
+    test('should resolve undecodable tiny links via redirect', async () => {
       const mock = new MockAdapter(client.client);
 
       mock.onGet(/\/wiki\/x\//).reply(302, null, {
         location: 'https://test.atlassian.net/wiki/spaces/TEST/pages/123456789/Page+Title'
       });
 
-      const tinyUrl = 'https://test.atlassian.net/wiki/x/aBcDeFg';
+      const tinyUrl = 'https://test.atlassian.net/wiki/x/aBcDeFgHiJkL';
       expect(await client.extractPageId(tinyUrl)).toBe('123456789');
+
+      mock.restore();
+    });
+
+    test('should resolve undecodable Server/Data Center tiny links via redirect', async () => {
+      const serverClient = new ConfluenceClient({
+        domain: 'wiki.example.com',
+        token: 'test-token'
+      });
+      const mock = new MockAdapter(serverClient.client);
+
+      mock.onGet(/\/x\//).reply(302, null, {
+        location: 'https://wiki.example.com/pages/viewpage.action?pageId=123456789'
+      });
+
+      expect(await serverClient.extractPageId('https://wiki.example.com/x/aBcDeFgHiJkL')).toBe('123456789');
 
       mock.restore();
     });
@@ -1554,7 +1599,7 @@ describe('ConfluenceClient', () => {
 
       mock.onGet(/\/wiki\/x\//).reply(404);
 
-      const tinyUrl = 'https://test.atlassian.net/wiki/x/invalidCode';
+      const tinyUrl = 'https://test.atlassian.net/wiki/x/invalidTinyCode';
       await expect(client.extractPageId(tinyUrl)).rejects.toThrow(/Could not resolve page ID from tiny link/);
 
       mock.restore();
