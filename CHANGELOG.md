@@ -1,3 +1,10 @@
+## [2.30.5](https://github.com/pchuri/confluence-cli/compare/v2.30.4...v2.30.5) (2026-10-28)
+
+
+### Bug Fixes
+
+* only resolve tiny links on the configured origin ([#288](https://github.com/pchuri/confluence-cli/issues/288)) ([22e4780](https://github.com/pchuri/confluence-cli/commit/22e4780c9b27c32e34accbc1ff8d25dbfde609c7))
+
 ## [2.30.4](https://github.com/pchuri/confluence-cli/compare/v2.30.3...v2.30.4) (2026-10-21)
 
 
