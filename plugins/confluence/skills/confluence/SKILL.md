@@ -78,6 +78,8 @@ confluence init \
   --token "ATATT3x..."
 ```
 
+A token passed with `--token` ends up in shell history and is visible in the process list. Prefer the `CONFLUENCE_*` environment variables (no `init` needed) in CI, or `--keychain` on macOS.
+
 **Cloud vs Server/DC:**
 - Atlassian Cloud (`*.atlassian.net`): use `--api-path "/wiki/rest/api"`, auth type `basic` with email + API token
 - Atlassian Cloud (custom domain): if your Cloud instance uses a custom domain (e.g., `wiki.example.org`), set `CONFLUENCE_FORCE_CLOUD=true` or add `"forceCloud": true` to your profile in `~/.config/confluence-cli/config.json` to enable Cloud smart-link rendering (or the legacy `~/.confluence-cli/config.json` if that directory already exists).

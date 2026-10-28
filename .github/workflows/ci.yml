@@ -11,6 +11,9 @@ on:
         description: 'Version to update Homebrew formula (e.g. 1.24.0)'
         required: true
 
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -20,10 +23,10 @@ jobs:
         node-version: [20.x, 22.x, 24.x]
     
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
     
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
@@ -35,7 +38,7 @@ jobs:
   security:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
     - run: npm ci
     - name: Run npm audit (production only)
       run: npm audit --audit-level moderate --omit=dev
@@ -53,13 +56,13 @@ jobs:
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
 
     steps:
-    - uses: actions/checkout@v5
+    - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       with:
         fetch-depth: 0
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup Node.js
-      uses: actions/setup-node@v5
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
       with:
         node-version: '20'
         registry-url: 'https://registry.npmjs.org'
@@ -71,7 +74,7 @@ jobs:
 
     - name: Semantic Release
       id: semantic
-      uses: cycjimmy/semantic-release-action@v5
+      uses: cycjimmy/semantic-release-action@ba330626c4750c19d8299de843f05c7aa5574f62 # v5.0.2
       with:
         extra_plugins: |
           @semantic-release/exec
@@ -92,6 +95,10 @@ jobs:
         id: sha
         timeout-minutes: 22
         run: |
+          if ! [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "Error: VERSION '${VERSION}' is not a valid semver version" >&2
+            exit 1
+          fi
           URL="https://registry.npmjs.org/confluence-cli/-/confluence-cli-${VERSION}.tgz"
           # Metadata can appear before the tarball. Retry the actual download,
           # including propagation-related 404s, for approximately 20 minutes.
@@ -106,16 +113,17 @@ jobs:
           echo "url=${URL}" >> "$GITHUB_OUTPUT"
 
       - name: Checkout homebrew-tap
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
           repository: pchuri/homebrew-tap
           token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
 
       - name: Update formula
+        env:
+          URL: ${{ steps.sha.outputs.url }}
+          SHA256: ${{ steps.sha.outputs.sha256 }}
         run: |
           set -e
-          URL="${{ steps.sha.outputs.url }}"
-          SHA256="${{ steps.sha.outputs.sha256 }}"
           sed -i \
             -e "s|url \"https://registry.npmjs.org/confluence-cli/-/confluence-cli-.*\.tgz\"|url \"${URL}\"|" \
             -e "s|sha256 \".*\"|sha256 \"${SHA256}\"|" \
