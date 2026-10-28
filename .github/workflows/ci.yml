@@ -51,6 +51,7 @@ jobs:
       contents: write
       issues: write
       pull-requests: write
+      id-token: write # npm trusted publishing (OIDC) and provenance
     outputs:
       new_release_published: ${{ steps.semantic.outputs.new_release_published }}
       new_release_version: ${{ steps.semantic.outputs.new_release_version }}
@@ -64,7 +65,7 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
       with:
-        node-version: '20'
+        node-version: '24'
         registry-url: 'https://registry.npmjs.org'
       env:
         NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
@@ -74,7 +75,10 @@ jobs:
 
     - name: Semantic Release
       id: semantic
-      uses: cycjimmy/semantic-release-action@ba330626c4750c19d8299de843f05c7aa5574f62 # v5.0.2
+      # semantic-release 25 (@semantic-release/npm 13) publishes through npm
+      # trusted publishing when it is configured for this package, and falls
+      # back to NPM_TOKEN otherwise.
+      uses: cycjimmy/semantic-release-action@b12c8f6015dc215fe37bc154d4ad456dd3833c90 # v6.0.0
       with:
         extra_plugins: |
           @semantic-release/exec
