@@ -1559,6 +1559,41 @@ describe('ConfluenceClient', () => {
 
       mock.restore();
     });
+
+    test.each([
+      ['a look-alike host', 'https://test.atlassian.net.attacker.example/wiki/x/aBcDeFg'],
+      ['a host that only contains the domain in its path', 'https://attacker.example/test.atlassian.net/wiki/x/aBcDeFg'],
+      ['an http:// downgrade', 'http://test.atlassian.net/wiki/x/aBcDeFg'],
+      ['a protocol-relative URL', '//attacker.example/test.atlassian.net/wiki/x/aBcDeFg'],
+    ])('refuses to resolve a tiny link on %s without sending credentials', async (_label, tinyUrl) => {
+      const mock = new MockAdapter(client.client);
+      mock.onAny().reply(302, null, {
+        location: 'https://test.atlassian.net/wiki/spaces/TEST/pages/123456789/Page+Title'
+      });
+
+      try {
+        await expect(client.extractPageId(tinyUrl)).rejects.toThrow(/Refusing to send credentials/);
+        expect(mock.history.get).toHaveLength(0);
+      } finally {
+        mock.restore();
+      }
+    });
+
+    test('refuses a tiny-link redirect that points to another origin', async () => {
+      const mock = new MockAdapter(client.client);
+      mock.onGet('https://test.atlassian.net/wiki/x/aBcDeFg').reply(302, null, {
+        location: 'https://attacker.example/test.atlassian.net/wiki/x/hOpPeD'
+      });
+
+      try {
+        await expect(client.extractPageId('https://test.atlassian.net/wiki/x/aBcDeFg'))
+          .rejects.toThrow(/Refusing to send credentials/);
+        expect(mock.history.get.map((request) => request.url))
+          .toEqual(['https://test.atlassian.net/wiki/x/aBcDeFg']);
+      } finally {
+        mock.restore();
+      }
+    });
   });
 
   describe('markdownToStorage', () => {
