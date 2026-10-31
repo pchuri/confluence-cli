@@ -1,3 +1,10 @@
+## [2.30.6](https://github.com/pchuri/confluence-cli/compare/v2.30.5...v2.30.6) (2026-10-31)
+
+
+### Bug Fixes
+
+* **deps:** bump follow-redirects to 1.16.2 for GHSA-mrwp-f3q8-3g9p ([#294](https://github.com/pchuri/confluence-cli/issues/294)) ([6a63b93](https://github.com/pchuri/confluence-cli/commit/6a63b93803764b9c9003fb755c63e3e5f137f4fe))
+
 ## [2.30.5](https://github.com/pchuri/confluence-cli/compare/v2.30.4...v2.30.5) (2026-10-28)
 
 
