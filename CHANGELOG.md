@@ -1,3 +1,10 @@
+# [2.31.0](https://github.com/pchuri/confluence-cli/compare/v2.30.6...v2.31.0) (2026-10-31)
+
+
+### Features
+
+* support Server/Data Center tiny links ([#284](https://github.com/pchuri/confluence-cli/issues/284)) ([7ffb799](https://github.com/pchuri/confluence-cli/commit/7ffb7995528779824e469d9ed741c1f9b34c8ed4))
+
 ## [2.30.6](https://github.com/pchuri/confluence-cli/compare/v2.30.5...v2.30.6) (2026-10-31)
 
 
