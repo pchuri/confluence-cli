@@ -128,10 +128,37 @@ describe('Confluence Cloud v2 page API', () => {
       });
     });
 
-    test('non-404 failures are not retried as folders', async () => {
+    test('a 403 on /pages without any other match is reported as the auth error, not a 404', async () => {
       mock.onGet(`${V2}/pages/77`).reply(403);
       await expect(client.readPage('77', 'storage')).rejects.toMatchObject({ response: { status: 403 } });
+    });
+
+    test('5xx and network failures stop the search at once', async () => {
+      mock.onGet(`${V2}/pages/77`).reply(404);
+      mock.onGet(`${V2}/blogposts/77`).reply(500);
+      await expect(client.readPage('77', 'storage')).rejects.toMatchObject({ response: { status: 500 } });
       expect(mock.history.get.filter(r => r.url.includes('/folders/'))).toHaveLength(0);
+    });
+
+    test('a folder is still found when the token lacks the blog post scope', async () => {
+      mock.onGet(`${V2}/pages/55`).reply(404);
+      mock.onGet(`${V2}/blogposts/55`).reply(401);
+      mock.onGet(`${V2}/folders/55`).reply(200, { id: '55', title: 'Dir', spaceId: SPACE.id, parentId: '1' });
+      mock.onGet(`${V2}/folders/55/ancestors`).reply(200, { results: [{ id: '1', type: 'page' }] });
+      await expect(client.getPageInfo('55')).resolves.toMatchObject({ id: '55', type: 'folder', parentId: '1' });
+    });
+
+    test('a blog post is read with only the blog post scope (/pages answers 401)', async () => {
+      mock.onGet(`${V2}/pages/88`).reply(401);
+      mock.onGet(`${V2}/blogposts/88`).reply(200, v2Page({ id: '88', body: { storage: { value: '<p>blog</p>' } } }));
+      await expect(client.readPage('88', 'storage')).resolves.toBe('<p>blog</p>');
+    });
+
+    test('when every collection is denied the auth error wins over a 404', async () => {
+      mock.onGet(`${V2}/pages/55`).reply(404);
+      mock.onGet(`${V2}/blogposts/55`).reply(401);
+      mock.onGet(`${V2}/folders/55`).reply(404);
+      await expect(client.readPage('55', 'storage')).rejects.toMatchObject({ response: { status: 401 } });
     });
 
     test('getPageInfo normalizes space, version, author, parent and ancestors', async () => {
@@ -444,6 +471,38 @@ describe('Confluence Cloud v2 page API', () => {
       customMock.onGet('https://wiki.example.org/wiki/api/v2/pages/1').reply(200, v2Page({ id: '1' }));
       await expect(custom.readPage('1', 'storage')).resolves.toBe('<p>Body</p>');
       customMock.restore();
+    });
+
+    test('deletePage reaches a folder even without delete:page or delete:blogpost', async () => {
+      mock.onDelete(`${V2}/pages/55`).reply(403);
+      mock.onDelete(`${V2}/blogposts/55`).reply(403);
+      mock.onDelete(`${V2}/folders/55`).reply(204);
+      await expect(client.deletePage('55')).resolves.toEqual({ id: '55' });
+
+      mock.onDelete(`${V2}/pages/56`).reply(403);
+      mock.onDelete(`${V2}/blogposts/56`).reply(404);
+      mock.onDelete(`${V2}/folders/56`).reply(404);
+      await expect(client.deletePage('56')).rejects.toMatchObject({ response: { status: 403 } });
+    });
+
+    test('title search links use the response _links.base through the gateway', async () => {
+      const gateway = new ConfluenceClient({
+        domain: 'api.atlassian.com',
+        token: 't',
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
+      });
+      const gwMock = new MockAdapter(gateway.client);
+      const gv2 = 'https://api.atlassian.com/ex/confluence/cloud-id/wiki/api/v2';
+      gwMock.onGet(`${gv2}/spaces`).reply(200, { results: [SPACE] });
+      gwMock.onGet(`${gv2}/pages`).reply(200, {
+        results: [{ id: '2', title: 'Other', spaceId: SPACE.id, _links: { webui: '/spaces/ENG/pages/2' } }],
+        _links: { base: 'https://tenant.atlassian.net/wiki' }
+      });
+      await expect(gateway.findPageByTitleAndSpace('ENG', 'Other')).resolves.toEqual({
+        title: 'Other',
+        url: 'https://tenant.atlassian.net/wiki/spaces/ENG/pages/2'
+      });
+      gwMock.restore();
     });
 
     test('deletePage also falls back to blog posts', async () => {

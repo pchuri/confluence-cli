@@ -500,39 +500,36 @@ Scoped tokens restrict access to specific Atlassian products and permissions, fo
    - **API path:** `/ex/confluence/<your-cloud-id>/wiki/rest/api`
    - **Auth type:** `basic` (email + scoped token)
 
-**Required scopes for scoped API tokens:**
+**Required scopes for scoped API tokens and OAuth 2.0 (3LO):**
 
-When creating a scoped token, select the following [classic scopes](https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/) based on your needs:
+On Confluence Cloud the page and space commands use the v2 REST API (see below) and need **granular** scopes. Everything that still goes through the v1 endpoints (search, attachments, comments, content properties, versions) uses [classic scopes](https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/):
 
-> Page and space commands on Cloud now use the v2 API and need the granular scopes listed in the table after this one; the classic scopes below still cover the endpoints that remain on v1 (attachments, search, comments, properties, versions).
-
-| Scope | Required for |
-|-------|-------------|
-| `read:confluence-content.all` | Reading pages and blog posts (`read`, `info`) |
-| `read:confluence-content.summary` | Reading content summaries and metadata (`read`, `info`) |
-| `read:confluence-space.summary` | Listing spaces (`spaces`) |
-| `search:confluence` | Searching content (`search`) |
-| `readonly:content.attachment:confluence` | Downloading attachments (`attachments --download`) |
-| `write:confluence-content` | Creating and updating pages (`create`, `update`) |
+| Classic scope | Required for |
+|---------------|-------------|
+| `search:confluence` | Searching content (`search`, `find`) |
+| `read:confluence-content.all` | Reading comments, properties, versions and attachment lists |
+| `readonly:content.attachment:confluence` | Downloading attachments (`attachments --download`, `export` attachments) |
+| `write:confluence-content` | Writing comments, properties; purging versions |
 | `write:confluence-file` | Uploading attachments (`attachments --upload`) |
-| `write:confluence-space` | Managing spaces |
 
-For **read-only** usage, select at minimum the classic scopes `read:confluence-content.all`, `read:confluence-content.summary`, `read:confluence-space.summary`, and `search:confluence`. Listing folders with `children --type folders`/`all` additionally requires the granular scope `read:hierarchical-content:confluence`.
+**Confluence Cloud page commands use the v2 REST API.** Atlassian has removed the v1 `/content` and `/space` endpoints on Cloud (they answer `410 Gone`), so on Cloud `read`, `info`, `create`, `create-child`, `update`, `edit`, `move`, `delete`, `children`, `copy-tree`, `export`, `spaces`, `space-lookup` and display-URL lookups call `/wiki/api/v2` (pages, blog posts, folders, spaces). Server/Data Center keeps using the v1 endpoints unchanged. Set `CONFLUENCE_PAGE_API=v1` or `v2` to override the automatic choice (for example, for a Cloud-compatible proxy). `info` reports authors as account IDs because v2 does not return display names. `update` and `move` work on pages only.
 
-**Confluence Cloud page commands use the v2 REST API.** Atlassian has removed the v1 `/content` and `/space` endpoints on Cloud (they answer `410 Gone`), so on Cloud `read`, `info`, `create`, `create-child`, `update`, `edit`, `move`, `delete`, `children`, `spaces`, `space-lookup` and display-URL lookups call `/wiki/api/v2` (pages, blog posts, folders, spaces). Server/Data Center keeps using the v1 endpoints unchanged. Set `CONFLUENCE_PAGE_API=v1` or `v2` to override the automatic choice (for example, for a Cloud-compatible proxy). `info` reports authors as account IDs because v2 does not return display names.
-
-For these commands OAuth 2.0 (3LO) and scoped tokens need the **granular** scopes of the v2 API; the classic scopes in the table above are not sufficient for them (a missing scope can surface as 401 or 403). Unscoped API tokens (basic auth) are not subject to scopes.
+Granular scopes per command (a missing scope can surface as 401 or 403; unscoped API tokens are not subject to scopes). `S` = `read:space:confluence`, `M` = `read:content.metadata:confluence` (ancestors), `H` = `read:hierarchical-content:confluence`:
 
 | Command | Granular scopes |
 |---------|-----------------|
-| `read` (pages) | `read:page:confluence` (+ `read:space:confluence` for markdown link resolution) |
-| `read` (blog posts) | `read:blogpost:confluence` |
-| `info` | `read:page:confluence`, `read:space:confluence`, `read:content.metadata:confluence` (ancestors) |
-| `children`, `copy-tree`, `export` | `read:hierarchical-content:confluence`, `read:page:confluence`, `read:space:confluence` |
-| `spaces`, `space-lookup` | `read:space:confluence` |
-| `create`, `create-child`, `update`, `edit`, `move` | `read:page:confluence`, `read:space:confluence`, `write:page:confluence` |
-| folders (`--type folder`, `children --type folders`) | `read:folder:confluence`, `write:folder:confluence` |
-| `delete` | `delete:page:confluence` (`delete:folder:confluence` for folders) |
+| `read` (storage/html/text) | `read:page:confluence` (blog post: `read:blogpost:confluence`; folder: `read:folder:confluence`) |
+| `read --format markdown` | as above, plus `S` (page links), and `H` if the page uses the children macro |
+| `info` | `read:page:confluence` + `S` + `M` (blog post: `read:blogpost:confluence` + `S`; folder: `read:folder:confluence` + `S` + `M`) |
+| `spaces`, `space-lookup` | `S` |
+| `create` | `S`, `write:page:confluence` (folder: `write:folder:confluence`) |
+| `create-child` | `create` scopes, plus `read:page:confluence` + `M` for the parent lookup |
+| `update`, `edit`, `move` | `read:page:confluence` + `S` + `write:page:confluence` |
+| `delete` | `info` scopes, plus `delete:page:confluence` (`delete:blogpost:confluence` / `delete:folder:confluence` for those types) |
+| `children` (pages) | `H` + `S`; `--recursive --json` adds `M`; `--format tree` adds the `info` scopes |
+| `children --type folders` / `all` | `H` (folders are listed through direct-children); `all` also needs the pages scopes |
+| `copy-tree` | `info` scopes for source and target, `H`, `read:page:confluence`, `write:page:confluence` |
+| `export` | `info` scopes, `H`, `read:page:confluence`, plus the classic attachment scope when downloading attachments |
 
 **On-premise / Data Center:** Use your Confluence username and password for basic authentication.
 
