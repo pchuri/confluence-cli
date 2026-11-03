@@ -325,6 +325,143 @@ describe('Confluence Cloud v2 page API', () => {
     });
   });
 
+  describe('review follow-ups', () => {
+    test('pagination follows a Link rel="next" header when the body has no next link', async () => {
+      const seen = [];
+      mock.onGet(`${V2}/spaces`).reply(config => {
+        seen.push(config.params);
+        if (!config.params.cursor) {
+          return [200, { results: [{ id: '1', key: 'A', name: 'A', type: 'global' }] },
+            { Link: '<https://evil.example/wiki/api/v2/spaces?cursor=c2&limit=1>; rel="next"' }];
+        }
+        return [200, { results: [{ id: '2', key: 'B', name: 'B', type: 'global' }] }];
+      });
+      const spaces = await client.getSpaces(null, { pageSize: 1 });
+      expect(spaces.map(s => s.key)).toEqual(['A', 'B']);
+      // only the cursor is taken from the header; the URL itself is never followed
+      expect(seen).toEqual([{ limit: 1 }, { limit: 1, cursor: 'c2' }]);
+      expect(mock.history.get.every(r => !r.url.includes('evil.example'))).toBe(true);
+    });
+
+    test('children pagination also reads the Link header', async () => {
+      mock.onGet(`${V2}/pages/10/children`).reply(config => (config.params.cursor
+        ? [200, { results: [{ id: '12', title: 'Two', spaceId: SPACE.id }] }]
+        : [200, { results: [{ id: '11', title: 'One', spaceId: SPACE.id }] },
+          { link: '</wiki/api/v2/pages/10/children?cursor=c2>; rel="next", </x>; rel="prev"' }]));
+      const kids = await client.getChildPages(10, 1);
+      expect(kids.map(k => k.id)).toEqual(['11', '12']);
+    });
+
+    test('child links use the listing _links.base through the OAuth gateway', async () => {
+      const gateway = new ConfluenceClient({
+        domain: 'api.atlassian.com',
+        token: 't',
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api',
+        siteUrl: 'https://example.atlassian.net'
+      });
+      const gwMock = new MockAdapter(gateway.client);
+      const gv2 = 'https://api.atlassian.com/ex/confluence/cloud-id/wiki/api/v2';
+      gwMock.onGet(`${gv2}/spaces/${SPACE.id}`).reply(200, { ...SPACE, key: '~abc' });
+      gwMock.onGet(`${gv2}/pages/1/children`).reply(200, {
+        results: [{ id: '2', title: 'Kid', spaceId: SPACE.id }],
+        _links: { base: 'https://tenant.atlassian.net/wiki' }
+      });
+      const [kid] = await gateway.getChildPages(1);
+      expect(kid.url).toBe('https://tenant.atlassian.net/wiki/spaces/~abc/pages/2');
+      gwMock.restore();
+    });
+
+    test('without a response base, child links use the configured siteUrl (never the gateway)', async () => {
+      const gateway = new ConfluenceClient({
+        domain: 'api.atlassian.com',
+        token: 't',
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api',
+        siteUrl: 'https://example.atlassian.net'
+      });
+      const gwMock = new MockAdapter(gateway.client);
+      const gv2 = 'https://api.atlassian.com/ex/confluence/cloud-id/wiki/api/v2';
+      gwMock.onGet(`${gv2}/spaces/${SPACE.id}`).reply(200, SPACE);
+      gwMock.onGet(`${gv2}/pages/1/children`).reply(200, { results: [{ id: '2', title: 'Kid', spaceId: SPACE.id }] });
+      const [kid] = await gateway.getChildPages(1);
+      expect(kid.url).toBe('https://example.atlassian.net/wiki/spaces/ENG/pages/2');
+      gwMock.restore();
+    });
+
+    test('folder info reports its parent and ancestors from /folders/{id}/ancestors', async () => {
+      mock.onGet(`${V2}/pages/55`).reply(404);
+      mock.onGet(`${V2}/blogposts/55`).reply(404);
+      mock.onGet(`${V2}/folders/55`).reply(200, {
+        id: '55', title: 'Dir', spaceId: SPACE.id, parentId: '100', authorId: 'a', createdAt: '2026-01-01T00:00:00Z'
+      });
+      mock.onGet(`${V2}/folders/55/ancestors`).reply(200, { results: [{ id: '1', type: 'folder' }, { id: '100', type: 'page' }] });
+      const info = await client.getPageInfo('55');
+      expect(info).toMatchObject({ type: 'folder', parentId: '100', spaceKey: 'ENG' });
+      expect(info.ancestors.map(a => a.id)).toEqual(['1', '100']);
+    });
+
+    test('folder info falls back to the record parentId when no ancestors are returned', async () => {
+      mock.onGet(`${V2}/pages/55`).reply(404);
+      mock.onGet(`${V2}/blogposts/55`).reply(404);
+      mock.onGet(`${V2}/folders/55`).reply(200, { id: '55', title: 'Dir', spaceId: SPACE.id, parentId: '100' });
+      mock.onGet(`${V2}/folders/55/ancestors`).reply(200, { results: [] });
+      await expect(client.getPageInfo('55')).resolves.toMatchObject({ parentId: '100' });
+    });
+
+    test('ancestor chains longer than 250 continue from the highest ancestor, preserving order', async () => {
+      const ids = n => Array.from({ length: n }, (_, i) => ({ id: String(1000 + i), type: i === 0 ? 'folder' : 'page' }));
+      const upper = ids(250); // 1000..1249, first is a folder
+      const lower = Array.from({ length: 250 }, (_, i) => ({ id: String(2000 + i), type: 'page' }));
+      mock.onGet(`${V2}/pages/123`).reply(200, v2Page());
+      mock.onGet(`${V2}/pages/123/ancestors`).reply(200, { results: lower });
+      mock.onGet(`${V2}/pages/2000/ancestors`).reply(200, { results: upper });
+      mock.onGet(`${V2}/folders/1000/ancestors`).reply(200, { results: [{ id: '1', type: 'page' }] });
+      const info = await client.getPageInfo('123');
+      expect(info.ancestors).toHaveLength(501);
+      expect(info.ancestors[0].id).toBe('1');
+      expect(info.ancestors[1].id).toBe('1000');
+      expect(info.ancestors[500].id).toBe('2249');
+    });
+
+    test('read and info resolve blog post ids via /blogposts/{id}', async () => {
+      mock.onGet(`${V2}/pages/88`).reply(404);
+      mock.onGet(`${V2}/blogposts/88`).reply(() => {
+        return [200, v2Page({ id: '88', title: 'Post', body: { storage: { value: '<p>blog</p>' } },
+          _links: { webui: '/spaces/ENG/blog/2026/01/01/88/Post', base: 'https://test.atlassian.net/wiki' } })];
+      });
+      await expect(client.readPage('88', 'storage')).resolves.toBe('<p>blog</p>');
+      const blogRead = mock.history.get.find(r => r.url.endsWith('/blogposts/88'));
+      expect(blogRead.params).toEqual({ 'body-format': 'storage' });
+      const info = await client.getPageInfo('88');
+      expect(info).toMatchObject({ id: '88', type: 'blogpost', title: 'Post', spaceKey: 'ENG' });
+      expect(info.url).toBe('https://test.atlassian.net/wiki/spaces/ENG/blog/2026/01/01/88/Post');
+    });
+
+    test('a custom domain with forceCloud routes to v2', async () => {
+      const custom = new ConfluenceClient({
+        domain: 'wiki.example.org', token: 't', apiPath: '/wiki/rest/api', forceCloud: true
+      });
+      const customMock = new MockAdapter(custom.client);
+      customMock.onGet('https://wiki.example.org/wiki/api/v2/pages/1').reply(200, v2Page({ id: '1' }));
+      await expect(custom.readPage('1', 'storage')).resolves.toBe('<p>Body</p>');
+      customMock.restore();
+    });
+
+    test('deletePage also falls back to blog posts', async () => {
+      mock.onDelete(`${V2}/pages/88`).reply(404);
+      mock.onDelete(`${V2}/blogposts/88`).reply(204);
+      await expect(client.deletePage('88')).resolves.toEqual({ id: '88' });
+    });
+
+    test('storage written for entity-bearing markdown keeps the characters intact', async () => {
+      mock.onPost(`${V2}/pages`).reply(200, v2Page({ id: '800' }));
+      await client.createPage('E', 'ENG', 'AT&T <b> 「日本語」 & 😀', 'markdown');
+      const value = JSON.parse(mock.history.post[0].data).body.value;
+      expect(value).toContain('AT&amp;T');
+      expect(value).toContain('「日本語」');
+      expect(value).toContain('😀');
+    });
+  });
+
   describe('text encoding through markdown -> storage -> markdown', () => {
     const samples = {
       japanese: '日本語のテキストです。\n\nこれは二つ目の段落です。',

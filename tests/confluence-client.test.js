@@ -695,7 +695,25 @@ describe('ConfluenceClient', () => {
   });
 
   describe('401 error handling', () => {
-    test('provides scoped token hints when using api.atlassian.com', async () => {
+    test('provides classic scope hints for scoped tokens on v1 requests', async () => {
+      const scopedClient = new ConfluenceClient({
+        domain: 'api.atlassian.com',
+        token: 'scoped-token',
+        authType: 'basic',
+        email: 'user@example.com',
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api',
+        pageApi: 'v1'
+      });
+      const mock = new MockAdapter(scopedClient.client);
+      mock.onGet(/\/content\/123/).reply(401);
+
+      await expect(scopedClient.readPage('123')).rejects.toThrow(/scoped API token/);
+      await expect(scopedClient.readPage('123')).rejects.toThrow(/read:confluence-content\.all/);
+      await expect(scopedClient.readPage('123')).rejects.toThrow(/read:hierarchical-content:confluence/);
+      mock.restore();
+    });
+
+    test('provides granular scope hints for scoped tokens on v2 requests', async () => {
       const scopedClient = new ConfluenceClient({
         domain: 'api.atlassian.com',
         token: 'scoped-token',
@@ -705,10 +723,13 @@ describe('ConfluenceClient', () => {
       });
       const mock = new MockAdapter(scopedClient.client);
       mock.onGet(/\/pages\/123/).reply(401);
+      mock.onGet(/\/pages\/124/).reply(403);
 
       await expect(scopedClient.readPage('123')).rejects.toThrow(/scoped API token/);
-      await expect(scopedClient.readPage('123')).rejects.toThrow(/read:confluence-content\.all/);
-      await expect(scopedClient.readPage('123')).rejects.toThrow(/read:hierarchical-content:confluence/);
+      await expect(scopedClient.readPage('123')).rejects.toThrow(/read:page:confluence/);
+      await expect(scopedClient.readPage('123')).rejects.toThrow(/read:content\.metadata:confluence/);
+      await expect(scopedClient.readPage('123')).rejects.not.toThrow(/read:confluence-content\.all/);
+      await expect(scopedClient.readPage('124')).rejects.toThrow(/403[\s\S]*granular scope/);
       mock.restore();
     });
 

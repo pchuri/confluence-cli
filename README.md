@@ -504,6 +504,8 @@ Scoped tokens restrict access to specific Atlassian products and permissions, fo
 
 When creating a scoped token, select the following [classic scopes](https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/) based on your needs:
 
+> Page and space commands on Cloud now use the v2 API and need the granular scopes listed in the table after this one; the classic scopes below still cover the endpoints that remain on v1 (attachments, search, comments, properties, versions).
+
 | Scope | Required for |
 |-------|-------------|
 | `read:confluence-content.all` | Reading pages and blog posts (`read`, `info`) |
@@ -517,7 +519,20 @@ When creating a scoped token, select the following [classic scopes](https://deve
 
 For **read-only** usage, select at minimum the classic scopes `read:confluence-content.all`, `read:confluence-content.summary`, `read:confluence-space.summary`, and `search:confluence`. Listing folders with `children --type folders`/`all` additionally requires the granular scope `read:hierarchical-content:confluence`.
 
-**Confluence Cloud page commands use the v2 REST API.** Atlassian has removed the v1 `/content` and `/space` endpoints on Cloud (they answer `410 Gone`), so on Cloud `read`, `info`, `create`, `create-child`, `update`, `edit`, `move`, `delete`, `children`, `spaces`, `space-lookup` and display-URL lookups call `/wiki/api/v2/pages`, `/folders` and `/spaces`. Server/Data Center keeps using the v1 endpoints unchanged. OAuth 2.0 (3LO) and scoped tokens need the granular scopes for these endpoints: `read:page:confluence` and `read:space:confluence` for reads, `write:page:confluence` for `create`/`update`/`move`/`delete`, `read:folder:confluence`/`write:folder:confluence` when working with folders, and `read:hierarchical-content:confluence` for ancestors and children. Unscoped API tokens (basic auth) are not affected by scopes. Set `CONFLUENCE_PAGE_API=v1` or `v2` to override the automatic choice (for example, for a Cloud-compatible proxy). `info` reports authors as account IDs because v2 does not return display names.
+**Confluence Cloud page commands use the v2 REST API.** Atlassian has removed the v1 `/content` and `/space` endpoints on Cloud (they answer `410 Gone`), so on Cloud `read`, `info`, `create`, `create-child`, `update`, `edit`, `move`, `delete`, `children`, `spaces`, `space-lookup` and display-URL lookups call `/wiki/api/v2` (pages, blog posts, folders, spaces). Server/Data Center keeps using the v1 endpoints unchanged. Set `CONFLUENCE_PAGE_API=v1` or `v2` to override the automatic choice (for example, for a Cloud-compatible proxy). `info` reports authors as account IDs because v2 does not return display names.
+
+For these commands OAuth 2.0 (3LO) and scoped tokens need the **granular** scopes of the v2 API; the classic scopes in the table above are not sufficient for them (a missing scope can surface as 401 or 403). Unscoped API tokens (basic auth) are not subject to scopes.
+
+| Command | Granular scopes |
+|---------|-----------------|
+| `read` (pages) | `read:page:confluence` (+ `read:space:confluence` for markdown link resolution) |
+| `read` (blog posts) | `read:blogpost:confluence` |
+| `info` | `read:page:confluence`, `read:space:confluence`, `read:content.metadata:confluence` (ancestors) |
+| `children`, `copy-tree`, `export` | `read:hierarchical-content:confluence`, `read:page:confluence`, `read:space:confluence` |
+| `spaces`, `space-lookup` | `read:space:confluence` |
+| `create`, `create-child`, `update`, `edit`, `move` | `read:page:confluence`, `read:space:confluence`, `write:page:confluence` |
+| folders (`--type folder`, `children --type folders`) | `read:folder:confluence`, `write:folder:confluence` |
+| `delete` | `delete:page:confluence` (`delete:folder:confluence` for folders) |
 
 **On-premise / Data Center:** Use your Confluence username and password for basic authentication.
 
