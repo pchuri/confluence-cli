@@ -47,7 +47,8 @@ describe('ConfluenceClient', () => {
   beforeEach(() => {
     client = new ConfluenceClient({
       domain: 'test.atlassian.net',
-      token: 'test-token'
+      token: 'test-token',
+      pageApi: 'v1' // these suites mock the v1 content endpoints; v2 has its own suite
     });
   });
 
@@ -703,7 +704,7 @@ describe('ConfluenceClient', () => {
         apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
       });
       const mock = new MockAdapter(scopedClient.client);
-      mock.onGet(/\/content\/123/).reply(401);
+      mock.onGet(/\/pages\/123/).reply(401);
 
       await expect(scopedClient.readPage('123')).rejects.toThrow(/scoped API token/);
       await expect(scopedClient.readPage('123')).rejects.toThrow(/read:confluence-content\.all/);
@@ -728,7 +729,7 @@ describe('ConfluenceClient', () => {
         email: 'user@example.com'
       });
       const mock = new MockAdapter(basicClient.client);
-      mock.onGet(/\/content\/123/).reply(401);
+      mock.onGet(/\/pages\/123/).reply(401);
 
       await expect(basicClient.readPage('123')).rejects.toThrow(/verify your email and API token/);
       mock.restore();
@@ -831,7 +832,8 @@ describe('ConfluenceClient', () => {
         domain: 'api.atlassian.com',
         email: 'user@example.com',
         token: 'scoped-token',
-        apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api',
+        pageApi: 'v1'
       });
       const mock = new MockAdapter(scopedClient.client);
       mock.onGet('/content/123').reply(200, {
@@ -1526,7 +1528,7 @@ describe('ConfluenceClient', () => {
       const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       const encodedCredentials = Buffer.from('config-user@example.com:config-password').toString('base64');
 
-      mock.onGet('/content').reply(401, { error: 'Unauthorized' });
+      mock.onGet(/\/spaces/).reply(401, { error: 'Unauthorized' });
 
       try {
         await expect(basicClient.extractPageId('https://test.atlassian.net/display/TEST/Private+Page'))

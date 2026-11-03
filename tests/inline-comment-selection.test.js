@@ -16,7 +16,7 @@ describe('Inline comment selection matches visible storage text', () => {
 
   afterEach(() => mock.restore());
 
-  const page = (storage) => mock.onGet('/content/123').reply(200, {
+  const page = (storage) => mock.onGet(/\/api\/v2\/pages\/123$/).reply(200, {
     body: { storage: { value: storage } }
   });
 
