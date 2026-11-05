@@ -4,8 +4,10 @@ const ConfluenceClient = require('../lib/confluence-client');
 const V2 = 'https://test.atlassian.net/wiki/api/v2';
 const SPACE = { id: '9001', key: 'ENG', name: 'Engineering', type: 'global' };
 
+// Most tests exercise the v2 code paths directly; the auto mode (v1 first,
+// v2 after a 410) has its own describe block.
 function cloudClient(extra = {}) {
-  return new ConfluenceClient({ domain: 'test.atlassian.net', token: 'test-token', apiPath: '/wiki/rest/api', ...extra });
+  return new ConfluenceClient({ domain: 'test.atlassian.net', token: 'test-token', apiPath: '/wiki/rest/api', pageApi: 'v2', ...extra });
 }
 
 function mockSpaces(mock) {
@@ -45,9 +47,15 @@ describe('Confluence Cloud v2 page API', () => {
   afterEach(() => mock.restore());
 
   describe('API selection', () => {
-    test('Cloud uses v2, Server/Data Center keeps v1', () => {
-      expect(client.usesV2PageApi()).toBe(true);
+    test('auto mode starts on v1 everywhere; pageApi v2 forces v2', () => {
+      expect(cloudClient({ pageApi: undefined }).usesV2PageApi()).toBe(false);
       expect(new ConfluenceClient({ domain: 'wiki.example.com', token: 't' }).usesV2PageApi()).toBe(false);
+      expect(client.usesV2PageApi()).toBe(true);
+    });
+
+    test('an unknown pageApi value is rejected; a blank one means auto', () => {
+      expect(() => cloudClient({ pageApi: 'v3' })).toThrow(/Invalid page API "v3"/);
+      expect(cloudClient({ pageApi: ' ' }).pageApi).toBe('auto');
     });
 
     test('OAuth gateway (api.atlassian.com) builds v2 URLs under /ex/confluence', () => {
@@ -56,7 +64,6 @@ describe('Confluence Cloud v2 page API', () => {
         token: 't',
         apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
       });
-      expect(scoped.usesV2PageApi()).toBe(true);
       expect(scoped.v2BaseUrl()).toBe('https://api.atlassian.com/ex/confluence/cloud-id/wiki/api/v2');
     });
 
@@ -65,7 +72,7 @@ describe('Confluence Cloud v2 page API', () => {
       expect(new ConfluenceClient({ domain: 'wiki.example.com', token: 't', pageApi: 'v2' }).usesV2PageApi()).toBe(true);
       process.env.CONFLUENCE_PAGE_API = 'v1';
       try {
-        expect(cloudClient().usesV2PageApi()).toBe(false);
+        expect(cloudClient({ pageApi: undefined }).usesV2PageApi()).toBe(false);
       } finally {
         delete process.env.CONFLUENCE_PAGE_API;
       }
@@ -154,10 +161,26 @@ describe('Confluence Cloud v2 page API', () => {
       await expect(client.readPage('88', 'storage')).resolves.toBe('<p>blog</p>');
     });
 
-    test('when every collection is denied the auth error wins over a 404', async () => {
+    test('a 404 from /pages wins over a later denial, naming what was not checked', async () => {
       mock.onGet(`${V2}/pages/55`).reply(404);
       mock.onGet(`${V2}/blogposts/55`).reply(401);
       mock.onGet(`${V2}/folders/55`).reply(404);
+      const error = await client.readPage('55', 'storage').catch(e => e);
+      expect(error.response.status).toBe(404);
+      expect(error.message).toMatch(/blogposts could not be checked/);
+    });
+
+    test('a denial on /pages itself is reported as the auth error', async () => {
+      mock.onGet(`${V2}/pages/55`).reply(403);
+      mock.onGet(`${V2}/blogposts/55`).reply(404);
+      mock.onGet(`${V2}/folders/55`).reply(404);
+      await expect(client.readPage('55', 'storage')).rejects.toMatchObject({ response: { status: 403 } });
+    });
+
+    test('when every collection is denied the auth error is reported', async () => {
+      mock.onGet(`${V2}/pages/55`).reply(401);
+      mock.onGet(`${V2}/blogposts/55`).reply(401);
+      mock.onGet(`${V2}/folders/55`).reply(403);
       await expect(client.readPage('55', 'storage')).rejects.toMatchObject({ response: { status: 401 } });
     });
 
@@ -384,7 +407,8 @@ describe('Confluence Cloud v2 page API', () => {
         domain: 'api.atlassian.com',
         token: 't',
         apiPath: '/ex/confluence/cloud-id/wiki/rest/api',
-        siteUrl: 'https://example.atlassian.net'
+        siteUrl: 'https://example.atlassian.net',
+        pageApi: 'v2'
       });
       const gwMock = new MockAdapter(gateway.client);
       const gv2 = 'https://api.atlassian.com/ex/confluence/cloud-id/wiki/api/v2';
@@ -403,7 +427,8 @@ describe('Confluence Cloud v2 page API', () => {
         domain: 'api.atlassian.com',
         token: 't',
         apiPath: '/ex/confluence/cloud-id/wiki/rest/api',
-        siteUrl: 'https://example.atlassian.net'
+        siteUrl: 'https://example.atlassian.net',
+        pageApi: 'v2'
       });
       const gwMock = new MockAdapter(gateway.client);
       const gv2 = 'https://api.atlassian.com/ex/confluence/cloud-id/wiki/api/v2';
@@ -463,11 +488,12 @@ describe('Confluence Cloud v2 page API', () => {
       expect(info.url).toBe('https://test.atlassian.net/wiki/spaces/ENG/blog/2026/01/01/88/Post');
     });
 
-    test('a custom domain with forceCloud routes to v2', async () => {
+    test('a custom domain with forceCloud falls back to v2 when v1 is gone', async () => {
       const custom = new ConfluenceClient({
         domain: 'wiki.example.org', token: 't', apiPath: '/wiki/rest/api', forceCloud: true
       });
       const customMock = new MockAdapter(custom.client);
+      customMock.onGet('/content/1').reply(410);
       customMock.onGet('https://wiki.example.org/wiki/api/v2/pages/1').reply(200, v2Page({ id: '1' }));
       await expect(custom.readPage('1', 'storage')).resolves.toBe('<p>Body</p>');
       customMock.restore();
@@ -489,7 +515,8 @@ describe('Confluence Cloud v2 page API', () => {
       const gateway = new ConfluenceClient({
         domain: 'api.atlassian.com',
         token: 't',
-        apiPath: '/ex/confluence/cloud-id/wiki/rest/api'
+        apiPath: '/ex/confluence/cloud-id/wiki/rest/api',
+        pageApi: 'v2'
       });
       const gwMock = new MockAdapter(gateway.client);
       const gv2 = 'https://api.atlassian.com/ex/confluence/cloud-id/wiki/api/v2';
@@ -569,6 +596,165 @@ describe('Confluence Cloud v2 page API', () => {
       });
       const sent = mock.history.post[0].data;
       expect(JSON.parse(sent).body.value).toContain(family);
+    });
+  });
+
+  describe('auto mode: v1 first, v2 after a 410', () => {
+    let auto;
+    let autoMock;
+    let savedEnv;
+    const gone = [410, { message: 'GoneException: This deprecated endpoint has been removed.' }];
+
+    beforeEach(() => {
+      savedEnv = process.env.CONFLUENCE_PAGE_API;
+      delete process.env.CONFLUENCE_PAGE_API;
+      auto = cloudClient({ pageApi: undefined });
+      autoMock = new MockAdapter(auto.client, { onNoMatch: 'throwException' });
+      mockSpaces(autoMock);
+    });
+
+    afterEach(() => {
+      autoMock.restore();
+      if (savedEnv === undefined) delete process.env.CONFLUENCE_PAGE_API;
+      else process.env.CONFLUENCE_PAGE_API = savedEnv;
+    });
+
+    test('a Cloud site that still serves v1 never touches v2', async () => {
+      autoMock.onGet('/content/123').reply(200, { body: { storage: { value: '<p>v1</p>' } } });
+      await expect(auto.readPage('123', 'storage')).resolves.toBe('<p>v1</p>');
+      expect(autoMock.history.get.map(r => r.url)).toEqual(['/content/123']);
+      expect(auto.usesV2PageApi()).toBe(false);
+    });
+
+    test('a 410 switches to v2 and later calls go straight to v2', async () => {
+      autoMock.onGet('/content/123').reply(...gone);
+      autoMock.onGet(`${V2}/pages/123`).reply(200, v2Page());
+      autoMock.onGet(`${V2}/pages/124`).reply(200, v2Page({ id: '124', body: { storage: { value: '<p>two</p>' } } }));
+      await expect(auto.readPage('123', 'storage')).resolves.toBe('<p>Body</p>');
+      await expect(auto.readPage('124', 'storage')).resolves.toBe('<p>two</p>');
+      expect(autoMock.history.get.filter(r => r.url.startsWith('/content'))).toHaveLength(1);
+    });
+
+    test('a create answered 410 is sent once through v2', async () => {
+      autoMock.onPost('/content').reply(...gone);
+      autoMock.onPost(`${V2}/pages`).reply(200, v2Page({ id: '900', title: 'New' }));
+      await expect(auto.createPage('New', 'ENG', '<p>x</p>')).resolves.toMatchObject({ id: '900' });
+      expect(autoMock.history.post.map(r => r.url)).toEqual(['/content', `${V2}/pages`]);
+    });
+
+    test('other v1 errors are not retried on v2', async () => {
+      autoMock.onGet('/content/123').reply(404);
+      await expect(auto.readPage('123', 'storage')).rejects.toMatchObject({ response: { status: 404 } });
+      expect(autoMock.history.get).toHaveLength(1);
+      expect(auto.usesV2PageApi()).toBe(false);
+    });
+
+    test('Server/Data Center never switches on a 410', async () => {
+      const dc = new ConfluenceClient({ domain: 'wiki.example.com', token: 't' });
+      const dcMock = new MockAdapter(dc.client, { onNoMatch: 'throwException' });
+      dcMock.onGet('/content/123').reply(410);
+      await expect(dc.readPage('123', 'storage')).rejects.toMatchObject({ response: { status: 410 } });
+      expect(dcMock.history.get).toHaveLength(1);
+      dcMock.restore();
+    });
+
+    test('an update whose v1 GET works but PUT answers 410 is written once through v2', async () => {
+      autoMock.onGet('/content/123').reply(200, {
+        id: '123', title: 'Page', space: { key: 'ENG' }, version: { number: 3 },
+        body: { storage: { value: '<p>old</p>' } }
+      });
+      autoMock.onPut('/content/123').reply(...gone);
+      autoMock.onPut(`${V2}/pages/123`).reply(200, v2Page({ version: { number: 4 } }));
+      await expect(auto.updatePage('123', null, '<p>new</p>')).resolves.toMatchObject({ id: '123' });
+      expect(autoMock.history.put.map(r => r.url)).toEqual(['/content/123', `${V2}/pages/123`]);
+      expect(JSON.parse(autoMock.history.put[1].data)).toMatchObject({ version: { number: 4 }, body: { value: '<p>new</p>' } });
+    });
+
+    test('a 410 inside display-URL resolution still falls back', async () => {
+      autoMock.onGet('/content').reply(...gone);
+      autoMock.onGet(`${V2}/pages`).reply(200, { results: [v2Page({ id: '456', title: 'Other' })] });
+      await expect(auto.extractPageId('https://test.atlassian.net/wiki/display/ENG/Other')).resolves.toBe('456');
+    });
+
+    test('withVersions sends no extra requests on v1', async () => {
+      autoMock.onGet('/content/1/child/page').reply(200, {
+        results: [{ id: '2', title: 'Kid', version: { number: 5 }, space: { key: 'ENG' } }], _links: {}
+      });
+      autoMock.onGet('/content/2/child/page').reply(200, { results: [], _links: {} });
+      const pages = await auto.getAllDescendantPages('1', 5, { withVersions: true });
+      expect(pages[0].version).toBe(5);
+      expect(autoMock.history.get.map(r => r.url).sort()).toEqual(['/content/1/child/page', '/content/2/child/page']);
+    });
+
+    test('spaces fall back as well', async () => {
+      autoMock.onGet('/space').reply(...gone);
+      await expect(auto.getSpaces()).resolves.toEqual([]);
+      expect(autoMock.history.get.map(r => r.url)).toEqual(['/space', `${V2}/spaces`]);
+    });
+  });
+
+  describe('v2 request details', () => {
+    test('child listings ask for page-tree order', async () => {
+      mock.onGet(`${V2}/pages/1/children`).reply(config => {
+        expect(config.params).toMatchObject({ sort: 'child-position' });
+        return [200, { results: [] }];
+      });
+      await expect(client.getChildPages('1')).resolves.toEqual([]);
+    });
+
+    test('title lookups only match current pages', async () => {
+      mock.onGet(`${V2}/pages`).reply(200, { results: [] });
+      await expect(client.findPageByTitleAndSpace('ENG', 'Other')).resolves.toBeNull();
+      // Asserted on the history: findPageByTitleAndSpace swallows errors thrown inside a reply.
+      const lookup = mock.history.get.find(r => r.url === `${V2}/pages`);
+      expect(lookup.params).toMatchObject({ title: 'Other', status: 'current' });
+    });
+
+    test('a page created without a parent goes to the space root, as on v1', async () => {
+      mock.onPost(`${V2}/pages`).reply(200, v2Page({ id: '901' }));
+      await client.createPage('Top', 'ENG', '<p>x</p>');
+      expect(mock.history.post[0].params).toEqual({ 'root-level': true });
+      mock.onPost(`${V2}/pages`).reply(200, v2Page({ id: '902' }));
+      await client.createChildPage('Kid', 'ENG', '100', '<p>x</p>');
+      expect(mock.history.post[1].params).toBeUndefined();
+      expect(JSON.parse(mock.history.post[1].data).parentId).toBe('100');
+    });
+
+    test('a repeated cursor ends the listing', async () => {
+      mock.onGet(`${V2}/pages/1/children`).reply(200, {
+        results: [v2Page({ id: '2', parentId: '1' })],
+        _links: { next: '/wiki/api/v2/pages/1/children?cursor=same' }
+      });
+      const kids = await client.getChildPages('1');
+      expect(kids.length).toBeGreaterThan(0);
+      expect(mock.history.get.filter(r => r.url.endsWith('/children'))).toHaveLength(2);
+    });
+
+    test('getSpaces rejects an offset it cannot honour', async () => {
+      await expect(client.getSpaces(10, { start: 5 })).rejects.toThrow(/options.start is not supported/);
+    });
+
+    test('creating a blog post is refused instead of silently creating a page', async () => {
+      await expect(client.createPage('B', 'ENG', '<p>x</p>', 'storage', 'blogpost'))
+        .rejects.toThrow(/type "blogpost" is not supported/);
+      expect(mock.history.post).toHaveLength(0);
+    });
+
+    test('descendants get their version filled in when asked (copy-tree plan)', async () => {
+      mock.onGet(`${V2}/pages/1/children`).reply(200, { results: [{ id: '2', title: 'Kid', spaceId: SPACE.id }] });
+      mock.onGet(`${V2}/pages/2/children`).reply(200, { results: [] });
+      mock.onGet(`${V2}/pages/2`).reply(200, v2Page({ id: '2', title: 'Kid', version: { number: 7 } }));
+      const plain = await client.getAllDescendantPages('1', 5);
+      expect(plain[0].version).toBeNull();
+      const withVersions = await client.getAllDescendantPages('1', 5, { withVersions: true });
+      expect(withVersions[0].version).toBe(7);
+    });
+
+    test('inline comments read the page body through v2', async () => {
+      mock.onGet(`${V2}/pages/123`).reply(200, v2Page({ body: { storage: { value: '<p>Release notes</p>' } } }));
+      mock.onPost(/\/api\/v2\/inline-comments$/).reply(200, { id: '1', pageId: '123' });
+      await expect(client.createInlineCommentV2('123', '<p>review</p>', { textSelection: 'Release notes' }))
+        .resolves.toHaveProperty('id', '1');
     });
   });
 });

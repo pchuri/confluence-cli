@@ -373,7 +373,7 @@ The stats file (`stats.json`) follows the same resolution and lives alongside `c
 
 **Custom domains on Confluence Cloud:**
 
-If your Confluence Cloud instance uses a custom domain (e.g., `wiki.example.org` instead of `*.atlassian.net`), the CLI may identify it as a Server/Data Center instance and use standard links instead of Cloud smart links. Set `CONFLUENCE_FORCE_CLOUD=true` to override the automatic detection:
+If your Confluence Cloud instance uses a custom domain (e.g., `wiki.example.org` instead of `*.atlassian.net`), the CLI may identify it as a Server/Data Center instance and use standard links instead of Cloud smart links, and it will not switch to the v2 page API when the v1 endpoints answer `410 Gone`. Set `CONFLUENCE_FORCE_CLOUD=true` to override the automatic detection:
 
 ```bash
 export CONFLUENCE_FORCE_CLOUD=true
@@ -500,21 +500,26 @@ Scoped tokens restrict access to specific Atlassian products and permissions, fo
    - **API path:** `/ex/confluence/<your-cloud-id>/wiki/rest/api`
    - **Auth type:** `basic` (email + scoped token)
 
-**Required scopes for scoped API tokens and OAuth 2.0 (3LO):**
+**Required scopes for scoped API tokens:**
 
-On Confluence Cloud the page and space commands use the v2 REST API (see below) and need **granular** scopes. Everything that still goes through the v1 endpoints (search, attachments, comments, content properties, versions) uses [classic scopes](https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/):
+When creating a scoped token, select the following [classic scopes](https://developer.atlassian.com/cloud/confluence/scopes-for-oauth-2-3LO-and-forge-apps/) based on your needs:
 
-| Classic scope | Required for |
-|---------------|-------------|
-| `search:confluence` | Searching content (`search`, `find`) |
-| `read:confluence-content.all` | Reading comments, properties, versions and attachment lists |
-| `readonly:content.attachment:confluence` | Downloading attachments (`attachments --download`, `export` attachments) |
-| `write:confluence-content` | Writing comments, properties; purging versions |
+| Scope | Required for |
+|-------|-------------|
+| `read:confluence-content.all` | Reading pages and blog posts (`read`, `info`) |
+| `read:confluence-content.summary` | Reading content summaries and metadata (`read`, `info`) |
+| `read:confluence-space.summary` | Listing spaces (`spaces`) |
+| `search:confluence` | Searching content (`search`) |
+| `readonly:content.attachment:confluence` | Downloading attachments (`attachments --download`) |
+| `write:confluence-content` | Creating and updating pages (`create`, `update`) |
 | `write:confluence-file` | Uploading attachments (`attachments --upload`) |
+| `write:confluence-space` | Managing spaces |
 
-**Confluence Cloud page commands use the v2 REST API.** Atlassian has removed the v1 `/content` and `/space` endpoints on Cloud (they answer `410 Gone`), so on Cloud `read`, `info`, `create`, `create-child`, `update`, `edit`, `move`, `delete`, `children`, `copy-tree`, `export`, `spaces`, `space-lookup` and display-URL lookups call `/wiki/api/v2` (pages, blog posts, folders, spaces). Server/Data Center keeps using the v1 endpoints unchanged. Set `CONFLUENCE_PAGE_API=v1` or `v2` to override the automatic choice (for example, for a Cloud-compatible proxy). `info` reports authors as account IDs because v2 does not return display names. `update` and `move` work on pages only.
+For **read-only** usage, select at minimum the classic scopes `read:confluence-content.all`, `read:confluence-content.summary`, `read:confluence-space.summary`, and `search:confluence`. Listing folders with `children --type folders`/`all` additionally requires the granular scope `read:hierarchical-content:confluence`.
 
-Granular scopes per command (a missing scope can surface as 401 or 403; unscoped API tokens are not subject to scopes). `S` = `read:space:confluence`, `M` = `read:content.metadata:confluence` (ancestors), `H` = `read:hierarchical-content:confluence` (needed only for direct-children listings of folders):
+**Confluence Cloud sites where the v1 page API is gone.** Atlassian is removing the v1 `/content` and `/space` endpoints on Cloud; a removed endpoint answers `410 Gone`. The CLI keeps using v1 until one answers 410 and then switches to `/wiki/api/v2` (pages, blog posts, folders, spaces) for the rest of the command, so a site that still serves v1 sees no change. On v2, `read`, `info`, `create`, `create-child`, `update`, `edit`, `move`, `delete`, `children`, `copy-tree`, `export`, `spaces`, `space-lookup` and display-URL lookups use v2. Search stays on v1 and keeps the classic scopes above. Attachments, comments, content properties and versions are not ported yet and still call v1, so they fail where Atlassian has removed those endpoints too; there, run `export` with `--skip-attachments`. Server/Data Center never switches. Set `CONFLUENCE_PAGE_API=v1` or `v2` (or the `pageApi` client option) to skip the detection, for example to use v2 from the first request. Differences on v2: `info` reports authors as account IDs and ancestors without titles, child listings carry no version (`children --json` reports `version: null`) and their URLs are built from the space key and page id, and `update`/`move` work on pages only.
+
+The v2 endpoints do not accept the classic content scopes; they need **granular** scopes. Granular scopes per command on the v2 API (a missing scope can surface as 401 or 403; unscoped API tokens are not subject to scopes). `S` = `read:space:confluence`, `M` = `read:content.metadata:confluence` (ancestors), `H` = `read:hierarchical-content:confluence` (needed only for direct-children listings of folders):
 
 | Command | Granular scopes |
 |---------|-----------------|

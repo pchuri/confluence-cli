@@ -38,7 +38,7 @@ describe('child page pagination', () => {
   };
 
   beforeEach(() => {
-    client = new ConfluenceClient({ domain: 'test.atlassian.net', token: 'test-token', pageApi: 'v1' });
+    client = new ConfluenceClient({ domain: 'test.atlassian.net', token: 'test-token' });
     mock = new MockAdapter(client.client);
   });
 
