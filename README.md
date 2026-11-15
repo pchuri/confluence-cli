@@ -373,7 +373,7 @@ The stats file (`stats.json`) follows the same resolution and lives alongside `c
 
 **Custom domains on Confluence Cloud:**
 
-If your Confluence Cloud instance uses a custom domain (e.g., `wiki.example.org` instead of `*.atlassian.net`), the CLI may identify it as a Server/Data Center instance and use standard links instead of Cloud smart links. Set `CONFLUENCE_FORCE_CLOUD=true` to override the automatic detection:
+If your Confluence Cloud instance uses a custom domain (e.g., `wiki.example.org` instead of `*.atlassian.net`), the CLI may identify it as a Server/Data Center instance and use standard links instead of Cloud smart links, and it will not switch to the v2 page API when the v1 endpoints answer `410 Gone`. Set `CONFLUENCE_FORCE_CLOUD=true` to override the automatic detection:
 
 ```bash
 export CONFLUENCE_FORCE_CLOUD=true
@@ -516,6 +516,25 @@ When creating a scoped token, select the following [classic scopes](https://deve
 | `write:confluence-space` | Managing spaces |
 
 For **read-only** usage, select at minimum the classic scopes `read:confluence-content.all`, `read:confluence-content.summary`, `read:confluence-space.summary`, and `search:confluence`. Listing folders with `children --type folders`/`all` additionally requires the granular scope `read:hierarchical-content:confluence`.
+
+**Confluence Cloud sites where the v1 page API is gone.** Atlassian is removing the v1 `/content` and `/space` endpoints on Cloud; a removed endpoint answers `410 Gone`. The CLI keeps using v1 until one answers 410 and then switches to `/wiki/api/v2` (pages, blog posts, folders, spaces) for the rest of the command, so a site that still serves v1 sees no change. On v2, `read`, `info`, `create`, `create-child`, `update`, `edit`, `move`, `delete`, `children`, `copy-tree`, `export`, `spaces`, `space-lookup` and display-URL lookups use v2. Search stays on v1 and keeps the classic scopes above. Attachments, comments, content properties and versions are not ported yet and still call v1, so they fail where Atlassian has removed those endpoints too; there, run `export` with `--skip-attachments`. Server/Data Center never switches. Set `CONFLUENCE_PAGE_API=v1` or `v2` (or the `pageApi` client option) to skip the detection, for example to use v2 from the first request. Differences on v2: `info` reports authors as account IDs and ancestors without titles, child listings carry no version (`children --json` reports `version: null`) and their URLs are built from the space key and page id, and `update`/`move` work on pages only.
+
+The v2 endpoints do not accept the classic content scopes; they need **granular** scopes. Granular scopes per command on the v2 API (a missing scope can surface as 401 or 403; unscoped API tokens are not subject to scopes). `S` = `read:space:confluence`, `M` = `read:content.metadata:confluence` (ancestors), `H` = `read:hierarchical-content:confluence` (needed only for direct-children listings of folders):
+
+| Command | Granular scopes |
+|---------|-----------------|
+| `read` (storage/html/text) | `read:page:confluence` (blog post: `read:blogpost:confluence`; folders have no body and always report "no readable body") |
+| `read --format markdown` | as above, plus `S` (page links); a page using the children macro also needs the child listing scopes (`read:page:confluence` + `S`) |
+| `info` | `read:page:confluence` + `S` + `M` (blog post: `read:blogpost:confluence` + `S`; folder: `read:folder:confluence` + `S` + `M`) |
+| `spaces`, `space-lookup` | `S` |
+| `create` | `S`, `write:page:confluence` (folder: `write:folder:confluence`) |
+| `create-child` | `create` scopes, plus the `info` scopes of the parent's type (`read:page:confluence` + `S` + `M` for a page parent, `read:folder:confluence` + `S` + `M` for a folder) |
+| `update`, `edit`, `move` | `read:page:confluence` + `S` + `write:page:confluence` |
+| `delete` | `info` scopes, plus `delete:page:confluence` (`delete:blogpost:confluence` / `delete:folder:confluence` for those types) |
+| `children` (pages) | `read:page:confluence` + `S`; `--recursive --json` adds `M`; `--format tree` adds the `info` scopes |
+| `children --type folders` / `all` | `H` (folders are listed through direct-children); `all` also needs the pages scopes |
+| `copy-tree` | `info` scopes for source and target, `S`, `write:page:confluence` (child listing needs only `read:page:confluence` + `S`) |
+| `export` | `info` scopes, child listing scopes (`read:page:confluence` + `S`), plus the classic attachment scope when downloading attachments |
 
 **On-premise / Data Center:** Use your Confluence username and password for basic authentication.
 

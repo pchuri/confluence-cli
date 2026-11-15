@@ -853,7 +853,7 @@ program
       const canonicalTargetId = String(targetInfo.id);
       const versionNumber = (value) => Number(value && typeof value === 'object' ? value.number : value);
       const rootTitle = newTitle || `${info.title}${copySuffix}`;
-      const descendants = await client.getAllDescendantPages(canonicalSourceId, maxDepth);
+      const descendants = await client.getAllDescendantPages(canonicalSourceId, maxDepth, { withVersions: jsonMode });
       const includedPageIds = new Set([canonicalSourceId]);
       const filtered = descendants.filter((page) => {
         if (!includedPageIds.has(String(page.parentId)) || client.shouldExcludePage(page.title, excludePatterns)) {
