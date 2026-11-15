@@ -1,6 +1,7 @@
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { spawnSync } = require('child_process');
 const {
   CONFIG_ENV_KEYS,
   ConfluencePiError,
@@ -45,6 +46,47 @@ test('executes package-local argv and parses complete JSON', async () => {
     cleanup(projectRoot);
   }
 });
+
+const bunAvailable = spawnSync('bun', ['--version'], { timeout: 5000 }).status === 0;
+
+(bunAvailable ? test : test.skip)('executes the CLI instead of restarting a compiled Bun host', async () => {
+  const packageRoot = fakePackage(`
+    process.stdout.write(JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() }));
+  `);
+  const hostSource = path.join(packageRoot, 'host.js');
+  const hostBinary = path.join(packageRoot, process.platform === 'win32' ? 'host.exe' : 'host');
+  fs.writeFileSync(hostSource, `
+    if (process.argv.length > 2) throw new Error('Compiled host restarted instead of running the CLI');
+    const { runCommand } = require(${JSON.stringify(require.resolve('../lib/pi/command-runner'))});
+    runCommand({
+      packageRoot: ${JSON.stringify(packageRoot)},
+      projectRoot: ${JSON.stringify(packageRoot)},
+      args: ['--json', 'info', '123; echo unsafe'],
+      env: { PATH: '' },
+      timeoutMs: 3000,
+      maxOutputBytes: 4096,
+      expectJson: true,
+      mutation: false,
+    }).then(result => process.stdout.write(JSON.stringify(result.json)))
+      .catch(error => { console.error(error.code); process.exitCode = 1; });
+  `);
+  try {
+    const build = spawnSync('bun', ['build', '--compile', hostSource, '--outfile', hostBinary], {
+      encoding: 'utf8', timeout: 20000,
+    });
+    expect(build.status).toBe(0);
+    const env = { ...process.env };
+    delete env.BUN_BE_BUN;
+    const result = spawnSync(hostBinary, [], { env, encoding: 'utf8', timeout: 5000 });
+    expect(result.status).toBe(0);
+    expect(JSON.parse(result.stdout)).toEqual({
+      argv: ['--json', 'info', '123; echo unsafe'],
+      cwd: fs.realpathSync(packageRoot),
+    });
+  } finally {
+    cleanup(packageRoot);
+  }
+}, 30000);
 
 test('rejects malformed JSON with INVALID_JSON', async () => {
   const packageRoot = fakePackage('process.stdout.write(\'{not json\');');
