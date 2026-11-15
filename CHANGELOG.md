@@ -1,3 +1,10 @@
+## [2.31.1](https://github.com/pchuri/confluence-cli/compare/v2.31.0...v2.31.1) (2026-11-15)
+
+
+### Bug Fixes
+
+* use the v2 REST API for page and space operations on Confluence Cloud ([#298](https://github.com/pchuri/confluence-cli/issues/298)) ([470e0f2](https://github.com/pchuri/confluence-cli/commit/470e0f29bfef4887685ddfab49b4c752fdcfc03e))
+
 # [2.31.0](https://github.com/pchuri/confluence-cli/compare/v2.30.6...v2.31.0) (2026-10-31)
 
 
