@@ -61,7 +61,7 @@ npm ci
 pi install /absolute/path/to/confluence-cli
 ```
 
-The extension supports Node.js and Bun, including compiled Bun executables. CLI subprocesses select the correct runtime automatically.
+Compiled Bun hosts run CLI subprocesses automatically without additional configuration.
 
 For a Server/Data Center instance at `confluence.example.com`, start Pi from a shell configured like this when protected writes are intended:
 
