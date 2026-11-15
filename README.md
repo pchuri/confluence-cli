@@ -61,7 +61,7 @@ npm ci
 pi install /absolute/path/to/confluence-cli
 ```
 
-The extension supports Node.js, Bun, and compiled Bun hosts such as oh-my-pi. Bun-hosted CLI subprocesses set `BUN_BE_BUN=1` so a compiled executable runs the package-local CLI instead of restarting its embedded application. No global environment export or separate Node launcher is needed.
+The extension supports Node.js and Bun, including compiled Bun executables. CLI subprocesses select the correct runtime automatically.
 
 For a Server/Data Center instance at `confluence.example.com`, start Pi from a shell configured like this when protected writes are intended:
 

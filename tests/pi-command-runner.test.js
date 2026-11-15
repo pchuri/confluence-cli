@@ -49,7 +49,7 @@ test('executes package-local argv and parses complete JSON', async () => {
 
 const bunAvailable = spawnSync('bun', ['--version'], { timeout: 5000 }).status === 0;
 
-(bunAvailable ? test : test.skip)('executes the CLI instead of restarting a compiled Bun host', async () => {
+(bunAvailable ? test.each : test.skip.each)(['plain', 'compiled'])('executes the CLI from a %s Bun host', async (runtime) => {
   const packageRoot = fakePackage(`
     process.stdout.write(JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd() }));
   `);
@@ -71,13 +71,17 @@ const bunAvailable = spawnSync('bun', ['--version'], { timeout: 5000 }).status =
       .catch(error => { console.error(error.code); process.exitCode = 1; });
   `);
   try {
-    const build = spawnSync('bun', ['build', '--compile', hostSource, '--outfile', hostBinary], {
-      encoding: 'utf8', timeout: 20000,
-    });
-    expect(build.status).toBe(0);
+    if (runtime === 'compiled') {
+      const build = spawnSync('bun', ['build', '--compile', hostSource, '--outfile', hostBinary], {
+        encoding: 'utf8', timeout: 20000,
+      });
+      expect(build.status).toBe(0);
+    }
     const env = { ...process.env };
     delete env.BUN_BE_BUN;
-    const result = spawnSync(hostBinary, [], { env, encoding: 'utf8', timeout: 5000 });
+    const executable = runtime === 'compiled' ? hostBinary : 'bun';
+    const args = runtime === 'compiled' ? [] : [hostSource];
+    const result = spawnSync(executable, args, { env, encoding: 'utf8', timeout: 5000 });
     expect(result.status).toBe(0);
     expect(JSON.parse(result.stdout)).toEqual({
       argv: ['--json', 'info', '123; echo unsafe'],
