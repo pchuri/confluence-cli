@@ -40,6 +40,7 @@
     "@types/node": "^20.10.0",
     "axios-mock-adapter": "^2.1.0",
     "eslint": "^10.13.0",
+    "get-east-asian-width": "1.7.0",
     "globals": "^17.13.0",
     "jest": "^30.5.2",
     "jiti": "^2.7.0",
