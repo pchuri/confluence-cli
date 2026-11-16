@@ -1,3 +1,10 @@
+## [2.31.2](https://github.com/pchuri/confluence-cli/compare/v2.31.1...v2.31.2) (2026-11-16)
+
+
+### Bug Fixes
+
+* render emphasis next to CJK text (CJK-friendly amendment) ([#300](https://github.com/pchuri/confluence-cli/issues/300)) ([d7ca4cb](https://github.com/pchuri/confluence-cli/commit/d7ca4cba43480c213b9b09427a41bdc7408bb183))
+
 ## [2.31.1](https://github.com/pchuri/confluence-cli/compare/v2.31.0...v2.31.1) (2026-11-15)
 
 
