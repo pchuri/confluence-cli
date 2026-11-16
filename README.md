@@ -1213,6 +1213,10 @@ echo "# Hello" | confluence convert --input-format markdown --output-format stor
 confluence convert -i page.xml -o page.md --input-format storage --output-format markdown
 ```
 
+## Emphasis in Chinese, Japanese and Korean text
+
+Markdown input follows the [CJK-friendly amendment](https://github.com/tats-u/markdown-cjk-friendly/blob/main/specification.md) to CommonMark's emphasis rules, so `*`, `**` and `~~` work next to CJK characters without spaces: `**「括弧」**の直後`, `これは**私のやりたかったこと。**だから`, `**스크립트(script)**라고` and ``**`npm publish`**를`` become bold, where plain CommonMark leaves the asterisks in place. `_` / `__` still never open or close inside a word. Text without CJK characters next to a delimiter parses as before, except that a variation selector (U+FE00–U+FE0E) right before a delimiter is looked through to the character it modifies, as the amendment specifies.
+
 ## Markdown Marker Conventions
 
 When converting markdown to Confluence storage format (via `confluence convert`, `create`, or `update`), the following paragraph-level markers produce native Confluence macros. Each marker round-trips back to its markdown form when going storage → markdown.
