@@ -1,3 +1,10 @@
+## [2.31.3](https://github.com/pchuri/confluence-cli/compare/v2.31.2...v2.31.3) (2026-11-21)
+
+
+### Bug Fixes
+
+* **deps:** bump glob to 14.0.2 and minimatch to 11.0.1 via overrides ([1ea4a0c](https://github.com/pchuri/confluence-cli/commit/1ea4a0c87a4e839777f9186e9796f0c4f939d33b))
+
 ## [2.31.2](https://github.com/pchuri/confluence-cli/compare/v2.31.1...v2.31.2) (2026-11-16)
 
 
